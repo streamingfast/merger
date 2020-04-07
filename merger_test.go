@@ -17,7 +17,7 @@ package merger
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 	_ "net/http/pprof"
@@ -25,49 +25,76 @@ import (
 	"testing"
 	"time"
 
-	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
-	//pbdeth "github.com/dfuse-io/pbgo/dfuse/codecs/deth"
-	pb "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/bstream"
-	//"github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/derr"
 	"github.com/dfuse-io/dstore"
-	"github.com/golang/protobuf/ptypes"
+	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
+	pb "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func ethBlock(id string, num uint64) *bstream.Block {
-	idBytes, err := hex.DecodeString(id)
-	if err != nil {
-		panic(err)
-	}
+// Hopefully, this block kind value will never be used!
+var TestProtocol = pbbstream.Protocol(0xFFFFFF)
+var testBlockReaderWriter *TestBlockReaderWriter
 
-	dblk := &pbdeth.Block{
-		Ver:    1,
-		Hash:   idBytes,
-		Number: num,
+func init() {
+	testBlockReaderWriter = &TestBlockReaderWriter{
+		blocks: []*bstream.Block{},
 	}
-	dblk.Header = &pbdeth.BlockHeader{
-		Timestamp: ptypes.TimestampNow(),
+	bstream.AddBlockReaderFactory(TestProtocol, bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
+		return testBlockReaderWriter, nil
+	}))
+	bstream.AddBlockWriterFactory(TestProtocol, bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
+		return testBlockReaderWriter, nil
+	}))
+}
+
+type TestBlockReaderWriter struct {
+	blocks []*bstream.Block
+}
+
+func (rw *TestBlockReaderWriter) Write(block *bstream.Block) error {
+	fmt.Println("Writing block:", block.Num(), block.Id)
+	rw.blocks = append(rw.blocks, block)
+	return nil
+}
+
+func (rw *TestBlockReaderWriter) Read() (block *bstream.Block, err error) {
+	if len(rw.blocks) == 0 {
+		return nil, io.EOF
 	}
-	bs, _ := deth.BlockFromProto(dblk)
-	return bs
+	block = rw.blocks[0]
+	rw.blocks = rw.blocks[1:]
+	return block, nil
+}
+
+func NewTestBlock(id string, num uint64) *bstream.Block {
+	return &bstream.Block{
+		Id:             id,
+		Number:         num,
+		PreviousId:     "",
+		Timestamp:      time.Time{},
+		LibNum:         0,
+		PayloadKind:    TestProtocol,
+		PayloadVersion: 0,
+		PayloadBuffer:  nil,
+	}
 }
 
 func writeOneBlockFile(block *bstream.Block, filename string, store dstore.Store) {
 	buffer := bytes.NewBuffer([]byte{})
 	blockWriter, err := bstream.MustGetBlockWriterFactory(block.Kind()).New(buffer)
-	derr.ErrorCheck("unable to create block writer", err)
+	derr.Check("unable to create NewTestBlock writer", err)
 
 	err = blockWriter.Write(block)
-	derr.ErrorCheck("unable to write test block", err)
+	derr.Check("unable to write test NewTestBlock", err)
 
 	err = store.WriteObject(
 		filename,
 		bytes.NewReader(buffer.Bytes()),
 	)
-	derr.ErrorCheck("unable to write block to storage", err)
+	derr.Check("unable to write NewTestBlock to storage", err)
 }
 
 func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, cleanup func()) {
@@ -85,7 +112,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	dst, err = dstore.NewDBinStore(dstdir)
 	require.NoError(t, err)
 
-	m = NewMerger(pbbstream.Protocol_ETH, src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "")
+	m = NewMerger(TestProtocol, src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "")
 	m.chunkSize = 5
 	m.bundle = NewBundle(100, 100)
 
@@ -95,34 +122,34 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	}
 }
 
-func TestMergeUploadAndDeleteEth(t *testing.T) {
+func TestMergeUploadAndDelete(t *testing.T) {
 	m, oneStore, multiStore, cleanup := setupMerger(t)
 	defer cleanup()
 
 	writeOneBlockFile(
-		ethBlock("dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64", 100),
+		NewTestBlock("dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64", 100),
 		"0000000100-19700117T153111.4-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64-db10afd3efa45327eb284c83cc925bd9bd7966aea53067c1eebe0724d124ec1e",
 		oneStore,
 	)
 	writeOneBlockFile(
-		ethBlock("4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc", 101),
+		NewTestBlock("4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc", 101),
 		"0000000101-19700117T153112.4-4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64",
 		oneStore,
 	)
 
 	writeOneBlockFile(
-		ethBlock("16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64", 102),
+		NewTestBlock("16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64", 102),
 		"0000000102-19700117T153113.4-16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64-4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc",
 		oneStore,
 	)
 
 	writeOneBlockFile(
-		ethBlock("39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713", 103),
+		NewTestBlock("39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713", 103),
 		"0000000103-19700117T153114.4-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713-16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64",
 		oneStore,
 	)
 	writeOneBlockFile(
-		ethBlock("7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e", 104),
+		NewTestBlock("7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e", 104),
 		"0000000104-19700117T153115.4-7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713",
 		oneStore,
 	)
@@ -140,7 +167,7 @@ func TestMergeUploadAndDeleteEth(t *testing.T) {
 	readBack, err := multiStore.OpenObject("0000000100")
 	require.NoError(t, err)
 
-	readBackBlocks, err := bstream.MustGetBlockReaderFactory(pbbstream.Protocol_ETH).New(readBack)
+	readBackBlocks, err := bstream.MustGetBlockReaderFactory(TestProtocol).New(readBack)
 	require.NoError(t, err)
 
 	b1 := mustReadBlock(t, readBackBlocks)
@@ -158,51 +185,35 @@ func TestMergeUploadAndDeleteEth(t *testing.T) {
 	assert.Equal(t, "#102 (16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64)", b3.String())
 	assert.Equal(t, "#103 (39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713)", b4.String())
 	assert.Equal(t, "#104 (7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e)", b5.String())
-
-	// for {
-
-	// 	if b != nil {
-	// 		fmt.Printf("Read block %s\n", b)
-	// 	}
-
-	// 	if err != nil {
-	// 		if err == io.EOF {
-	// 			break
-	// 		}
-
-	// 		fmt.Println("error: ", err)
-	// 		t.FailNow()
-	// 	}
-	// }
 }
 
-type testEthBlock struct {
+type testBlockFile struct {
 	id       string
 	filename string
 	num      uint64
 }
 
-var blk100 = &testEthBlock{
+var blk100 = &testBlockFile{
 	id:       "dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64",
 	num:      100,
 	filename: "0000000100-19700117T153111.4-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64-db10afd3efa45327eb284c83cc925bd9bd7966aea53067c1eebe0724d124ec1e",
 }
-var blk101 = &testEthBlock{
+var blk101 = &testBlockFile{
 	id:       "4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc",
 	num:      101,
 	filename: "0000000101-19700117T153112.4-4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64",
 }
-var blk102 = &testEthBlock{
+var blk102 = &testBlockFile{
 	id:       "16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64",
 	num:      102,
 	filename: "0000000102-19700117T153113.4-16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64-4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc",
 }
-var blk103 = &testEthBlock{
+var blk103 = &testBlockFile{
 	id:       "39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713",
 	num:      103,
 	filename: "0000000103-19700117T153114.4-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713-16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64",
 }
-var blk104 = &testEthBlock{
+var blk104 = &testBlockFile{
 	id:       "7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e",
 	num:      104,
 	filename: "0000000104-19700117T153115.4-7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713",
@@ -212,7 +223,7 @@ func TestPreMergedBlocks(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		writeBlocks      []*testEthBlock
+		writeBlocks      []*testBlockFile
 		lowBlockNum      uint64
 		highBlockID      string
 		expectedBlockIDs []string
@@ -220,15 +231,15 @@ func TestPreMergedBlocks(t *testing.T) {
 	}{
 		{
 			name:             "perfect",
-			writeBlocks:      []*testEthBlock{blk100, blk101, blk102, blk103, blk104},
+			writeBlocks:      []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
 			lowBlockNum:      100,
 			highBlockID:      blk104.id,
 			expectedBlockIDs: []string{blk100.id, blk101.id, blk102.id, blk103.id, blk104.id},
 			expectedFound:    true,
 		},
 		{
-			name:             "same low block as high",
-			writeBlocks:      []*testEthBlock{blk100, blk101, blk102, blk103, blk104},
+			name:             "same low NewTestBlock as high",
+			writeBlocks:      []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
 			lowBlockNum:      100,
 			highBlockID:      blk100.id,
 			expectedBlockIDs: []string{blk100.id},
@@ -236,7 +247,7 @@ func TestPreMergedBlocks(t *testing.T) {
 		},
 		{
 			name:             "partial low",
-			writeBlocks:      []*testEthBlock{blk100, blk101, blk102, blk103, blk104},
+			writeBlocks:      []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
 			lowBlockNum:      100,
 			highBlockID:      blk103.id,
 			expectedBlockIDs: []string{blk100.id, blk101.id, blk102.id, blk103.id},
@@ -244,29 +255,29 @@ func TestPreMergedBlocks(t *testing.T) {
 		},
 		{
 			name:             "partial high",
-			writeBlocks:      []*testEthBlock{blk100, blk101, blk102, blk103, blk104},
-			lowBlockNum:      102,
+			writeBlocks:      []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
+			lowBlockNum:      1,
 			highBlockID:      blk104.id,
 			expectedBlockIDs: []string{blk102.id, blk103.id, blk104.id},
 			expectedFound:    true,
 		},
 		{
 			name:          "high ID not found",
-			writeBlocks:   []*testEthBlock{blk100, blk101, blk102, blk103},
+			writeBlocks:   []*testBlockFile{blk100, blk101, blk102, blk103},
 			lowBlockNum:   100,
 			highBlockID:   blk104.id,
 			expectedFound: false,
 		},
 		{
 			name:          "low num too low",
-			writeBlocks:   []*testEthBlock{blk100, blk101, blk102, blk103, blk104},
+			writeBlocks:   []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
 			lowBlockNum:   99,
 			highBlockID:   blk104.id,
 			expectedFound: false,
 		},
 		{
 			name:          "low num too high",
-			writeBlocks:   []*testEthBlock{blk100, blk101, blk102, blk103, blk104},
+			writeBlocks:   []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
 			lowBlockNum:   200,
 			highBlockID:   blk104.id,
 			expectedFound: false,
@@ -279,10 +290,11 @@ func TestPreMergedBlocks(t *testing.T) {
 			m, oneStore, _, cleanup := setupMerger(t)
 			defer cleanup()
 
+			testBlockReaderWriter.blocks = []*bstream.Block{}
 			var writtenFileNames []string
 			for _, blk := range test.writeBlocks {
 				writeOneBlockFile(
-					ethBlock(blk.id, blk.num),
+					NewTestBlock(blk.id, blk.num),
 					blk.filename,
 					oneStore,
 				)

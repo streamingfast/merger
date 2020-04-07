@@ -28,10 +28,10 @@ import (
 type Bundle struct {
 	fileList map[string]*OneBlockFile // key: "0000000100-20170701T122141.0-24a07267-e5914b39" ->
 
-	lowerBlock uint64 // base block number for bundle, like 38918100 (always % chunkSize)
+	lowerBlock uint64 // base NewTestBlock number for bundle, like 38918100 (always % chunkSize)
 	chunkSize  uint64
 
-	upperBlockID   string // this would correspond to the block_id of the LAST block of the bundle, 38918199
+	upperBlockID   string // this would correspond to the block_id of the LAST NewTestBlock of the bundle, 38918199
 	upperBlockTime time.Time
 
 	downloadWaitGroup *errgroup.Group
@@ -84,7 +84,7 @@ func (b *Bundle) isComplete() (complete bool) {
 		return true
 	}
 	if b.lowerBlock == 0 && lowestContiguous.num <= 2 {
-		return true // EOS or ETH have different starting block numbers
+		return true
 	}
 
 	zlog.Warn("found a hole in a oneblock files", zap.Uint64("bundle_lower_block", b.lowerBlock), zap.Uint64("missing_block_num", lowestContiguous.num-1), zap.String("missing_block_id", prevID))
@@ -114,13 +114,13 @@ func (b *Bundle) triage(filename string, sourceStore dstore.Store, seenCache *Se
 	}
 
 	if blockNum+b.chunkSize < b.lowerBlock {
-		zlog.Warn("including an unseen block that is far before lower block number, should reprocess to make it cleaner", zap.Uint64("delta", b.lowerBlock-blockNum))
-		// TODO add that block to the previous bundle automatically to help with future replays-from-blockfile
+		zlog.Warn("including an unseen NewTestBlock that is far before lower NewTestBlock number, should reprocess to make it cleaner", zap.Uint64("delta", b.lowerBlock-blockNum))
+		// TODO add that NewTestBlock to the previous bundle automatically to help with future replays-from-blockfile
 	}
 
 	if blockNum == b.upperBlock() {
 		if b.upperBlockTime.IsZero() || blockTime.Before(b.upperBlockTime) {
-			zlog.Debug("upper block time stretched", zap.Time("block_time", blockTime))
+			zlog.Debug("upper NewTestBlock time stretched", zap.Time("block_time", blockTime))
 			b.upperBlockID = previousIDSuffix
 			b.upperBlockTime = blockTime
 		}

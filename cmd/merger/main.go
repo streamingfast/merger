@@ -21,8 +21,6 @@ import (
 
 	"github.com/abourget/viperbind"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
-	_ "github.com/dfuse-io/pbgo/dfuse/codecs/deth"
-	_ "github.com/dfuse-io/bstream/codecs/deos"
 	"github.com/dfuse-io/derr"
 	mergerapp "github.com/dfuse-io/merger/app/merger"
 	"github.com/dfuse-io/merger/metrics"

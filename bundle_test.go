@@ -50,7 +50,7 @@ func TestIsComplete(t *testing.T) {
 			expectComplete: true,
 		},
 		{
-			name:           "EOSbeginning",
+			name:           "beginning",
 			fileListGetter: contiguousBlocksGetter(2, 99),
 			bundle: &Bundle{
 				lowerBlock:   0,
