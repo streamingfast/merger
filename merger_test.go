@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dfuse-io/dbin"
+	"github.com/gogo/protobuf/proto"
+
 	"github.com/dfuse-io/bstream"
 	"github.com/dfuse-io/derr"
 	"github.com/dfuse-io/dstore"
@@ -36,39 +39,66 @@ import (
 
 // Hopefully, this block kind value will never be used!
 var TestProtocol = pbbstream.Protocol(0xFFFFFF)
-var testBlockReaderWriter *TestBlockReaderWriter
 
 func init() {
-	testBlockReaderWriter = &TestBlockReaderWriter{
-		blocks: []*bstream.Block{},
-	}
+
 	bstream.AddBlockReaderFactory(TestProtocol, bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
-		return testBlockReaderWriter, nil
+		return &TestBlockReader{
+			dbinReader: dbin.NewReader(reader),
+		}, nil
 	}))
 	bstream.AddBlockWriterFactory(TestProtocol, bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
-		return testBlockReaderWriter, nil
+		return &TestBlockWriter{
+			dbinWriter: dbin.NewWriter(writer),
+		}, nil
 	}))
 }
 
-type TestBlockReaderWriter struct {
-	blocks []*bstream.Block
+type TestBlockWriter struct {
+	dbinWriter *dbin.Writer
 }
 
-func (rw *TestBlockReaderWriter) Write(block *bstream.Block) error {
-	fmt.Println("Writing block:", block.Num(), block.Id)
-	rw.blocks = append(rw.blocks, block)
-	return nil
-}
-
-func (rw *TestBlockReaderWriter) Read() (block *bstream.Block, err error) {
-	if len(rw.blocks) == 0 {
-		return nil, io.EOF
+func (w *TestBlockWriter) Write(block *bstream.Block) error {
+	pbBlock, err := block.ToProto()
+	if err != nil {
+		return err
 	}
-	block = rw.blocks[0]
-	rw.blocks = rw.blocks[1:]
-	return block, nil
+
+	bytes, err := proto.Marshal(pbBlock)
+	if err != nil {
+		return fmt.Errorf("unable to marshal proto block: %s", err)
+	}
+
+	return w.dbinWriter.WriteMessage(bytes)
 }
 
+type TestBlockReader struct {
+	dbinReader *dbin.Reader
+}
+
+func (l *TestBlockReader) Read() (*bstream.Block, error) {
+	message, err := l.dbinReader.ReadMessage()
+	if len(message) > 0 {
+		pbBlock := new(pbbstream.Block)
+		err = proto.Unmarshal(message, pbBlock)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read block proto: %s", err)
+		}
+
+		blk, err := bstream.BlockFromProto(pbBlock)
+		if err != nil {
+			return nil, err
+		}
+
+		return blk, nil
+	}
+
+	if err == io.EOF {
+		return nil, err
+	}
+
+	return nil, fmt.Errorf("failed reading next dbin message: %s", err)
+}
 func NewTestBlock(id string, num uint64) *bstream.Block {
 	return &bstream.Block{
 		Id:             id,
@@ -256,7 +286,7 @@ func TestPreMergedBlocks(t *testing.T) {
 		{
 			name:             "partial high",
 			writeBlocks:      []*testBlockFile{blk100, blk101, blk102, blk103, blk104},
-			lowBlockNum:      1,
+			lowBlockNum:      102,
 			highBlockID:      blk104.id,
 			expectedBlockIDs: []string{blk102.id, blk103.id, blk104.id},
 			expectedFound:    true,
@@ -290,7 +320,6 @@ func TestPreMergedBlocks(t *testing.T) {
 			m, oneStore, _, cleanup := setupMerger(t)
 			defer cleanup()
 
-			testBlockReaderWriter.blocks = []*bstream.Block{}
 			var writtenFileNames []string
 			for _, blk := range test.writeBlocks {
 				writeOneBlockFile(

@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dfuse-io/bstream"
 	"github.com/dfuse-io/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -125,7 +124,6 @@ func TestFindNextBaseBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			tmpdir, err := ioutil.TempDir("", "")
-			testBlockReaderWriter.blocks = []*bstream.Block{}
 			defer os.RemoveAll(tmpdir)
 			require.NoError(t, err)
 
@@ -140,7 +138,8 @@ func TestFindNextBaseBlock(t *testing.T) {
 			m := &Merger{destStore: s, chunkSize: 100, minimalBlockNum: test.minimalBlockNum}
 			i, err := m.FindNextBaseBlock()
 			require.NoError(t, err)
-			assert.Equal(t, test.expectedBaseBlock, i)
+
+			assert.Equal(t, int(test.expectedBaseBlock), int(i))
 
 		})
 	}

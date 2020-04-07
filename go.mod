@@ -4,6 +4,7 @@ require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/abourget/viperbind v0.1.0
 	github.com/dfuse-io/bstream v0.0.0-20200406220134-fe85c256872f
+	github.com/dfuse-io/dbin v0.0.0-20200406215642-ec7f22e794eb
 	github.com/dfuse-io/derr v0.0.0-20200406214256-c690655246a1
 	github.com/dfuse-io/dgrpc v0.0.0-20200406214416-6271093e544c
 	github.com/dfuse-io/dmetrics v0.0.0-20200406214800-499fc7b320ab
@@ -11,6 +12,7 @@ require (
 	github.com/dfuse-io/logging v0.0.0-20200406213449-45fc25dc6a8d
 	github.com/dfuse-io/pbgo v0.0.6-0.20200325181437-64bdab32d1b7
 	github.com/dfuse-io/shutter v1.4.1-0.20200319040708-c809eec458e6
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.3.4
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/viper v1.6.2
