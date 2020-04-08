@@ -81,41 +81,55 @@ func TestFindNextBaseBlock(t *testing.T) {
 		name              string
 		writtenFiles      []string
 		minimalBlockNum   uint64
+		chunkSize         uint64
 		expectedBaseBlock uint64
 	}{
 		{
 			name:              "zero",
 			writtenFiles:      []string{},
+			chunkSize:         100,
 			minimalBlockNum:   0,
 			expectedBaseBlock: 0,
 		},
 		{
 			name:              "simple",
 			writtenFiles:      []string{"0000000000", "0000000100", "0000000200"},
+			chunkSize:         100,
 			minimalBlockNum:   0,
 			expectedBaseBlock: 300,
 		},
 		{
 			name:              "round_minimal_num",
 			writtenFiles:      []string{"0000000100", "0000003400", "0000010000", "0000010100", "0000010200"},
+			chunkSize:         100,
 			minimalBlockNum:   10000,
 			expectedBaseBlock: 10300,
 		},
 		{
 			name:              "specific_minimal_num",
 			writtenFiles:      []string{"0000000100", "0000003400", "0000010000", "0000010200", "0000010300"},
+			chunkSize:         100,
 			minimalBlockNum:   10200,
 			expectedBaseBlock: 10400,
 		},
 		{
 			name:              "complex_minimal_num",
 			writtenFiles:      []string{"0000000100", "0000003400", "0000010000", "0008976500", "0008976600"},
+			chunkSize:         100,
 			minimalBlockNum:   8976500,
 			expectedBaseBlock: 8976700,
 		},
+		//{
+		//	name:              "complex_minimal_num with chunck size 50",
+		//	writtenFiles:      []string{"0000000100", "0000000150", "0000015000", "0008976500", "0008976550", "0008976600", "0008976650"},
+		//	chunkSize:         50,
+		//	minimalBlockNum:   8976500,
+		//	expectedBaseBlock: 8976700,
+		//},
 		{
 			name:              "absent_minimal_num",
 			writtenFiles:      []string{"0000000100", "0000003400", "0000010000"},
+			chunkSize:         100,
 			minimalBlockNum:   8976500,
 			expectedBaseBlock: 8976500,
 		},
@@ -135,7 +149,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			m := &Merger{destStore: s, chunkSize: 100, minimalBlockNum: test.minimalBlockNum}
+			m := &Merger{destStore: s, chunkSize: test.chunkSize, minimalBlockNum: test.minimalBlockNum}
 			i, err := m.FindNextBaseBlock()
 			require.NoError(t, err)
 
