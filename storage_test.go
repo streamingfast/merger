@@ -119,13 +119,20 @@ func TestFindNextBaseBlock(t *testing.T) {
 			minimalBlockNum:   8976500,
 			expectedBaseBlock: 8976700,
 		},
-		//{
-		//	name:              "complex_minimal_num with chunck size 50",
-		//	writtenFiles:      []string{"0000000100", "0000000150", "0000015000", "0008976500", "0008976550", "0008976600", "0008976650"},
-		//	chunkSize:         50,
-		//	minimalBlockNum:   8976500,
-		//	expectedBaseBlock: 8976700,
-		//},
+		{
+			name:              "complex_minimal_num with chunck size 50",
+			writtenFiles:      []string{"0000000100", "0000000150", "0000015000", "0008976500", "0008976550", "0008976600", "0008976650"},
+			chunkSize:         50,
+			minimalBlockNum:   8976500,
+			expectedBaseBlock: 8976700,
+		},
+		{
+			name:              "complex_minimal_num with chunck size 3",
+			writtenFiles:      []string{"0000000100", "0000000103", "0000000106", "0000000507", "0000000510", "0000000513"},
+			chunkSize:         3,
+			minimalBlockNum:   507,
+			expectedBaseBlock: 516,
+		},
 		{
 			name:              "absent_minimal_num",
 			writtenFiles:      []string{"0000000100", "0000003400", "0000010000"},

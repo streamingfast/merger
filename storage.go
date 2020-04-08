@@ -76,11 +76,13 @@ func getLeadingZeroes(blockNum uint64) (leadingZeros int) {
 	return
 }
 
-func scanForHighestPrefix(store dstore.Store, chuckSize, blockNum uint64, lastPrefix string, level int) string {
-	if level == 0 {
+func scanForHighestPrefix(store dstore.Store, chunckSize, blockNum uint64, lastPrefix string, level int) string {
+	if level == -1 {
 		return lastPrefix
 	}
-	inc := uint64(math.Pow10(level))
+
+	inc := chunckSize * uint64(math.Pow10(level))
+	fmt.Println("inc:", inc)
 	for {
 		b := blockNum + inc
 		leadingZeroes := strings.Repeat("0", getLeadingZeroes(b))
@@ -91,7 +93,7 @@ func scanForHighestPrefix(store dstore.Store, chuckSize, blockNum uint64, lastPr
 		blockNum = b
 		lastPrefix = prefix
 	}
-	return scanForHighestPrefix(store, chuckSize, blockNum, lastPrefix, level-1)
+	return scanForHighestPrefix(store, chunckSize, blockNum, lastPrefix, level-1)
 }
 
 // findMinimalLastBaseBlocksBundle tries to minimize the number of network calls
@@ -104,7 +106,7 @@ func highestFilePrefix(store dstore.Store, minimalBlockNum uint64, chuckSize uin
 		return
 	}
 
-	filePrefix = scanForHighestPrefix(store, chuckSize, minimalBlockNum, filePrefix, 6)
+	filePrefix = scanForHighestPrefix(store, chuckSize, minimalBlockNum, filePrefix, 4)
 	fmt.Println("highestFilePrefix:", filePrefix)
 	return
 }
