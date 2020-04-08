@@ -82,7 +82,6 @@ func scanForHighestPrefix(store dstore.Store, chunckSize, blockNum uint64, lastP
 	}
 
 	inc := chunckSize * uint64(math.Pow10(level))
-	fmt.Println("inc:", inc)
 	for {
 		b := blockNum + inc
 		leadingZeroes := strings.Repeat("0", getLeadingZeroes(b))
@@ -96,18 +95,18 @@ func scanForHighestPrefix(store dstore.Store, chunckSize, blockNum uint64, lastP
 	return scanForHighestPrefix(store, chunckSize, blockNum, lastPrefix, level-1)
 }
 
-// findMinimalLastBaseBlocksBundle tries to minimize the number of network calls
-// to storage, by trying incremental first digits, one at a time..
 func highestFilePrefix(store dstore.Store, minimalBlockNum uint64, chuckSize uint64) (filePrefix string) {
 	leadingZeroes := strings.Repeat("0", getLeadingZeroes(minimalBlockNum))
 	blockNumStr := strconv.Itoa(int(minimalBlockNum))
 	filePrefix = leadingZeroes + blockNumStr
+
 	if !fileExistWithPrefix(filePrefix, store) {
+		// prefix of minimalBlockNum not found.
+		// we consider it has the highest file prefix
 		return
 	}
 
 	filePrefix = scanForHighestPrefix(store, chuckSize, minimalBlockNum, filePrefix, 4)
-	fmt.Println("highestFilePrefix:", filePrefix)
 	return
 }
 
