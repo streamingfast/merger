@@ -31,8 +31,8 @@ import (
 )
 
 type Config struct {
-	StoragePathSource       string
-	StoragePathDest         string
+	StorageOneBlockFilePath string
+	StorageMergedBlockFile  string
 	StoreOperationTimeout   time.Duration
 	GRPCListenAddr          string
 	Protocol                pbbstream.Protocol
@@ -66,13 +66,13 @@ func New(config *Config) *App {
 func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
 
-	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StoragePathSource)
+	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
 	sourceArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
 
-	destArchiveStore, err := dstore.NewDBinStore(a.config.StoragePathDest)
+	destArchiveStore, err := dstore.NewDBinStore(a.config.StorageMergedBlockFile)
 	if err != nil {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
