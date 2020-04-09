@@ -31,18 +31,18 @@ import (
 )
 
 type Config struct {
-	StorageOneBlockFilePath string
-	StorageMergedBlockFile  string
-	StoreOperationTimeout   time.Duration
-	GRPCListenAddr          string
-	Protocol                pbbstream.Protocol
-	Live                    bool
-	StartBlockNum           uint64
-	StopBlockNum            uint64
-	ProgressFilename        string
-	MinimalBlockNum         uint64
-	WritersLeewayDuration   time.Duration
-	TimeBetweenStoreLookups time.Duration
+	StorageOneBlockFilesPath     string
+	StorageMergedBlocksFilesPath string
+	StoreOperationTimeout        time.Duration
+	GRPCListenAddr               string
+	Protocol                     pbbstream.Protocol
+	Live                         bool
+	StartBlockNum                uint64
+	StopBlockNum                 uint64
+	ProgressFilename             string
+	MinimalBlockNum              uint64
+	WritersLeewayDuration        time.Duration
+	TimeBetweenStoreLookups      time.Duration
 	SeenBlocksFile          string
 	MaxFixableFork          uint64
 	DeleteBlocksBefore      bool
@@ -66,13 +66,13 @@ func New(config *Config) *App {
 func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
 
-	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilePath)
+	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
 	sourceArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
 
-	destArchiveStore, err := dstore.NewDBinStore(a.config.StorageMergedBlockFile)
+	destArchiveStore, err := dstore.NewDBinStore(a.config.StorageMergedBlocksFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
