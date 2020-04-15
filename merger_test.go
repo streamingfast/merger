@@ -41,17 +41,16 @@ import (
 var TestProtocol = pbbstream.Protocol(0xFFFFFF)
 
 func init() {
-
-	bstream.AddBlockReaderFactory(TestProtocol, bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
+	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
 		return &TestBlockReader{
 			dbinReader: dbin.NewReader(reader),
 		}, nil
-	}))
-	bstream.AddBlockWriterFactory(TestProtocol, bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
+	})
+	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
 		return &TestBlockWriter{
 			dbinWriter: dbin.NewWriter(writer),
 		}, nil
-	}))
+	})
 }
 
 type TestBlockWriter struct {
@@ -114,7 +113,7 @@ func NewTestBlock(id string, num uint64) *bstream.Block {
 
 func writeOneBlockFile(block *bstream.Block, filename string, store dstore.Store) {
 	buffer := bytes.NewBuffer([]byte{})
-	blockWriter, err := bstream.MustGetBlockWriterFactory(block.Kind()).New(buffer)
+	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
 	derr.Check("unable to create NewTestBlock writer", err)
 
 	err = blockWriter.Write(block)
@@ -142,7 +141,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	dst, err = dstore.NewDBinStore(dstdir)
 	require.NoError(t, err)
 
-	m = NewMerger(TestProtocol, src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "")
+	m = NewMerger(src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "")
 	m.chunkSize = 5
 	m.bundle = NewBundle(100, 100)
 
@@ -197,7 +196,7 @@ func TestMergeUploadAndDelete(t *testing.T) {
 	readBack, err := multiStore.OpenObject("0000000100")
 	require.NoError(t, err)
 
-	readBackBlocks, err := bstream.MustGetBlockReaderFactory(TestProtocol).New(readBack)
+	readBackBlocks, err := bstream.GetBlockReaderFactory.New(readBack)
 	require.NoError(t, err)
 
 	b1 := mustReadBlock(t, readBackBlocks)

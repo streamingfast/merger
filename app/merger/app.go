@@ -21,12 +21,11 @@ import (
 	"strconv"
 	"time"
 
-	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
-	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
-	"github.com/dfuse-io/shutter"
 	"github.com/dfuse-io/dgrpc"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger"
+	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	"github.com/dfuse-io/shutter"
 	"go.uber.org/zap"
 )
 
@@ -35,7 +34,6 @@ type Config struct {
 	StorageMergedBlocksFilesPath string
 	StoreOperationTimeout        time.Duration
 	GRPCListenAddr               string
-	Protocol                     pbbstream.Protocol
 	Live                         bool
 	StartBlockNum                uint64
 	StopBlockNum                 uint64
@@ -79,7 +77,7 @@ func (a *App) Run() error {
 
 	destArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
 
-	m := merger.NewMerger(a.config.Protocol, sourceArchiveStore, destArchiveStore, a.config.WritersLeewayDuration, a.config.MinimalBlockNum, a.config.ProgressFilename, a.config.DeleteBlocksBefore, a.config.SeenBlocksFile, a.config.TimeBetweenStoreLookups, a.config.MaxFixableFork, a.config.GRPCListenAddr)
+	m := merger.NewMerger(sourceArchiveStore, destArchiveStore, a.config.WritersLeewayDuration, a.config.MinimalBlockNum, a.config.ProgressFilename, a.config.DeleteBlocksBefore, a.config.SeenBlocksFile, a.config.TimeBetweenStoreLookups, a.config.MaxFixableFork, a.config.GRPCListenAddr)
 	zlog.Info("merger initiated")
 
 	var startBlockNum uint64

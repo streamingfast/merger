@@ -36,8 +36,6 @@ import (
 
 type Merger struct {
 	*shutter.Shutter
-
-	protocol                pbbstream.Protocol
 	sourceStore             dstore.Store
 	destStore               dstore.Store
 	chunkSize               uint64
@@ -56,7 +54,6 @@ type Merger struct {
 }
 
 func NewMerger(
-	protocol pbbstream.Protocol,
 	sourceStore dstore.Store,
 	destStore dstore.Store,
 	writersLeewayDuration time.Duration,
@@ -69,7 +66,6 @@ func NewMerger(
 	grpcListenAddr string) *Merger {
 	return &Merger{
 		Shutter:                 shutter.New(),
-		protocol:                protocol,
 		sourceStore:             sourceStore,
 		progressFilename:        progressFilename,
 		destStore:               destStore,
@@ -117,7 +113,7 @@ func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pb
 		if uint64(oneBlock.num) < req.LowBlockNum {
 			continue
 		}
-		blockReader, err := bstream.MustGetBlockReaderFactory(m.protocol).New(bytes.NewReader(oneBlock.blk))
+		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
 			return nil, fmt.Errorf("unable to read one NewTestBlock: %s", err)
 		}
@@ -359,13 +355,14 @@ func (m *Merger) mergeUploadAndDelete() error {
 	}
 
 	buffer := bytes.NewBuffer([]byte{})
-	blockWriter, err := bstream.MustGetBlockWriterFactory(m.protocol).New(buffer)
+
+	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
 	if err != nil {
 		return fmt.Errorf("unable to create writer: %s", err)
 	}
 
 	for _, oneBlock := range b.timeSortedFiles() {
-		blockReader, err := bstream.MustGetBlockReaderFactory(m.protocol).New(bytes.NewReader(oneBlock.blk))
+		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
 			return fmt.Errorf("unable to read one NewTestBlock: %s", err)
 		}

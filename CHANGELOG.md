@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 * `--listen-grpc-addr` now is `--grpc-listen-addr`
 
+### Removed
+* Removed the `protocol`, merger is not `protocol` agnostic 
 
 ## 2020-03-21
 
