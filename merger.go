@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/abourget/llerrgroup"
+	"github.com/dfuse-io/bstream"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
-	"github.com/dfuse-io/bstream"
 	//_ "github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger/metrics"

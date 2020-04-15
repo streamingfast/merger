@@ -46,6 +46,7 @@ func init() {
 			dbinReader: dbin.NewReader(reader),
 		}, nil
 	})
+
 	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
 		return &TestBlockWriter{
 			dbinWriter: dbin.NewWriter(writer),
