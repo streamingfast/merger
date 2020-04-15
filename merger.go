@@ -24,10 +24,10 @@ import (
 	"time"
 
 	"github.com/abourget/llerrgroup"
+	"github.com/dfuse-io/bstream"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
-	"github.com/dfuse-io/bstream"
 	//_ "github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger/metrics"
@@ -117,7 +117,7 @@ func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pb
 		if uint64(oneBlock.num) < req.LowBlockNum {
 			continue
 		}
-		blockReader, err := bstream.MustGetBlockReaderFactory(m.protocol).New(bytes.NewReader(oneBlock.blk))
+		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
 			return nil, fmt.Errorf("unable to read one NewTestBlock: %s", err)
 		}
@@ -365,7 +365,7 @@ func (m *Merger) mergeUploadAndDelete() error {
 	}
 
 	for _, oneBlock := range b.timeSortedFiles() {
-		blockReader, err := bstream.MustGetBlockReaderFactory(m.protocol).New(bytes.NewReader(oneBlock.blk))
+		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
 			return fmt.Errorf("unable to read one NewTestBlock: %s", err)
 		}

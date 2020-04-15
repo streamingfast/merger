@@ -42,11 +42,12 @@ var TestProtocol = pbbstream.Protocol(0xFFFFFF)
 
 func init() {
 
-	bstream.AddBlockReaderFactory(TestProtocol, bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
+	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
 		return &TestBlockReader{
 			dbinReader: dbin.NewReader(reader),
 		}, nil
-	}))
+	})
+
 	bstream.AddBlockWriterFactory(TestProtocol, bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
 		return &TestBlockWriter{
 			dbinWriter: dbin.NewWriter(writer),
@@ -197,7 +198,7 @@ func TestMergeUploadAndDelete(t *testing.T) {
 	readBack, err := multiStore.OpenObject("0000000100")
 	require.NoError(t, err)
 
-	readBackBlocks, err := bstream.MustGetBlockReaderFactory(TestProtocol).New(readBack)
+	readBackBlocks, err := bstream.GetBlockReaderFactory.New(readBack)
 	require.NoError(t, err)
 
 	b1 := mustReadBlock(t, readBackBlocks)
