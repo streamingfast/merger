@@ -2,7 +2,7 @@ module github.com/dfuse-io/merger
 
 require (
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/dfuse-io/bstream v0.0.0-20200415151736-2d83aea8c5af
+	github.com/dfuse-io/bstream v0.0.0-20200415154805-fc5f1d364031
 	github.com/dfuse-io/dbin v0.0.0-20200406215642-ec7f22e794eb
 	github.com/dfuse-io/derr v0.0.0-20200406214256-c690655246a1
 	github.com/dfuse-io/dgrpc v0.0.0-20200406214416-6271093e544c

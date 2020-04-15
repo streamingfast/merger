@@ -17,7 +17,6 @@ package merger
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	_ "net/http/pprof"
@@ -25,10 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dfuse-io/dbin"
-	"github.com/gogo/protobuf/proto"
-
 	"github.com/dfuse-io/bstream"
+	"github.com/dfuse-io/dbin"
 	"github.com/dfuse-io/derr"
 	"github.com/dfuse-io/dstore"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
@@ -42,63 +39,18 @@ var TestProtocol = pbbstream.Protocol(0xFFFFFF)
 
 func init() {
 	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
-		return &TestBlockReader{
-			dbinReader: dbin.NewReader(reader),
+		return &bstream.TestBlockReaderBin{
+			DBinReader: dbin.NewReader(reader),
 		}, nil
 	})
 
 	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
-		return &TestBlockWriter{
-			dbinWriter: dbin.NewWriter(writer),
+		return &bstream.TestBlockWriterBin{
+			DBinWriter: dbin.NewWriter(writer),
 		}, nil
 	})
 }
 
-type TestBlockWriter struct {
-	dbinWriter *dbin.Writer
-}
-
-func (w *TestBlockWriter) Write(block *bstream.Block) error {
-	pbBlock, err := block.ToProto()
-	if err != nil {
-		return err
-	}
-
-	bytes, err := proto.Marshal(pbBlock)
-	if err != nil {
-		return fmt.Errorf("unable to marshal proto block: %s", err)
-	}
-
-	return w.dbinWriter.WriteMessage(bytes)
-}
-
-type TestBlockReader struct {
-	dbinReader *dbin.Reader
-}
-
-func (l *TestBlockReader) Read() (*bstream.Block, error) {
-	message, err := l.dbinReader.ReadMessage()
-	if len(message) > 0 {
-		pbBlock := new(pbbstream.Block)
-		err = proto.Unmarshal(message, pbBlock)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read block proto: %s", err)
-		}
-
-		blk, err := bstream.BlockFromProto(pbBlock)
-		if err != nil {
-			return nil, err
-		}
-
-		return blk, nil
-	}
-
-	if err == io.EOF {
-		return nil, err
-	}
-
-	return nil, fmt.Errorf("failed reading next dbin message: %s", err)
-}
 func NewTestBlock(id string, num uint64) *bstream.Block {
 	return &bstream.Block{
 		Id:             id,
