@@ -44,8 +44,6 @@ type Config struct {
 	SeenBlocksFile          string
 	MaxFixableFork          uint64
 	DeleteBlocksBefore      bool
-
-	EnableReadinessProbe bool
 }
 
 type App struct {
@@ -99,13 +97,11 @@ func (a *App) Run() error {
 
 	m.SetupBundle(startBlockNum, stopBlockNum)
 
-	if a.config.EnableReadinessProbe {
-		gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
-		if err != nil {
-			return fmt.Errorf("cannot create readiness probe")
-		}
-		a.readinessProbe = pbhealth.NewHealthClient(gs)
+	gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
+	if err != nil {
+		return fmt.Errorf("cannot create readiness probe")
 	}
+	a.readinessProbe = pbhealth.NewHealthClient(gs)
 
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
