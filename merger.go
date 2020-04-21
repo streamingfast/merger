@@ -28,6 +28,7 @@ import (
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
+
 	//_ "github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger/metrics"
@@ -414,8 +415,12 @@ func (m *Merger) mergeUploadAndDelete() error {
 			return nil
 		})
 	}
-	_ = eg.Wait()
-	zlog.Debug("done deleting one-NewTestBlock files")
+	err = eg.Wait()
+	if err != nil {
+		zlog.Warn("cannot delete oneblockfile", zap.Error(err))
+	} else {
+		zlog.Debug("done deleting one-NewTestBlock files", zap.Int("len_filelist", len(b.fileList)))
+	}
 
 	return nil
 }
