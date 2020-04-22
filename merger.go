@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/abourget/llerrgroup"
 	"github.com/dfuse-io/bstream"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
@@ -116,7 +117,7 @@ func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pb
 		}
 		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
-			return nil, fmt.Errorf("unable to read one NewTestBlock: %s", err)
+			return nil, fmt.Errorf("unable to read one block: %s", err)
 		}
 
 		block, err := blockReader.Read()
@@ -160,10 +161,10 @@ func deleteOneblockFiles(files []string, s dstore.Store) {
 	if len(files) == 0 {
 		return
 	}
-	zlog.Info("Deleting old NewTestBlock files", zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
+	zlog.Info("Deleting old block files", zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
 	for i, filename := range files {
 		if i%10 == 0 {
-			zlog.Info("deleting one NewTestBlock files that is older than our seenBlocksBuffer", zap.Int("i", i), zap.Int("len_todelete", len(files)), zap.String("filename", filename))
+			zlog.Info("deleting one block files that is older than our seenBlocksBuffer", zap.Int("i", i), zap.Int("len_todelete", len(files)), zap.String("filename", filename))
 		}
 		f := filename //thread safety
 		go s.DeleteObject(f)
@@ -206,7 +207,7 @@ func (m *Merger) launch() (err error) {
 				m.bundleLock.Unlock()
 			}
 
-			zlog.Debug("One NewTestBlock file list empty, building list")
+			zlog.Debug("One block file list empty, building list")
 			var tooOldFiles []string
 			tooOldFiles, _, oneBlockFiles, err = m.retrieveListOfFiles()
 			if err != nil {
@@ -265,7 +266,7 @@ func (m *Merger) launch() (err error) {
 		m.seenBlocks.Truncate()
 
 		if m.stopBlockNum > 0 && m.bundle.upperBlock() >= m.stopBlockNum {
-			zlog.Info("reached stop NewTestBlock, terminating process", zap.Uint64("stop_block", m.stopBlockNum))
+			zlog.Info("reached stop block, terminating process", zap.Uint64("stop_block", m.stopBlockNum))
 			return nil
 		}
 
@@ -341,7 +342,7 @@ func (m *Merger) triageNewOneBlockFiles(in []string) (remaining []string, err er
 // waitedEnoughForUpperBoundFiles will ensure we have at least 25
 // seconds between the last check on Google Storage, to make sure any
 // processes that would have been in the process of writing a
-// one-NewTestBlock file, had the time to finish writing, and didn't move the
+// one-block file, had the time to finish writing, and didn't move the
 // lower boundary of our bundle.
 func (m *Merger) waitedEnoughForUpperBound() bool {
 	return !m.bundle.upperBlockTime.IsZero() && time.Since(m.bundle.upperBlockTime) > m.writersLeewayDuration
@@ -365,17 +366,17 @@ func (m *Merger) mergeUploadAndDelete() error {
 	for _, oneBlock := range b.timeSortedFiles() {
 		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
-			return fmt.Errorf("unable to read one NewTestBlock: %s", err)
+			return fmt.Errorf("unable to read one block: %s", err)
 		}
 
 		block, err := blockReader.Read()
 		if block == nil {
-			return fmt.Errorf("NewTestBlock read was nil: %s", err)
+			return fmt.Errorf("block read was nil: %s", err)
 		}
 
 		err = blockWriter.Write(block)
 		if err != nil {
-			return fmt.Errorf("one NewTestBlock writer error: %s", err)
+			return fmt.Errorf("one block writer error: %s", err)
 		}
 	}
 
@@ -409,8 +410,8 @@ func (m *Merger) mergeUploadAndDelete() error {
 		f := filename
 		eg.Go(func() error {
 			err = m.sourceStore.DeleteObject(f)
-			if err != nil {
-				zlog.Error("cannot delete onefile object after merging", zap.String("filename", f))
+			if err != nil && err.Error() != storage.ErrObjectNotExist.Error() {
+				zlog.Error("cannot delete onefile object after merging", zap.String("filename", f), zap.Error(err))
 			}
 			return nil
 		})
@@ -419,7 +420,7 @@ func (m *Merger) mergeUploadAndDelete() error {
 	if err != nil {
 		zlog.Warn("cannot delete oneblockfile", zap.Error(err))
 	} else {
-		zlog.Debug("done deleting one-NewTestBlock files", zap.Int("len_filelist", len(b.fileList)))
+		zlog.Debug("done deleting one-block files", zap.Int("len_filelist", len(b.fileList)))
 	}
 
 	return nil
