@@ -157,7 +157,7 @@ func (m *Merger) CacheInvalid() bool {
 	return m.bundle.lowerBlock > m.seenBlocks.HighestSeen+1
 }
 
-func deleteOneblockFiles(files []string, s dstore.Store) {
+func deleteOneblockFiles(ctx context.Context, files []string, s dstore.Store) {
 	if len(files) == 0 {
 		return
 	}
@@ -167,7 +167,7 @@ func deleteOneblockFiles(files []string, s dstore.Store) {
 			zlog.Info("deleting one block files that is older than our seenBlocksBuffer", zap.Int("i", i), zap.Int("len_todelete", len(files)), zap.String("filename", filename))
 		}
 		f := filename //thread safety
-		go s.DeleteObject(f)
+		go s.DeleteObject(ctx, f)
 	}
 
 }
@@ -207,15 +207,18 @@ func (m *Merger) launch() (err error) {
 				m.bundleLock.Unlock()
 			}
 
+			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
+			defer cancel()
+
 			zlog.Debug("One block file list empty, building list")
 			var tooOldFiles []string
-			tooOldFiles, _, oneBlockFiles, err = m.retrieveListOfFiles()
+			tooOldFiles, _, oneBlockFiles, err = m.retrieveListOfFiles(ctx)
 			if err != nil {
 				return err
 			}
 
 			if m.deleteBlocksBefore {
-				deleteOneblockFiles(tooOldFiles, m.sourceStore)
+				deleteOneblockFiles(ctx, tooOldFiles, m.sourceStore)
 			}
 		}
 
@@ -274,10 +277,10 @@ func (m *Merger) launch() (err error) {
 		m.bundleLock.Unlock()
 	}
 }
-func (m *Merger) retrieveListOfFiles() (tooOld []string, seenInCache []string, good []string, err error) {
+func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seenInCache []string, good []string, err error) {
 	var count int
 
-	err = m.sourceStore.Walk("", ".tmp", func(filename string) error {
+	err = m.sourceStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		num, _, _, _, err := parseFilename(filename)
 		if err != nil {
 			return nil
@@ -380,7 +383,10 @@ func (m *Merger) mergeUploadAndDelete() error {
 		}
 	}
 
-	err = m.destStore.WriteObject(blockNumToStr(b.lowerBlock), bytes.NewReader(buffer.Bytes()))
+	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+	defer cancel()
+
+	err = m.destStore.WriteObject(ctx, blockNumToStr(b.lowerBlock), bytes.NewReader(buffer.Bytes()))
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
@@ -409,7 +415,10 @@ func (m *Merger) mergeUploadAndDelete() error {
 
 		f := filename
 		eg.Go(func() error {
-			err = m.sourceStore.DeleteObject(f)
+			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
+			defer cancel()
+
+			err = m.sourceStore.DeleteObject(ctx, f)
 			if err != nil && err.Error() != storage.ErrObjectNotExist.Error() {
 				zlog.Error("cannot delete onefile object after merging", zap.String("filename", f), zap.Error(err))
 			}

@@ -15,6 +15,7 @@
 package merger
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -40,12 +41,12 @@ func TestWalkGS(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, filename := range writtenFiles {
-		err := s.WriteObject(filename, strings.NewReader(""))
+		err := s.WriteObject(context.Background(), filename, strings.NewReader(""))
 		require.NoError(t, err)
 	}
 
 	files := []string{}
-	s.Walk("", ".tmp", func(filename string) error {
+	s.Walk(context.Background(), "", ".tmp", func(filename string) error {
 		files = append(files, filename)
 		return nil
 	})
@@ -68,7 +69,7 @@ func TestWalkFS(t *testing.T) {
 	s, err := dstore.NewDBinStore(tmpdir)
 	require.NoError(t, err)
 	files := []string{}
-	s.Walk("", ".tmp", func(filename string) error {
+	s.Walk(context.Background(), "", ".tmp", func(filename string) error {
 		files = append(files, filename)
 		return nil
 	})
@@ -152,7 +153,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, filename := range test.writtenFiles {
-				err := s.WriteObject(filename, strings.NewReader(""))
+				err := s.WriteObject(context.Background(), filename, strings.NewReader(""))
 				require.NoError(t, err)
 			}
 

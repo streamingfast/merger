@@ -73,6 +73,7 @@ func writeOneBlockFile(block *bstream.Block, filename string, store dstore.Store
 	derr.Check("unable to write test NewTestBlock", err)
 
 	err = store.WriteObject(
+		context.Background(),
 		filename,
 		bytes.NewReader(buffer.Bytes()),
 	)
@@ -146,7 +147,7 @@ func TestMergeUploadAndDelete(t *testing.T) {
 
 	m.mergeUploadAndDelete()
 
-	readBack, err := multiStore.OpenObject("0000000100")
+	readBack, err := multiStore.OpenObject(context.Background(), "0000000100")
 	require.NoError(t, err)
 
 	readBackBlocks, err := bstream.GetBlockReaderFactory.New(readBack)

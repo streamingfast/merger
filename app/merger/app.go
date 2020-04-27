@@ -32,7 +32,6 @@ import (
 type Config struct {
 	StorageOneBlockFilesPath     string
 	StorageMergedBlocksFilesPath string
-	StoreOperationTimeout        time.Duration
 	GRPCListenAddr               string
 	Live                         bool
 	StartBlockNum                uint64
@@ -41,9 +40,9 @@ type Config struct {
 	MinimalBlockNum              uint64
 	WritersLeewayDuration        time.Duration
 	TimeBetweenStoreLookups      time.Duration
-	SeenBlocksFile          string
-	MaxFixableFork          uint64
-	DeleteBlocksBefore      bool
+	SeenBlocksFile               string
+	MaxFixableFork               uint64
+	DeleteBlocksBefore           bool
 }
 
 type App struct {
@@ -66,14 +65,11 @@ func (a *App) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
-	sourceArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
 
 	destArchiveStore, err := dstore.NewDBinStore(a.config.StorageMergedBlocksFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
-
-	destArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
 
 	m := merger.NewMerger(sourceArchiveStore, destArchiveStore, a.config.WritersLeewayDuration, a.config.MinimalBlockNum, a.config.ProgressFilename, a.config.DeleteBlocksBefore, a.config.SeenBlocksFile, a.config.TimeBetweenStoreLookups, a.config.MaxFixableFork, a.config.GRPCListenAddr)
 	zlog.Info("merger initiated")
