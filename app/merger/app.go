@@ -26,7 +26,6 @@ import (
 	"github.com/dfuse-io/dgrpc"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger"
-	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
 	"github.com/dfuse-io/shutter"
 	"go.uber.org/zap"
@@ -35,9 +34,7 @@ import (
 type Config struct {
 	StorageOneBlockFilesPath     string
 	StorageMergedBlocksFilesPath string
-	StoreOperationTimeout        time.Duration
 	GRPCListenAddr               string
-	Protocol                     pbbstream.Protocol
 	Live                         bool
 	StartBlockNum                uint64
 	StopBlockNum                 uint64
@@ -48,8 +45,6 @@ type Config struct {
 	SeenBlocksFile               string
 	MaxFixableFork               uint64
 	DeleteBlocksBefore           bool
-
-	EnableReadinessProbe bool
 }
 
 type App struct {
@@ -74,16 +69,13 @@ func (a *App) Run() error {
 	if err != nil {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
-	sourceArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
 
 	destArchiveStore, err := dstore.NewDBinStore(a.config.StorageMergedBlocksFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	destArchiveStore.SetOperationTimeout(a.config.StoreOperationTimeout)
-
-	m := merger.NewMerger(a.config.Protocol, sourceArchiveStore, destArchiveStore, a.config.WritersLeewayDuration, a.config.MinimalBlockNum, a.config.ProgressFilename, a.config.DeleteBlocksBefore, a.config.SeenBlocksFile, a.config.TimeBetweenStoreLookups, a.config.MaxFixableFork, a.config.GRPCListenAddr)
+	m := merger.NewMerger(sourceArchiveStore, destArchiveStore, a.config.WritersLeewayDuration, a.config.MinimalBlockNum, a.config.ProgressFilename, a.config.DeleteBlocksBefore, a.config.SeenBlocksFile, a.config.TimeBetweenStoreLookups, a.config.MaxFixableFork, a.config.GRPCListenAddr)
 	zlog.Info("merger initiated")
 
 	var startBlockNum uint64
@@ -105,13 +97,11 @@ func (a *App) Run() error {
 
 	m.SetupBundle(startBlockNum, stopBlockNum)
 
-	if a.config.EnableReadinessProbe {
-		gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
-		if err != nil {
-			return fmt.Errorf("cannot create readiness probe")
-		}
-		a.readinessProbe = pbhealth.NewHealthClient(gs)
+	gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
+	if err != nil {
+		return fmt.Errorf("cannot create readiness probe")
 	}
+	a.readinessProbe = pbhealth.NewHealthClient(gs)
 
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)

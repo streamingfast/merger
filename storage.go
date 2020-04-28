@@ -15,6 +15,7 @@
 package merger
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"strconv"
@@ -26,11 +27,14 @@ import (
 
 // findNextBaseBlock will return an error if there is a gap found ...
 func (m *Merger) FindNextBaseBlock() (uint64, error) {
-	prefix := highestFilePrefix(m.destStore, m.minimalBlockNum, m.chunkSize)
+	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
+	defer cancel()
+
+	prefix := highestFilePrefix(ctx, m.destStore, m.minimalBlockNum, m.chunkSize)
 	zlog.Debug("find_next_base looking with prefix", zap.String("prefix", prefix))
 	var lastNumber uint64
 	foundAny := false
-	err := m.destStore.Walk(prefix, ".tmp", func(filename string) error {
+	err := m.destStore.Walk(ctx, prefix, ".tmp", func(filename string) error {
 		fileNumberVal, err := strconv.ParseUint(filename, 10, 32)
 		if err != nil {
 			zlog.Warn("findNextBaseBlock skipping unknown file", zap.String("filename", filename))
@@ -76,7 +80,7 @@ func getLeadingZeroes(blockNum uint64) (leadingZeros int) {
 	return
 }
 
-func scanForHighestPrefix(store dstore.Store, chunckSize, blockNum uint64, lastPrefix string, level int) string {
+func scanForHighestPrefix(ctx context.Context, store dstore.Store, chunckSize, blockNum uint64, lastPrefix string, level int) string {
 	if level == -1 {
 		return lastPrefix
 	}
@@ -86,34 +90,34 @@ func scanForHighestPrefix(store dstore.Store, chunckSize, blockNum uint64, lastP
 		b := blockNum + inc
 		leadingZeroes := strings.Repeat("0", getLeadingZeroes(b))
 		prefix := leadingZeroes + strconv.Itoa(int(b))
-		if !fileExistWithPrefix(prefix, store) {
+		if !fileExistWithPrefix(ctx, prefix, store) {
 			break
 		}
 		blockNum = b
 		lastPrefix = prefix
 	}
-	return scanForHighestPrefix(store, chunckSize, blockNum, lastPrefix, level-1)
+	return scanForHighestPrefix(ctx, store, chunckSize, blockNum, lastPrefix, level-1)
 }
 
-func highestFilePrefix(store dstore.Store, minimalBlockNum uint64, chuckSize uint64) (filePrefix string) {
+func highestFilePrefix(ctx context.Context, store dstore.Store, minimalBlockNum uint64, chuckSize uint64) (filePrefix string) {
 	leadingZeroes := strings.Repeat("0", getLeadingZeroes(minimalBlockNum))
 	blockNumStr := strconv.Itoa(int(minimalBlockNum))
 	filePrefix = leadingZeroes + blockNumStr
 
-	if !fileExistWithPrefix(filePrefix, store) {
+	if !fileExistWithPrefix(ctx, filePrefix, store) {
 		// prefix of minimalBlockNum not found.
 		// we consider it has the highest file prefix
 		return
 	}
 
-	filePrefix = scanForHighestPrefix(store, chuckSize, minimalBlockNum, filePrefix, 4)
+	filePrefix = scanForHighestPrefix(ctx, store, chuckSize, minimalBlockNum, filePrefix, 4)
 	return
 }
 
-func fileExistWithPrefix(filePrefix string, s dstore.Store) bool {
+func fileExistWithPrefix(ctx context.Context, filePrefix string, s dstore.Store) bool {
 	needZeros := 10 - len(filePrefix)
 	resultFileName := filePrefix + strings.Repeat("0", needZeros)
-	exists, err := s.FileExists(resultFileName)
+	exists, err := s.FileExists(ctx, resultFileName)
 	if err != nil {
 		zlog.Error("looking for file existence on archive store", zap.Error(err))
 		return false

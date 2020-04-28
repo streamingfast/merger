@@ -155,7 +155,7 @@ func (b *Bundle) addAndDownload(oneBlock *OneBlockFile, sourceStore dstore.Store
 }
 
 func downloadFile(ctx context.Context, bf *OneBlockFile, s dstore.Store) error {
-	out, err := s.OpenObject(bf.name)
+	out, err := s.OpenObject(ctx, bf.name)
 	if err != nil {
 		return err
 	}

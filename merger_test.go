@@ -17,7 +17,6 @@ package merger
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	_ "net/http/pprof"
@@ -25,10 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dfuse-io/dbin"
-	"github.com/gogo/protobuf/proto"
-
 	"github.com/dfuse-io/bstream"
+	"github.com/dfuse-io/dbin"
 	"github.com/dfuse-io/derr"
 	"github.com/dfuse-io/dstore"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
@@ -41,65 +38,19 @@ import (
 var TestProtocol = pbbstream.Protocol(0xFFFFFF)
 
 func init() {
-
 	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(func(reader io.Reader) (bstream.BlockReader, error) {
-		return &TestBlockReader{
-			dbinReader: dbin.NewReader(reader),
+		return &bstream.TestBlockReaderBin{
+			DBinReader: dbin.NewReader(reader),
 		}, nil
 	})
 
-	bstream.AddBlockWriterFactory(TestProtocol, bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
-		return &TestBlockWriter{
-			dbinWriter: dbin.NewWriter(writer),
+	bstream.GetBlockWriterFactory = bstream.BlockWriterFactoryFunc(func(writer io.Writer) (bstream.BlockWriter, error) {
+		return &bstream.TestBlockWriterBin{
+			DBinWriter: dbin.NewWriter(writer),
 		}, nil
-	}))
+	})
 }
 
-type TestBlockWriter struct {
-	dbinWriter *dbin.Writer
-}
-
-func (w *TestBlockWriter) Write(block *bstream.Block) error {
-	pbBlock, err := block.ToProto()
-	if err != nil {
-		return err
-	}
-
-	bytes, err := proto.Marshal(pbBlock)
-	if err != nil {
-		return fmt.Errorf("unable to marshal proto block: %s", err)
-	}
-
-	return w.dbinWriter.WriteMessage(bytes)
-}
-
-type TestBlockReader struct {
-	dbinReader *dbin.Reader
-}
-
-func (l *TestBlockReader) Read() (*bstream.Block, error) {
-	message, err := l.dbinReader.ReadMessage()
-	if len(message) > 0 {
-		pbBlock := new(pbbstream.Block)
-		err = proto.Unmarshal(message, pbBlock)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read block proto: %s", err)
-		}
-
-		blk, err := bstream.BlockFromProto(pbBlock)
-		if err != nil {
-			return nil, err
-		}
-
-		return blk, nil
-	}
-
-	if err == io.EOF {
-		return nil, err
-	}
-
-	return nil, fmt.Errorf("failed reading next dbin message: %s", err)
-}
 func NewTestBlock(id string, num uint64) *bstream.Block {
 	return &bstream.Block{
 		Id:             id,
@@ -115,13 +66,14 @@ func NewTestBlock(id string, num uint64) *bstream.Block {
 
 func writeOneBlockFile(block *bstream.Block, filename string, store dstore.Store) {
 	buffer := bytes.NewBuffer([]byte{})
-	blockWriter, err := bstream.MustGetBlockWriterFactory(block.Kind()).New(buffer)
+	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
 	derr.Check("unable to create NewTestBlock writer", err)
 
 	err = blockWriter.Write(block)
 	derr.Check("unable to write test NewTestBlock", err)
 
 	err = store.WriteObject(
+		context.Background(),
 		filename,
 		bytes.NewReader(buffer.Bytes()),
 	)
@@ -143,7 +95,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	dst, err = dstore.NewDBinStore(dstdir)
 	require.NoError(t, err)
 
-	m = NewMerger(TestProtocol, src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "")
+	m = NewMerger(src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "")
 	m.chunkSize = 5
 	m.bundle = NewBundle(100, 100)
 
@@ -195,7 +147,7 @@ func TestMergeUploadAndDelete(t *testing.T) {
 
 	m.mergeUploadAndDelete()
 
-	readBack, err := multiStore.OpenObject("0000000100")
+	readBack, err := multiStore.OpenObject(context.Background(), "0000000100")
 	require.NoError(t, err)
 
 	readBackBlocks, err := bstream.GetBlockReaderFactory.New(readBack)

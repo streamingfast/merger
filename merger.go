@@ -23,11 +23,13 @@ import (
 	"sync"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/abourget/llerrgroup"
 	"github.com/dfuse-io/bstream"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
+
 	//_ "github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger/metrics"
@@ -36,8 +38,6 @@ import (
 
 type Merger struct {
 	*shutter.Shutter
-
-	protocol                pbbstream.Protocol
 	sourceStore             dstore.Store
 	destStore               dstore.Store
 	chunkSize               uint64
@@ -56,7 +56,6 @@ type Merger struct {
 }
 
 func NewMerger(
-	protocol pbbstream.Protocol,
 	sourceStore dstore.Store,
 	destStore dstore.Store,
 	writersLeewayDuration time.Duration,
@@ -69,7 +68,6 @@ func NewMerger(
 	grpcListenAddr string) *Merger {
 	return &Merger{
 		Shutter:                 shutter.New(),
-		protocol:                protocol,
 		sourceStore:             sourceStore,
 		progressFilename:        progressFilename,
 		destStore:               destStore,
@@ -119,7 +117,7 @@ func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pb
 		}
 		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
-			return nil, fmt.Errorf("unable to read one NewTestBlock: %s", err)
+			return nil, fmt.Errorf("unable to read one block: %s", err)
 		}
 
 		block, err := blockReader.Read()
@@ -159,17 +157,17 @@ func (m *Merger) CacheInvalid() bool {
 	return m.bundle.lowerBlock > m.seenBlocks.HighestSeen+1
 }
 
-func deleteOneblockFiles(files []string, s dstore.Store) {
+func deleteOneblockFiles(ctx context.Context, files []string, s dstore.Store) {
 	if len(files) == 0 {
 		return
 	}
-	zlog.Info("Deleting old NewTestBlock files", zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
+	zlog.Info("Deleting old block files", zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
 	for i, filename := range files {
 		if i%10 == 0 {
-			zlog.Info("deleting one NewTestBlock files that is older than our seenBlocksBuffer", zap.Int("i", i), zap.Int("len_todelete", len(files)), zap.String("filename", filename))
+			zlog.Info("deleting one block files that is older than our seenBlocksBuffer", zap.Int("i", i), zap.Int("len_todelete", len(files)), zap.String("filename", filename))
 		}
 		f := filename //thread safety
-		go s.DeleteObject(f)
+		go s.DeleteObject(ctx, f)
 	}
 
 }
@@ -209,15 +207,18 @@ func (m *Merger) launch() (err error) {
 				m.bundleLock.Unlock()
 			}
 
-			zlog.Debug("One NewTestBlock file list empty, building list")
+			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
+			defer cancel()
+
+			zlog.Debug("One block file list empty, building list")
 			var tooOldFiles []string
-			tooOldFiles, _, oneBlockFiles, err = m.retrieveListOfFiles()
+			tooOldFiles, _, oneBlockFiles, err = m.retrieveListOfFiles(ctx)
 			if err != nil {
 				return err
 			}
 
 			if m.deleteBlocksBefore {
-				deleteOneblockFiles(tooOldFiles, m.sourceStore)
+				deleteOneblockFiles(ctx, tooOldFiles, m.sourceStore)
 			}
 		}
 
@@ -268,7 +269,7 @@ func (m *Merger) launch() (err error) {
 		m.seenBlocks.Truncate()
 
 		if m.stopBlockNum > 0 && m.bundle.upperBlock() >= m.stopBlockNum {
-			zlog.Info("reached stop NewTestBlock, terminating process", zap.Uint64("stop_block", m.stopBlockNum))
+			zlog.Info("reached stop block, terminating process", zap.Uint64("stop_block", m.stopBlockNum))
 			return nil
 		}
 
@@ -276,10 +277,10 @@ func (m *Merger) launch() (err error) {
 		m.bundleLock.Unlock()
 	}
 }
-func (m *Merger) retrieveListOfFiles() (tooOld []string, seenInCache []string, good []string, err error) {
+func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seenInCache []string, good []string, err error) {
 	var count int
 
-	err = m.sourceStore.Walk("", ".tmp", func(filename string) error {
+	err = m.sourceStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		num, _, _, _, err := parseFilename(filename)
 		if err != nil {
 			return nil
@@ -344,7 +345,7 @@ func (m *Merger) triageNewOneBlockFiles(in []string) (remaining []string, err er
 // waitedEnoughForUpperBoundFiles will ensure we have at least 25
 // seconds between the last check on Google Storage, to make sure any
 // processes that would have been in the process of writing a
-// one-NewTestBlock file, had the time to finish writing, and didn't move the
+// one-block file, had the time to finish writing, and didn't move the
 // lower boundary of our bundle.
 func (m *Merger) waitedEnoughForUpperBound() bool {
 	return !m.bundle.upperBlockTime.IsZero() && time.Since(m.bundle.upperBlockTime) > m.writersLeewayDuration
@@ -359,7 +360,8 @@ func (m *Merger) mergeUploadAndDelete() error {
 	}
 
 	buffer := bytes.NewBuffer([]byte{})
-	blockWriter, err := bstream.MustGetBlockWriterFactory(m.protocol).New(buffer)
+
+	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
 	if err != nil {
 		return fmt.Errorf("unable to create writer: %s", err)
 	}
@@ -367,21 +369,24 @@ func (m *Merger) mergeUploadAndDelete() error {
 	for _, oneBlock := range b.timeSortedFiles() {
 		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
 		if err != nil {
-			return fmt.Errorf("unable to read one NewTestBlock: %s", err)
+			return fmt.Errorf("unable to read one block: %s", err)
 		}
 
 		block, err := blockReader.Read()
 		if block == nil {
-			return fmt.Errorf("NewTestBlock read was nil: %s", err)
+			return fmt.Errorf("block read was nil: %s", err)
 		}
 
 		err = blockWriter.Write(block)
 		if err != nil {
-			return fmt.Errorf("one NewTestBlock writer error: %s", err)
+			return fmt.Errorf("one block writer error: %s", err)
 		}
 	}
 
-	err = m.destStore.WriteObject(blockNumToStr(b.lowerBlock), bytes.NewReader(buffer.Bytes()))
+	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+	defer cancel()
+
+	err = m.destStore.WriteObject(ctx, blockNumToStr(b.lowerBlock), bytes.NewReader(buffer.Bytes()))
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
@@ -410,15 +415,22 @@ func (m *Merger) mergeUploadAndDelete() error {
 
 		f := filename
 		eg.Go(func() error {
-			err = m.sourceStore.DeleteObject(f)
-			if err != nil {
-				zlog.Error("cannot delete onefile object after merging", zap.String("filename", f))
+			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
+			defer cancel()
+
+			err = m.sourceStore.DeleteObject(ctx, f)
+			if err != nil && err.Error() != storage.ErrObjectNotExist.Error() {
+				zlog.Error("cannot delete onefile object after merging", zap.String("filename", f), zap.Error(err))
 			}
 			return nil
 		})
 	}
-	_ = eg.Wait()
-	zlog.Debug("done deleting one-NewTestBlock files")
+	err = eg.Wait()
+	if err != nil {
+		zlog.Warn("cannot delete oneblockfile", zap.Error(err))
+	} else {
+		zlog.Debug("done deleting one-block files", zap.Int("len_filelist", len(b.fileList)))
+	}
 
 	return nil
 }
