@@ -17,16 +17,18 @@ package merger
 import (
 	"context"
 	"fmt"
+	"github.com/dfuse-io/dmetrics"
+	"github.com/dfuse-io/merger/metrics"
 	"io/ioutil"
 	"strconv"
 	"time"
 
-	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
-	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
-	"github.com/dfuse-io/shutter"
 	"github.com/dfuse-io/dgrpc"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger"
+	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
+	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	"github.com/dfuse-io/shutter"
 	"go.uber.org/zap"
 )
 
@@ -43,9 +45,9 @@ type Config struct {
 	MinimalBlockNum              uint64
 	WritersLeewayDuration        time.Duration
 	TimeBetweenStoreLookups      time.Duration
-	SeenBlocksFile          string
-	MaxFixableFork          uint64
-	DeleteBlocksBefore      bool
+	SeenBlocksFile               string
+	MaxFixableFork               uint64
+	DeleteBlocksBefore           bool
 
 	EnableReadinessProbe bool
 }
@@ -65,6 +67,8 @@ func New(config *Config) *App {
 
 func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
+
+	dmetrics.Register(metrics.MetricSet)
 
 	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
 	if err != nil {

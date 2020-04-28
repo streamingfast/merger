@@ -16,15 +16,7 @@ package metrics
 
 import "github.com/dfuse-io/dmetrics"
 
-func init() {
-	metrics.Register()
-}
+var MetricSet = dmetrics.NewSet()
 
-var metrics = dmetrics.NewSet()
-
-var HeadBlockTimeDrift = metrics.NewHeadTimeDrift("merger")
-var HeadBlockNumber = metrics.NewHeadBlockNumber("merger")
-
-func ServeMetrics() {
-	dmetrics.Serve(":9102")
-}
+var HeadBlockTimeDrift = MetricSet.NewHeadTimeDrift("merger")
+var HeadBlockNumber = MetricSet.NewHeadBlockNumber("merger")
