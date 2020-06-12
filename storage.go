@@ -90,7 +90,9 @@ func scanForHighestPrefix(ctx context.Context, store dstore.Store, chunckSize, b
 		b := blockNum + inc
 		leadingZeroes := strings.Repeat("0", getLeadingZeroes(b))
 		prefix := leadingZeroes + strconv.Itoa(int(b))
-		if !fileExistWithPrefix(ctx, prefix, store) {
+		exist := fileExistWithPrefix(ctx, prefix, store)
+		zlog.Debug("file with prefix", zap.String("prefix", prefix), zap.Bool("exist", exist))
+		if !exist {
 			break
 		}
 		blockNum = b
@@ -107,6 +109,7 @@ func highestFilePrefix(ctx context.Context, store dstore.Store, minimalBlockNum 
 	if !fileExistWithPrefix(ctx, filePrefix, store) {
 		// prefix of minimalBlockNum not found.
 		// we consider it has the highest file prefix
+		zlog.Info("prefix of minimalBlockNum not found. we consider it has the highest file prefix")
 		return
 	}
 
