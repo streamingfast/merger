@@ -42,6 +42,7 @@ func (b *Bundle) upperBlock() uint64 {
 }
 
 func NewBundle(lowerBlockNum, chunkSize uint64) *Bundle {
+	zlog.Info("Creating new bundle", zap.Uint64("lower_block_num", lowerBlockNum), zap.Uint64("chunk_size", chunkSize))
 	b := &Bundle{
 		chunkSize:  chunkSize,
 		lowerBlock: lowerBlockNum,

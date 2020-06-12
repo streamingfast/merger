@@ -144,6 +144,7 @@ func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pb
 }
 
 func (m *Merger) SetupBundle(start, stop uint64) {
+	zlog.Info("Setting up bundle", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.Uint64("chunk_size", m.chunkSize))
 	m.liveMode = stop == 0
 	m.bundle = NewBundle(start-(start%m.chunkSize), m.chunkSize)
 	m.stopBlockNum = stop
