@@ -10,9 +10,8 @@ require (
 	github.com/dfuse-io/dmetrics v0.0.0-20200406214800-499fc7b320ab
 	github.com/dfuse-io/dstore v0.1.0
 	github.com/dfuse-io/logging v0.0.0-20200407175011-14021b7a79af
-	github.com/dfuse-io/pbgo v0.0.6-0.20200602201455-99986ef5a09d
+	github.com/dfuse-io/pbgo v0.0.6-0.20200619193216-9bbf0c9fb1f8
 	github.com/dfuse-io/shutter v1.4.1-0.20200319040708-c809eec458e6
-	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/stretchr/testify v1.4.0
 	go.uber.org/zap v1.14.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
