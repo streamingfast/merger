@@ -5,7 +5,6 @@ require (
 	github.com/abourget/llerrgroup v0.2.0
 	github.com/dfuse-io/bstream v0.0.2-0.20200703210323-f92a36d42ed3
 	github.com/dfuse-io/dbin v0.0.0-20200406215642-ec7f22e794eb
-	github.com/dfuse-io/derr v0.0.0-20200406214256-c690655246a1
 	github.com/dfuse-io/dgrpc v0.0.0-20200406214416-6271093e544c
 	github.com/dfuse-io/dmetrics v0.0.0-20200406214800-499fc7b320ab
 	github.com/dfuse-io/dstore v0.1.0
@@ -15,7 +14,6 @@ require (
 	github.com/stretchr/testify v1.4.0
 	go.uber.org/zap v1.14.0
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/tools v0.0.0-20191216173652-a0e659d51361
 	gopkg.in/olivere/elastic.v3 v3.0.75
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 )
