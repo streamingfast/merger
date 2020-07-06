@@ -17,6 +17,7 @@ package merger
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"io/ioutil"
 	_ "net/http/pprof"
@@ -26,7 +27,6 @@ import (
 
 	"github.com/dfuse-io/bstream"
 	"github.com/dfuse-io/dbin"
-	"github.com/dfuse-io/derr"
 	"github.com/dfuse-io/dstore"
 	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pb "github.com/dfuse-io/pbgo/dfuse/merger/v1"
@@ -60,24 +60,25 @@ func NewTestBlock(id string, num uint64) *bstream.Block {
 		LibNum:         0,
 		PayloadKind:    TestProtocol,
 		PayloadVersion: 0,
-		PayloadBuffer:  nil,
+		PayloadBuffer:  []byte{0x0},
 	}
 }
 
-func writeOneBlockFile(block *bstream.Block, filename string, store dstore.Store) {
+func writeOneBlockFile(t *testing.T, block *bstream.Block, filename string, store dstore.Store) {
+	t.Helper()
 	buffer := bytes.NewBuffer([]byte{})
 	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
-	derr.Check("unable to create NewTestBlock writer", err)
+	require.NoError(t, err)
 
 	err = blockWriter.Write(block)
-	derr.Check("unable to write test NewTestBlock", err)
+	require.NoError(t, err)
 
 	err = store.WriteObject(
 		context.Background(),
 		filename,
 		bytes.NewReader(buffer.Bytes()),
 	)
-	derr.Check("unable to write NewTestBlock to storage", err)
+	require.NoError(t, err)
 }
 
 func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, cleanup func()) {
@@ -106,36 +107,43 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 }
 
 func TestMergeUploadAndDelete(t *testing.T) {
+
 	m, oneStore, multiStore, cleanup := setupMerger(t)
+	fmt.Println("Merger setup completed")
 	defer cleanup()
 
-	writeOneBlockFile(
+	fmt.Println("about to write one block files")
+	writeOneBlockFile(t,
 		NewTestBlock("dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64", 100),
 		"0000000100-19700117T153111.4-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64-db10afd3efa45327eb284c83cc925bd9bd7966aea53067c1eebe0724d124ec1e",
 		oneStore,
 	)
-	writeOneBlockFile(
+	fmt.Println("Written dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64")
+
+	writeOneBlockFile(t,
 		NewTestBlock("4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc", 101),
 		"0000000101-19700117T153112.4-4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64",
 		oneStore,
 	)
 
-	writeOneBlockFile(
+	writeOneBlockFile(t,
 		NewTestBlock("16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64", 102),
 		"0000000102-19700117T153113.4-16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64-4f66fd0241681ebbc119f97e952c1036b87b6e8f64f5c5d84c5c7a9bb1ebfdcc",
 		oneStore,
 	)
 
-	writeOneBlockFile(
+	writeOneBlockFile(t,
 		NewTestBlock("39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713", 103),
 		"0000000103-19700117T153114.4-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713-16110f3aa1895de2ec22cfd746751f724d112a953c71b62858a1523b50f3dc64",
 		oneStore,
 	)
-	writeOneBlockFile(
+	writeOneBlockFile(t,
 		NewTestBlock("7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e", 104),
 		"0000000104-19700117T153115.4-7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713",
 		oneStore,
 	)
+
+	fmt.Println("one block files created")
 
 	m.triageNewOneBlockFiles([]string{
 		"0000000100-19700117T153111.4-dfe2e70d6c116a541101cecbb256d7402d62125f6ddc9b607d49edc989825c64-db10afd3efa45327eb284c83cc925bd9bd7966aea53067c1eebe0724d124ec1e",
@@ -145,7 +153,9 @@ func TestMergeUploadAndDelete(t *testing.T) {
 		"0000000104-19700117T153115.4-7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713",
 	})
 
+	fmt.Println("Triage completed")
 	m.mergeUploadAndDelete()
+	fmt.Println("Upload and delete files completed")
 
 	readBack, err := multiStore.OpenObject(context.Background(), "0000000100")
 	require.NoError(t, err)
@@ -275,7 +285,7 @@ func TestPreMergedBlocks(t *testing.T) {
 
 			var writtenFileNames []string
 			for _, blk := range test.writeBlocks {
-				writeOneBlockFile(
+				writeOneBlockFile(t,
 					NewTestBlock(blk.id, blk.num),
 					blk.filename,
 					oneStore,
