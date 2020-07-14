@@ -67,8 +67,9 @@ func (m *Merger) FindNextBaseBlock() (uint64, error) {
 }
 
 func getLeadingZeroes(blockNum uint64) (leadingZeros int) {
-	zlog.Debug("looking for filename", zap.String("filename", fileNameForBlocksBundle(int64(blockNum))))
-	for i, digit := range fileNameForBlocksBundle(int64(blockNum)) {
+	filename := fileNameForBlocksBundle(blockNum)
+	zlog.Debug("looking for filename", zap.String("filename", filename))
+	for i, digit := range filename {
 		if digit == '0' && leadingZeros == 0 {
 			continue
 		}
@@ -131,6 +132,6 @@ func fileExistWithPrefix(ctx context.Context, filePrefix string, s dstore.Store)
 	return false
 }
 
-func fileNameForBlocksBundle(blockNum int64) string {
+func fileNameForBlocksBundle(blockNum uint64) string {
 	return fmt.Sprintf("%010d", blockNum)
 }
