@@ -363,7 +363,7 @@ func (m *Merger) mergeUploadAndDelete() error {
 	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 	defer cancel()
 
-	err := m.destStore.WriteObject(ctx, blockNumToStr(b.lowerBlock), NewBundleReader(ctx, b, m.sourceStore))
+	err := m.destStore.WriteObject(ctx, fileNameForBlocksBundle(b.lowerBlock), NewBundleReader(ctx, b, m.sourceStore))
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
@@ -378,7 +378,7 @@ func (m *Merger) mergeUploadAndDelete() error {
 		}
 	}
 
-	zlog.Info("merged and uploaded", zap.String("filename", blockNumToStr(b.lowerBlock)), zap.Duration("merge_time", time.Since(t0)))
+	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(b.lowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
 	for filename := range b.fileList {
 		m.seenBlocks.Add(filename) // add them to 'seenbefore' right before deleting them on gs
