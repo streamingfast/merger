@@ -25,6 +25,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/dfuse-io/bstream"
 	"github.com/dfuse-io/dbin"
 	"github.com/dfuse-io/dstore"
@@ -107,6 +109,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 }
 
 func TestMergeUploadAndDelete(t *testing.T) {
+	bstream.GetBlockWriterHeaderLen = 0 //because GetBlockWriterFactory return a writer that do not add the header
 
 	m, oneStore, multiStore, cleanup := setupMerger(t)
 	fmt.Println("Merger setup completed")
@@ -212,6 +215,39 @@ var blk104 = &testBlockFile{
 	filename: "0000000104-19700117T153115.4-7faae5e905007d146c15b22dcb736935cb344f88be0d35fe656701e84d52398e-39bef3da2cd14e02781b576050dc426606149bff937a4af43e65417e6e98c713",
 }
 
+type TestMerger_PreMergedBlocksServer struct {
+	responses []*pb.Response
+}
+
+func (s *TestMerger_PreMergedBlocksServer) Send(response *pb.Response) error {
+	s.responses = append(s.responses, response)
+	return nil
+}
+
+func (s *TestMerger_PreMergedBlocksServer) SetHeader(md metadata.MD) error {
+	panic("implement me")
+}
+
+func (s *TestMerger_PreMergedBlocksServer) SendHeader(md metadata.MD) error {
+	panic("implement me")
+}
+
+func (s *TestMerger_PreMergedBlocksServer) SetTrailer(md metadata.MD) {
+	panic("implement me")
+}
+
+func (s *TestMerger_PreMergedBlocksServer) Context() context.Context {
+	return context.Background()
+}
+
+func (s *TestMerger_PreMergedBlocksServer) SendMsg(m interface{}) error {
+	panic("implement me")
+}
+
+func (s *TestMerger_PreMergedBlocksServer) RecvMsg(m interface{}) error {
+	panic("implement me")
+}
+
 func TestPreMergedBlocks(t *testing.T) {
 
 	tests := []struct {
@@ -295,22 +331,27 @@ func TestPreMergedBlocks(t *testing.T) {
 
 			m.triageNewOneBlockFiles(writtenFileNames)
 
-			pbresp, err := m.PreMergedBlocks(context.Background(), &pb.Request{
-				LowBlockNum: test.lowBlockNum,
-				HighBlockID: test.highBlockID,
-			})
-			assert.NoError(t, err)
+			server := &TestMerger_PreMergedBlocksServer{}
+
+			err := m.PreMergedBlocks(
+				&pb.Request{
+					LowBlockNum: test.lowBlockNum,
+					HighBlockID: test.highBlockID,
+				},
+				server,
+			)
+			require.NoError(t, err)
 
 			if test.expectedFound {
-				assert.True(t, pbresp.Found)
-				assert.Len(t, pbresp.Blocks, len(test.expectedBlockIDs))
+				assert.Len(t, server.responses, len(test.expectedBlockIDs))
 				var foundBlockIDs []string
-				for _, blk := range pbresp.Blocks {
+				for _, resp := range server.responses {
+					blk := resp.Block
 					foundBlockIDs = append(foundBlockIDs, blk.GetId())
 				}
 				assert.EqualValues(t, test.expectedBlockIDs, foundBlockIDs)
 			} else {
-				assert.False(t, pbresp.Found)
+				assert.Equal(t, 0, len(server.responses))
 			}
 		})
 	}

@@ -14,7 +14,13 @@
 
 package merger
 
-import "time"
+import (
+	"context"
+	"io/ioutil"
+	"time"
+
+	"github.com/dfuse-io/dstore"
+)
 
 type OneBlockFile struct {
 	name       string
@@ -22,5 +28,32 @@ type OneBlockFile struct {
 	id         string
 	num        uint64
 	previousID string
-	blk        []byte
+	data       []byte
+}
+
+func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error) {
+	if len(f.data) == 0 {
+		err := f.downloadFile(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return f.data, nil
+}
+
+func (f *OneBlockFile) downloadFile(ctx context.Context, s dstore.Store) error {
+	out, err := s.OpenObject(ctx, f.name)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	f.data, err = ioutil.ReadAll(out)
+	return err
 }

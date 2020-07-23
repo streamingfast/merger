@@ -15,14 +15,11 @@
 package merger
 
 import (
-	"context"
-	"io/ioutil"
 	"sort"
 	"time"
 
 	"github.com/dfuse-io/dstore"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 )
 
 type Bundle struct {
@@ -33,8 +30,6 @@ type Bundle struct {
 
 	upperBlockID   string // this would correspond to the block_id of the LAST NewTestBlock of the bundle, 38918199
 	upperBlockTime time.Time
-
-	downloadWaitGroup *errgroup.Group
 }
 
 func (b *Bundle) upperBlock() uint64 {
@@ -48,8 +43,6 @@ func NewBundle(lowerBlockNum, chunkSize uint64) *Bundle {
 		lowerBlock: lowerBlockNum,
 		fileList:   make(map[string]*OneBlockFile),
 	}
-	group := &errgroup.Group{}
-	b.downloadWaitGroup = group
 	return b
 }
 
@@ -104,7 +97,7 @@ func (b *Bundle) triage(filename string, sourceStore dstore.Store, seenCache *Se
 
 	if blockNum < b.upperBlock() {
 		zlog.Debug("adding and downloading file", zap.String("filename", filename), zap.Time("blocktime", blockTime), zap.Uint64("blockNum", blockNum))
-		b.addAndDownload(&OneBlockFile{
+		b.add(&OneBlockFile{
 			name:       filename,
 			blockTime:  blockTime,
 			id:         blockIDSuffix,
@@ -135,41 +128,6 @@ func (b *Bundle) containsFilename(filename string) bool {
 	return found
 }
 
-func (b *Bundle) addAndDownload(oneBlock *OneBlockFile, sourceStore dstore.Store) {
+func (b *Bundle) add(oneBlock *OneBlockFile, sourceStore dstore.Store) {
 	b.fileList[oneBlock.name] = oneBlock
-
-	b.downloadWaitGroup.Go(func() error {
-		// FIXME: we need to manage the error, make it bubble up, retry or something...
-		err := Retry(5, 500*time.Millisecond, func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-			defer cancel()
-
-			return downloadFile(ctx, oneBlock, sourceStore)
-		})
-
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
-}
-
-func downloadFile(ctx context.Context, bf *OneBlockFile, s dstore.Store) error {
-	out, err := s.OpenObject(ctx, bf.name)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	// TODO: In the future, implement `ctx` cancellation *during* download here.. would require
-	//       splitting `ReadAll` in chunks and check if the context is `Done` between each chunk.
-	bf.blk, err = ioutil.ReadAll(out)
-	return err
 }

@@ -26,7 +26,6 @@ import (
 	"cloud.google.com/go/storage"
 	"github.com/abourget/llerrgroup"
 	"github.com/dfuse-io/bstream"
-	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
 
@@ -81,24 +80,19 @@ func NewMerger(
 		timeBetweenStoreLookups: timeBetweenStoreLookups,
 	}
 }
-
-func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pbmerge.Response, error) {
+func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_PreMergedBlocksServer) error {
 	m.bundleLock.Lock()
 	defer m.bundleLock.Unlock()
 
 	if req.LowBlockNum < m.bundle.lowerBlock || req.LowBlockNum >= m.bundle.upperBlock() {
-		return &pbmerge.Response{}, nil
-	}
-
-	if err := m.bundle.downloadWaitGroup.Wait(); err != nil {
-		return nil, err
+		return nil
 	}
 
 	files := m.bundle.timeSortedFiles()
 	var foundHighBlockID bool
 	var foundLowBlockNum bool
 	for _, oneBlock := range files {
-		if uint64(oneBlock.num) == req.LowBlockNum {
+		if oneBlock.num == req.LowBlockNum {
 			foundLowBlockNum = true
 		}
 		if strings.HasSuffix(req.HighBlockID, oneBlock.id) {
@@ -107,40 +101,49 @@ func (m *Merger) PreMergedBlocks(ctx context.Context, req *pbmerge.Request) (*pb
 		}
 	}
 	if !foundLowBlockNum || !foundHighBlockID {
-		return &pbmerge.Response{}, nil // found=false
+		return nil
 	}
 
-	protoblocks := []*pbbstream.Block{}
 	for _, oneBlock := range m.bundle.timeSortedFiles() {
-		if uint64(oneBlock.num) < req.LowBlockNum {
+		if oneBlock.num < req.LowBlockNum {
 			continue
 		}
-		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
+		data, err := oneBlock.Data(server.Context(), m.sourceStore)
 		if err != nil {
-			return nil, fmt.Errorf("unable to read one block: %s", err)
+			return fmt.Errorf("unable to get one block data: %w", err)
+		}
+
+		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
+		if err != nil {
+			return fmt.Errorf("unable to read one block: %w", err)
 		}
 
 		block, err := blockReader.Read()
 		if block == nil {
-			return nil, err
+			return err
 		}
 
 		protoblock, err := block.ToProto()
 		if protoblock == nil || err != nil {
-			return nil, err
+			return err
 		}
-		protoblocks = append(protoblocks, protoblock)
+
+		err = server.Send(
+			&pbmerge.Response{
+				Found: true, //todo: this is not require any more
+				Block: protoblock,
+			})
+
+		if err != nil {
+			return fmt.Errorf("unable send response to client: %w", err)
+		}
 
 		if strings.HasSuffix(req.HighBlockID, oneBlock.id) {
 			break
 		}
 	}
 
-	resp := &pbmerge.Response{
-		Found:  true,
-		Blocks: protoblocks,
-	}
-	return resp, nil
+	return nil
 }
 
 func (m *Merger) SetupBundle(start, stop uint64) {
@@ -356,38 +359,11 @@ func (m *Merger) mergeUploadAndDelete() error {
 	b := m.bundle
 
 	t0 := time.Now()
-	if err := b.downloadWaitGroup.Wait(); err != nil {
-		return err
-	}
-
-	buffer := bytes.NewBuffer([]byte{})
-
-	blockWriter, err := bstream.GetBlockWriterFactory.New(buffer)
-	if err != nil {
-		return fmt.Errorf("unable to create writer: %s", err)
-	}
-
-	for _, oneBlock := range b.timeSortedFiles() {
-		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(oneBlock.blk))
-		if err != nil {
-			return fmt.Errorf("unable to read one block: %s", err)
-		}
-
-		block, err := blockReader.Read()
-		if block == nil {
-			return fmt.Errorf("block read was nil: %s", err)
-		}
-
-		err = blockWriter.Write(block)
-		if err != nil {
-			return fmt.Errorf("one block writer error: %s", err)
-		}
-	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 	defer cancel()
 
-	err = m.destStore.WriteObject(ctx, blockNumToStr(b.lowerBlock), bytes.NewReader(buffer.Bytes()))
+	err := m.destStore.WriteObject(ctx, blockNumToStr(b.lowerBlock), NewBundleReader(ctx, b, m.sourceStore))
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
