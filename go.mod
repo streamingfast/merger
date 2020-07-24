@@ -5,7 +5,7 @@ go 1.13
 require (
 	cloud.google.com/go/storage v1.4.0
 	github.com/abourget/llerrgroup v0.2.0
-	github.com/dfuse-io/bstream v0.0.2-0.20200723165551-55b8b4c9b523
+	github.com/dfuse-io/bstream v0.0.2-0.20200724152201-64aae5bc532f
 	github.com/dfuse-io/dbin v0.0.0-20200406215642-ec7f22e794eb
 	github.com/dfuse-io/dgrpc v0.0.0-20200406214416-6271093e544c
 	github.com/dfuse-io/dmetrics v0.0.0-20200406214800-499fc7b320ab
@@ -21,4 +21,3 @@ require (
 )
 
 replace git.apache.org/thrift.git => github.com/apache/thrift v0.0.0-20180902110319-2566ecd5d999
-
