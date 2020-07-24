@@ -225,7 +225,7 @@ func (s *TestMerger_PreMergedBlocksServer) Send(response *pb.Response) error {
 }
 
 func (s *TestMerger_PreMergedBlocksServer) SetHeader(md metadata.MD) error {
-	panic("implement me")
+	return nil
 }
 
 func (s *TestMerger_PreMergedBlocksServer) SendHeader(md metadata.MD) error {
@@ -340,19 +340,18 @@ func TestPreMergedBlocks(t *testing.T) {
 				},
 				server,
 			)
-			require.NoError(t, err)
-
-			if test.expectedFound {
-				assert.Len(t, server.responses, len(test.expectedBlockIDs))
-				var foundBlockIDs []string
-				for _, resp := range server.responses {
-					blk := resp.Block
-					foundBlockIDs = append(foundBlockIDs, blk.GetId())
-				}
-				assert.EqualValues(t, test.expectedBlockIDs, foundBlockIDs)
-			} else {
+			if !test.expectedFound {
+				require.Error(t, err)
 				assert.Equal(t, 0, len(server.responses))
 			}
+
+			assert.Len(t, server.responses, len(test.expectedBlockIDs))
+			var foundBlockIDs []string
+			for _, resp := range server.responses {
+				blk := resp.Block
+				foundBlockIDs = append(foundBlockIDs, blk.GetId())
+			}
+			assert.EqualValues(t, test.expectedBlockIDs, foundBlockIDs)
 		})
 	}
 }

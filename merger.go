@@ -28,6 +28,7 @@ import (
 	"github.com/dfuse-io/bstream"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
+	"google.golang.org/grpc/metadata"
 
 	//_ "github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/dstore"
@@ -85,7 +86,9 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 	defer m.bundleLock.Unlock()
 
 	if req.LowBlockNum < m.bundle.lowerBlock || req.LowBlockNum >= m.bundle.upperBlock() {
-		return nil
+		err := fmt.Errorf("cannot find requested blocks")
+		server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
 	}
 
 	files := m.bundle.timeSortedFiles()
@@ -100,8 +103,15 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 			break
 		}
 	}
-	if !foundLowBlockNum || !foundHighBlockID {
-		return nil
+	if !foundLowBlockNum {
+		err := fmt.Errorf("cannot find requested lowBlockNum")
+		server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
+	}
+	if !foundHighBlockID {
+		err := fmt.Errorf("cannot find requested highBlockID")
+		server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
 	}
 
 	for _, oneBlock := range m.bundle.timeSortedFiles() {
