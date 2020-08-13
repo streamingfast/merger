@@ -2,6 +2,7 @@ package merger
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/dfuse-io/bstream"
@@ -41,10 +42,15 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 
 			//merge file only contain header
 			removeHeaderLength := bstream.GetBlockWriterHeaderLen
+
 			if !r.headerRead {
 				removeHeaderLength = 0
 				r.headerRead = true
 			}
+			if len(data) < removeHeaderLength {
+				return 0, fmt.Errorf("error in oneblockfile: corrupted: size is too small: %d (expected more than %d)", len(data), removeHeaderLength)
+			}
+
 			r.readBuffer = append(r.readBuffer, data[removeHeaderLength:]...)
 		} else {
 			break //no more file
