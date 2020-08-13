@@ -180,22 +180,18 @@ func (m *Merger) CacheInvalid() bool {
 
 func newOneBlockFilesDeleter(store dstore.Store) *oneBlockFilesDeleter {
 	return &oneBlockFilesDeleter{
-		lastDeletable: make(map[string]struct{}),
-		store:         store,
+		store: store,
 	}
 }
 
 type oneBlockFilesDeleter struct {
 	sync.Mutex
-	lastDeletable map[string]struct{}
-	toProcess     chan string
-	failed        chan string
-	store         dstore.Store
+	toProcess chan string
+	store     dstore.Store
 }
 
 func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
 	od.toProcess = make(chan string, maxDeletions)
-	od.failed = make(chan string, maxDeletions)
 	for i := 0; i < threads; i++ {
 		go od.processDeletions()
 	}
@@ -207,32 +203,29 @@ func (od *oneBlockFilesDeleter) Delete(files []string) {
 	if len(files) == 0 {
 		return
 	}
-	zlog.Info("Calling deletion on files that are too old or already seen", zap.Int("number_of_files", len(files)), zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
+	zlog.Info("deleting files that are too old or already seen", zap.Int("number_of_files", len(files)), zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
 
-	for {
-		var empty bool
+	deletable := make(map[string]struct{})
+
+	// dedupe processing queue
+	for empty := false; !empty; {
 		select {
-		case f := <-od.failed:
-			delete(od.lastDeletable, f) // removing it from here will make us add it again to the next process list
+		case f := <-od.toProcess:
+			deletable[f] = struct{}{}
 		default:
 			empty = true
 		}
-		if empty {
-			break
-		}
 	}
 
-	newDeletable := make(map[string]struct{})
 	for _, file := range files {
 		if len(od.toProcess) == cap(od.toProcess) {
 			break
 		}
-		newDeletable[file] = struct{}{}
-		if _, exists := od.lastDeletable[file]; !exists {
+		if _, exists := deletable[file]; !exists {
 			od.toProcess <- file
 		}
+		deletable[file] = struct{}{}
 	}
-	od.lastDeletable = newDeletable
 }
 
 func (od *oneBlockFilesDeleter) processDeletions() {
@@ -250,8 +243,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 			time.Sleep(time.Duration(100*i) * time.Millisecond)
 		}
 		if err != nil {
-			zlog.Warn("cannot delete oneblock file", zap.String("file", file), zap.Error(err))
-			od.failed <- file
+			zlog.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
 		}
 	}
 }
@@ -283,9 +275,13 @@ func (m *Merger) launch() (err error) {
 			zlog.Debug("verifying if bundle file already exist in store")
 			baseBlockNum, err := m.FindNextBaseBlock()
 			if err != nil {
-				zlog.Warn("an error on find next base block")
-				time.Sleep(m.timeBetweenStoreLookups)
-				continue
+				zlog.Warn("an error occured on find next base block", zap.Error(err))
+				select {
+				case <-time.After(m.timeBetweenStoreLookups):
+					continue
+				case <-m.Terminating():
+					return m.Err()
+				}
 			}
 			if baseBlockNum > m.bundle.lowerBlock {
 				zlog.Info("bumping bundle, destination file already exists",
