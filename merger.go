@@ -236,23 +236,24 @@ func (od *oneBlockFilesDeleter) Delete(files []string) {
 }
 
 func (od *oneBlockFilesDeleter) processDeletions() {
-	file := <-od.toProcess
+	for {
+		file := <-od.toProcess
 
-	var err error
-	for i := 0; i < 3; i++ {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		err = od.store.DeleteObject(ctx, file)
-		cancel()
-		if err == nil {
-			break
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			err = od.store.DeleteObject(ctx, file)
+			cancel()
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Duration(100*i) * time.Millisecond)
 		}
-		time.Sleep(time.Duration(100*i) * time.Millisecond)
+		if err != nil {
+			zlog.Warn("cannot delete oneblock file", zap.String("file", file), zap.Error(err))
+			od.failed <- file
+		}
 	}
-	if err != nil {
-		zlog.Warn("cannot delete oneblock file", zap.String("file", file), zap.Error(err))
-		od.failed <- file
-	}
-
 }
 
 func (m *Merger) Launch() {
@@ -280,7 +281,13 @@ func (m *Merger) launch() (err error) {
 
 		if len(oneBlockFiles) == 0 {
 			zlog.Debug("verifying if bundle file already exist in store")
-			if baseBlockNum, err := m.FindNextBaseBlock(); err != nil && baseBlockNum > m.bundle.lowerBlock {
+			baseBlockNum, err := m.FindNextBaseBlock()
+			if err != nil {
+				zlog.Warn("an error on find next base block")
+				time.Sleep(m.timeBetweenStoreLookups)
+				continue
+			}
+			if baseBlockNum > m.bundle.lowerBlock {
 				zlog.Info("bumping bundle, destination file already exists",
 					zap.Uint64("previous_lowerblock", m.bundle.lowerBlock),
 					zap.Uint64("new_lowerblock", baseBlockNum),
