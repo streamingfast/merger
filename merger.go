@@ -38,18 +38,20 @@ import (
 
 type Merger struct {
 	*shutter.Shutter
-	sourceStore             dstore.Store
-	destStore               dstore.Store
-	chunkSize               uint64
-	grpcListenAddr          string
-	seenBlocks              *SeenBlockCache
-	progressFilename        string
-	liveMode                bool
-	minimalBlockNum         uint64
-	stopBlockNum            uint64
-	writersLeewayDuration   time.Duration // 0 during reprocessing, 25 secs during live.
-	deleteBlocksBefore      bool
-	timeBetweenStoreLookups time.Duration // should be very low on local filesystem
+	sourceStore                    dstore.Store
+	destStore                      dstore.Store
+	chunkSize                      uint64
+	grpcListenAddr                 string
+	seenBlocks                     *SeenBlockCache
+	progressFilename               string
+	liveMode                       bool
+	minimalBlockNum                uint64
+	stopBlockNum                   uint64
+	writersLeewayDuration          time.Duration // 0 during reprocessing, 25 secs during live.
+	deleteBlocksBefore             bool
+	timeBetweenStoreLookups        time.Duration // should be very low on local filesystem
+	oneBlockDeletionThreads        int
+	maxOneBlockOperationsBatchSize int
 
 	bundle     *Bundle // currently managed bundle
 	bundleLock *sync.Mutex
@@ -65,20 +67,25 @@ func NewMerger(
 	seenCacheFilename string,
 	timeBetweenStoreLookups time.Duration,
 	maxFixableFork uint64,
-	grpcListenAddr string) *Merger {
+	grpcListenAddr string,
+	oneBlockDeletionThreads int,
+	maxOneBlockOperationsBatchSize int,
+) *Merger {
 	return &Merger{
-		Shutter:                 shutter.New(),
-		sourceStore:             sourceStore,
-		progressFilename:        progressFilename,
-		destStore:               destStore,
-		chunkSize:               100,
-		minimalBlockNum:         minimalBlockNum,
-		writersLeewayDuration:   writersLeewayDuration,
-		bundleLock:              &sync.Mutex{},
-		deleteBlocksBefore:      deleteBlocksBefore,
-		grpcListenAddr:          grpcListenAddr,
-		seenBlocks:              NewSeenBlockCache(seenCacheFilename, maxFixableFork),
-		timeBetweenStoreLookups: timeBetweenStoreLookups,
+		Shutter:                        shutter.New(),
+		sourceStore:                    sourceStore,
+		progressFilename:               progressFilename,
+		destStore:                      destStore,
+		chunkSize:                      100,
+		minimalBlockNum:                minimalBlockNum,
+		writersLeewayDuration:          writersLeewayDuration,
+		bundleLock:                     &sync.Mutex{},
+		deleteBlocksBefore:             deleteBlocksBefore,
+		grpcListenAddr:                 grpcListenAddr,
+		seenBlocks:                     NewSeenBlockCache(seenCacheFilename, maxFixableFork),
+		timeBetweenStoreLookups:        timeBetweenStoreLookups,
+		oneBlockDeletionThreads:        oneBlockDeletionThreads,
+		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 	}
 }
 func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_PreMergedBlocksServer) error {
@@ -171,17 +178,79 @@ func (m *Merger) CacheInvalid() bool {
 	return m.bundle.lowerBlock > m.seenBlocks.HighestSeen+1
 }
 
-func deleteOneblockFiles(ctx context.Context, files []string, s dstore.Store) {
+func newOneBlockFilesDeleter(store dstore.Store) *oneBlockFilesDeleter {
+	return &oneBlockFilesDeleter{
+		lastDeletable: make(map[string]struct{}),
+		store:         store,
+	}
+}
+
+type oneBlockFilesDeleter struct {
+	sync.Mutex
+	lastDeletable map[string]struct{}
+	toProcess     chan string
+	failed        chan string
+	store         dstore.Store
+}
+
+func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
+	od.toProcess = make(chan string, maxDeletions)
+	od.failed = make(chan string, maxDeletions)
+	for i := 0; i < threads; i++ {
+		go od.processDeletions()
+	}
+}
+
+func (od *oneBlockFilesDeleter) Delete(files []string) {
+	od.Lock()
+	defer od.Unlock()
 	if len(files) == 0 {
 		return
 	}
-	zlog.Info("Deleting old block files", zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
-	for i, filename := range files {
-		if i%10 == 0 {
-			zlog.Info("deleting one block files that is older than our seenBlocksBuffer", zap.Int("i", i), zap.Int("len_todelete", len(files)), zap.String("filename", filename))
+	zlog.Info("Calling deletion on files that are too old or already seen", zap.Int("number_of_files", len(files)), zap.String("first_file", files[0]), zap.String("last_file", files[len(files)-1]))
+
+	for {
+		var empty bool
+		select {
+		case f := <-od.failed:
+			delete(od.lastDeletable, f) // removing it from here will make us add it again to the next process list
+		default:
+			empty = true
 		}
-		f := filename //thread safety
-		go s.DeleteObject(ctx, f)
+		if empty {
+			break
+		}
+	}
+
+	newDeletable := make(map[string]struct{})
+	for _, file := range files {
+		if len(od.toProcess) == cap(od.toProcess) {
+			break
+		}
+		newDeletable[file] = struct{}{}
+		if _, exists := od.lastDeletable[file]; !exists {
+			od.toProcess <- file
+		}
+	}
+	od.lastDeletable = newDeletable
+}
+
+func (od *oneBlockFilesDeleter) processDeletions() {
+	file := <-od.toProcess
+
+	var err error
+	for i := 0; i < 3; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		err = od.store.DeleteObject(ctx, file)
+		cancel()
+		if err == nil {
+			break
+		}
+		time.Sleep(time.Duration(100*i) * time.Millisecond)
+	}
+	if err != nil {
+		zlog.Warn("cannot delete oneblock file", zap.String("file", file), zap.Error(err))
+		od.failed <- file
 	}
 
 }
@@ -200,6 +269,9 @@ func (m *Merger) Launch() {
 
 func (m *Merger) launch() (err error) {
 	var oneBlockFiles []string
+	od := newOneBlockFilesDeleter(m.sourceStore)
+	od.Start(m.oneBlockDeletionThreads, m.maxOneBlockOperationsBatchSize)
+
 	for {
 
 		if m.IsTerminating() {
@@ -226,13 +298,14 @@ func (m *Merger) launch() (err error) {
 
 			zlog.Debug("One block file list empty, building list")
 			var tooOldFiles []string
-			tooOldFiles, _, oneBlockFiles, err = m.retrieveListOfFiles(ctx)
+			var seenFiles []string
+			tooOldFiles, seenFiles, oneBlockFiles, err = m.retrieveListOfFiles(ctx)
 			if err != nil {
 				return err
 			}
 
 			if m.deleteBlocksBefore {
-				deleteOneblockFiles(ctx, tooOldFiles, m.sourceStore)
+				od.Delete(append(tooOldFiles, seenFiles...))
 			}
 		}
 
@@ -319,7 +392,7 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 		}
 		count++
 
-		if len(good) >= 2000 {
+		if len(good) >= m.maxOneBlockOperationsBatchSize {
 			return dstore.StopIteration
 		}
 		return nil

@@ -17,11 +17,12 @@ package merger
 import (
 	"context"
 	"fmt"
-	"github.com/dfuse-io/dmetrics"
-	"github.com/dfuse-io/merger/metrics"
 	"io/ioutil"
 	"strconv"
 	"time"
+
+	"github.com/dfuse-io/dmetrics"
+	"github.com/dfuse-io/merger/metrics"
 
 	"github.com/dfuse-io/dgrpc"
 	"github.com/dfuse-io/dstore"
@@ -32,19 +33,21 @@ import (
 )
 
 type Config struct {
-	StorageOneBlockFilesPath     string
-	StorageMergedBlocksFilesPath string
-	GRPCListenAddr               string
-	Live                         bool
-	StartBlockNum                uint64
-	StopBlockNum                 uint64
-	ProgressFilename             string
-	MinimalBlockNum              uint64
-	WritersLeewayDuration        time.Duration
-	TimeBetweenStoreLookups      time.Duration
-	SeenBlocksFile               string
-	MaxFixableFork               uint64
-	DeleteBlocksBefore           bool
+	StorageOneBlockFilesPath       string
+	StorageMergedBlocksFilesPath   string
+	GRPCListenAddr                 string
+	Live                           bool
+	StartBlockNum                  uint64
+	StopBlockNum                   uint64
+	ProgressFilename               string
+	MinimalBlockNum                uint64
+	WritersLeewayDuration          time.Duration
+	TimeBetweenStoreLookups        time.Duration
+	SeenBlocksFile                 string
+	MaxFixableFork                 uint64
+	DeleteBlocksBefore             bool
+	OneBlockDeletionThreads        int
+	MaxOneBlockOperationsBatchSize int
 }
 
 type App struct {
@@ -63,6 +66,13 @@ func New(config *Config) *App {
 func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
 
+	if a.config.DeleteBlocksBefore && a.config.OneBlockDeletionThreads < 1 {
+		return fmt.Errorf("need at least 1 OneBlockDeletionThread")
+	}
+	if a.config.MaxOneBlockOperationsBatchSize < 250 {
+		return fmt.Errorf("minimum MaxOneBlockOperationsBatchSize is 250")
+	}
+
 	dmetrics.Register(metrics.MetricSet)
 
 	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
@@ -75,7 +85,20 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	m := merger.NewMerger(sourceArchiveStore, destArchiveStore, a.config.WritersLeewayDuration, a.config.MinimalBlockNum, a.config.ProgressFilename, a.config.DeleteBlocksBefore, a.config.SeenBlocksFile, a.config.TimeBetweenStoreLookups, a.config.MaxFixableFork, a.config.GRPCListenAddr)
+	m := merger.NewMerger(
+		sourceArchiveStore,
+		destArchiveStore,
+		a.config.WritersLeewayDuration,
+		a.config.MinimalBlockNum,
+		a.config.ProgressFilename,
+		a.config.DeleteBlocksBefore,
+		a.config.SeenBlocksFile,
+		a.config.TimeBetweenStoreLookups,
+		a.config.MaxFixableFork,
+		a.config.GRPCListenAddr,
+		a.config.OneBlockDeletionThreads,
+		a.config.MaxOneBlockOperationsBatchSize,
+	)
 	zlog.Info("merger initiated")
 
 	var startBlockNum uint64
