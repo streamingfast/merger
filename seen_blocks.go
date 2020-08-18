@@ -22,13 +22,27 @@ import (
 )
 
 type SeenBlockCache struct {
-	M           map[string]bool
-	filename    string
-	keepSize    uint64
+	M        map[string]bool
+	filename string // optional, in-memory mode if not set
+	keepSize uint64
+
 	HighestSeen uint64
+	LowestSeen  uint64
 }
 
-func NewSeenBlockCache(filename string, keepSize uint64) (c *SeenBlockCache) {
+func NewSeenBlockCacheInMemory(startBlockNum, keepSize uint64) (c *SeenBlockCache) {
+	var highestSeen uint64
+	if startBlockNum > 0 {
+		highestSeen = startBlockNum - 1
+	}
+	return &SeenBlockCache{
+		M:           make(map[string]bool),
+		keepSize:    keepSize,
+		HighestSeen: highestSeen,
+	}
+}
+
+func NewSeenBlockCacheFromFile(filename string, keepSize uint64) (c *SeenBlockCache) {
 	var err error
 	c, err = loadSeenBlocks(filename)
 	if err != nil {
@@ -41,20 +55,30 @@ func NewSeenBlockCache(filename string, keepSize uint64) (c *SeenBlockCache) {
 	}
 	c.filename = filename
 	c.keepSize = keepSize
+	c.adjustLowestSeen()
 	return
 }
 
-func (c *SeenBlockCache) Reset() {
-	c.M = make(map[string]bool)
-	c.HighestSeen = 0
+// adjustLowestSeen will never lower the lowestSeen value, it can only go up
+func (c *SeenBlockCache) adjustLowestSeen() {
+	if c.HighestSeen < c.keepSize {
+		return
+	}
+
+	newLowestSeen := c.HighestSeen - c.keepSize
+	if newLowestSeen > c.LowestSeen {
+		c.LowestSeen = newLowestSeen
+	}
+
 }
 
 func (c *SeenBlockCache) IsTooOld(num uint64) bool {
-	if num < c.lowBoundary() {
+	if num < c.LowestSeen {
 		return true
 	}
 	return false
 }
+
 func (c *SeenBlockCache) SeenBefore(filename string) bool {
 	if _, ok := c.M[filename]; ok {
 		return true
@@ -75,18 +99,10 @@ func fileToNum(filename string) uint64 {
 	return blockNum
 }
 
-func (c *SeenBlockCache) lowBoundary() uint64 {
-	if c.HighestSeen <= c.keepSize {
-		return 0
-	}
-
-	return c.HighestSeen - c.keepSize
-
-}
-
 func (c *SeenBlockCache) Truncate() {
+	c.adjustLowestSeen()
 	for filename := range c.M {
-		if fileToNum(filename) < c.lowBoundary() {
+		if fileToNum(filename) < c.LowestSeen {
 			delete(c.M, filename)
 		}
 	}
@@ -105,6 +121,9 @@ func loadSeenBlocks(filename string) (decoded *SeenBlockCache, err error) {
 }
 
 func (c *SeenBlockCache) Save() error {
+	if c.filename == "" { // in memory mode
+		return nil
+	}
 	f, err := os.Create(c.filename)
 	if err != nil {
 		return err

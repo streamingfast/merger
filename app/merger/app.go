@@ -17,8 +17,6 @@ package merger
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"strconv"
 	"time"
 
 	"github.com/dfuse-io/dmetrics"
@@ -36,16 +34,14 @@ type Config struct {
 	StorageOneBlockFilesPath       string
 	StorageMergedBlocksFilesPath   string
 	GRPCListenAddr                 string
-	Live                           bool
+	BatchMode                      bool
 	StartBlockNum                  uint64
 	StopBlockNum                   uint64
-	ProgressFilename               string
 	MinimalBlockNum                uint64
 	WritersLeewayDuration          time.Duration
 	TimeBetweenStoreLookups        time.Duration
-	SeenBlocksFile                 string
+	StateFile                      string
 	MaxFixableFork                 uint64
-	DeleteBlocksBefore             bool
 	OneBlockDeletionThreads        int
 	MaxOneBlockOperationsBatchSize int
 }
@@ -66,7 +62,7 @@ func New(config *Config) *App {
 func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
 
-	if a.config.DeleteBlocksBefore && a.config.OneBlockDeletionThreads < 1 {
+	if a.config.OneBlockDeletionThreads < 1 {
 		return fmt.Errorf("need at least 1 OneBlockDeletionThread")
 	}
 	if a.config.MaxOneBlockOperationsBatchSize < 250 {
@@ -90,11 +86,7 @@ func (a *App) Run() error {
 		destArchiveStore,
 		a.config.WritersLeewayDuration,
 		a.config.MinimalBlockNum,
-		a.config.ProgressFilename,
-		a.config.DeleteBlocksBefore,
-		a.config.SeenBlocksFile,
 		a.config.TimeBetweenStoreLookups,
-		a.config.MaxFixableFork,
 		a.config.GRPCListenAddr,
 		a.config.OneBlockDeletionThreads,
 		a.config.MaxOneBlockOperationsBatchSize,
@@ -103,22 +95,23 @@ func (a *App) Run() error {
 
 	var startBlockNum uint64
 	var stopBlockNum uint64
-	if a.config.Live {
-		startBlockNum, err = m.FindNextBaseBlock()
-		if err != nil {
-			return fmt.Errorf("finding where to start: %w", err)
-		}
-	} else {
+	var seenBlocks *merger.SeenBlockCache
+
+	if a.config.BatchMode {
 		startBlockNum = a.config.StartBlockNum
-		if start, err := getStartBlockFromProgressFile(a.config.ProgressFilename); err == nil {
-			if start > startBlockNum {
-				startBlockNum = start
+		stopBlockNum = a.config.StopBlockNum
+		seenBlocks = merger.NewSeenBlockCacheInMemory(startBlockNum, a.config.MaxFixableFork)
+	} else {
+		seenBlocks = merger.NewSeenBlockCacheFromFile(a.config.StateFile, a.config.MaxFixableFork)
+		if seenBlocks.HighestSeen != 0 {
+			startBlockNum = seenBlocks.HighestSeen + 1
+		} else {
+			startBlockNum, err = m.FindNextBaseBlock()
+			if err != nil {
+				return fmt.Errorf("finding where to start: %w", err)
 			}
 		}
-		stopBlockNum = a.config.StopBlockNum
 	}
-
-	m.SetupBundle(startBlockNum, stopBlockNum)
 
 	gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
 	if err != nil {
@@ -129,7 +122,7 @@ func (a *App) Run() error {
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
 
-	go m.Launch()
+	go m.Launch(startBlockNum, stopBlockNum, seenBlocks)
 
 	zlog.Info("merger running")
 	return nil
@@ -151,19 +144,4 @@ func (a *App) IsReady() bool {
 	}
 
 	return false
-}
-
-func getStartBlockFromProgressFile(filename string) (uint64, error) {
-	if filename == "" {
-		return 0, fmt.Errorf("filename not set")
-	}
-	content, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return 0, err
-	}
-	val, err := strconv.ParseUint(fmt.Sprintf("%s", content), 10, 64)
-	if err != nil {
-		return 0, err
-	}
-	return val, nil
 }
