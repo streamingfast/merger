@@ -287,6 +287,10 @@ func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
 	for _, seenblk := range seenBlocks {
 		m.seenBlocks.Add(seenblk)
 	}
+	if err := m.seenBlocks.Save(); err != nil {
+		zlog.Error("cannot save SeenBlockCache", zap.Error(err))
+	}
+	m.seenBlocks.Truncate()
 
 	return nil
 }
