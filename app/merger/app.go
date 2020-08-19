@@ -81,18 +81,6 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	m := merger.NewMerger(
-		sourceArchiveStore,
-		destArchiveStore,
-		a.config.WritersLeewayDuration,
-		a.config.MinimalBlockNum,
-		a.config.TimeBetweenStoreLookups,
-		a.config.GRPCListenAddr,
-		a.config.OneBlockDeletionThreads,
-		a.config.MaxOneBlockOperationsBatchSize,
-	)
-	zlog.Info("merger initiated")
-
 	var startBlockNum uint64
 	var stopBlockNum uint64
 	var seenBlocks *merger.SeenBlockCache
@@ -103,15 +91,30 @@ func (a *App) Run() error {
 		seenBlocks = merger.NewSeenBlockCacheInMemory(startBlockNum, a.config.MaxFixableFork)
 	} else {
 		seenBlocks = merger.NewSeenBlockCacheFromFile(a.config.StateFile, a.config.MaxFixableFork)
-		if seenBlocks.HighestSeen != 0 {
-			startBlockNum = seenBlocks.HighestSeen + 1
+		if seenBlocks.HighestBlockNum != 0 {
+			startBlockNum = seenBlocks.HighestBlockNum + 1
 		} else {
-			startBlockNum, err = m.FindNextBaseBlock()
+			startBlockNum, err = merger.FindNextBaseBlock(destArchiveStore, a.config.MinimalBlockNum, 100)
 			if err != nil {
 				return fmt.Errorf("finding where to start: %w", err)
 			}
 		}
 	}
+
+	m := merger.NewMerger(
+		sourceArchiveStore,
+		destArchiveStore,
+		a.config.WritersLeewayDuration,
+		100,
+		seenBlocks,
+		startBlockNum,
+		stopBlockNum,
+		a.config.TimeBetweenStoreLookups,
+		a.config.GRPCListenAddr,
+		a.config.OneBlockDeletionThreads,
+		a.config.MaxOneBlockOperationsBatchSize,
+	)
+	zlog.Info("merger initiated")
 
 	gs, err := dgrpc.NewInternalClient(a.config.GRPCListenAddr)
 	if err != nil {
@@ -122,7 +125,7 @@ func (a *App) Run() error {
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
 
-	go m.Launch(startBlockNum, stopBlockNum, seenBlocks)
+	go m.Launch()
 
 	zlog.Info("merger running")
 	return nil

@@ -22,65 +22,65 @@ import (
 )
 
 type SeenBlockCache struct {
-	M        map[string]bool
-	filename string // optional, in-memory mode if not set
-	keepSize uint64
+	OneBlockFiles map[string]bool
+	filename      string // optional, in-memory mode if not set
+	maxSize       uint64
 
-	HighestSeen uint64
-	LowestSeen  uint64
+	HighestBlockNum uint64
+	LowestBlockNum  uint64
 }
 
-func NewSeenBlockCacheInMemory(startBlockNum, keepSize uint64) (c *SeenBlockCache) {
+func NewSeenBlockCacheInMemory(startBlockNum, maxSize uint64) (c *SeenBlockCache) {
 	var highestSeen uint64
 	if startBlockNum > 0 {
 		highestSeen = startBlockNum - 1
 	}
 	return &SeenBlockCache{
-		M:           make(map[string]bool),
-		keepSize:    keepSize,
-		HighestSeen: highestSeen,
+		OneBlockFiles:   make(map[string]bool),
+		maxSize:         maxSize,
+		HighestBlockNum: highestSeen,
 	}
 }
 
-func NewSeenBlockCacheFromFile(filename string, keepSize uint64) (c *SeenBlockCache) {
+func NewSeenBlockCacheFromFile(filename string, maxSize uint64) (c *SeenBlockCache) {
 	var err error
 	c, err = loadSeenBlocks(filename)
 	if err != nil {
 		zlog.Info("cannot load seen_block_cache", zap.String("filename", filename), zap.Error(err))
 		c = &SeenBlockCache{
-			M: make(map[string]bool),
+			OneBlockFiles: make(map[string]bool),
 		}
 	} else {
-		zlog.Info("loaded seen_block_cache", zap.String("filename", filename), zap.Int("length", len(c.M)))
+		zlog.Info("loaded seen_block_cache", zap.String("filename", filename), zap.Int("length", len(c.OneBlockFiles)))
 	}
 	c.filename = filename
-	c.keepSize = keepSize
-	c.adjustLowestSeen()
+	c.maxSize = maxSize
+	c.adjustLowestBlockNum()
 	return
 }
 
-// adjustLowestSeen will never lower the lowestSeen value, it can only go up
-func (c *SeenBlockCache) adjustLowestSeen() {
-	if c.HighestSeen < c.keepSize {
+// adjustLowestBlockNum will never lower the lowestSeen value, it can only go up
+func (c *SeenBlockCache) adjustLowestBlockNum() {
+	if c.HighestBlockNum < c.maxSize {
 		return
 	}
 
-	newLowestSeen := c.HighestSeen - c.keepSize
-	if newLowestSeen > c.LowestSeen {
-		c.LowestSeen = newLowestSeen
+	newLowestBlockNum := c.HighestBlockNum - c.maxSize
+	if newLowestBlockNum > c.LowestBlockNum {
+		c.LowestBlockNum = newLowestBlockNum
 	}
 
 }
 
 func (c *SeenBlockCache) IsTooOld(num uint64) bool {
-	if num < c.LowestSeen {
+	if num < c.LowestBlockNum {
 		return true
 	}
 	return false
 }
 
 func (c *SeenBlockCache) SeenBefore(filename string) bool {
-	if _, ok := c.M[filename]; ok {
+	if _, ok := c.OneBlockFiles[filename]; ok {
 		return true
 	}
 	return false
@@ -88,10 +88,10 @@ func (c *SeenBlockCache) SeenBefore(filename string) bool {
 
 func (c *SeenBlockCache) Add(filename string) {
 	num := fileToNum(filename)
-	if num > c.HighestSeen {
-		c.HighestSeen = num
+	if num > c.HighestBlockNum {
+		c.HighestBlockNum = num
 	}
-	c.M[filename] = true
+	c.OneBlockFiles[filename] = true
 }
 
 func fileToNum(filename string) uint64 {
@@ -100,10 +100,10 @@ func fileToNum(filename string) uint64 {
 }
 
 func (c *SeenBlockCache) Truncate() {
-	c.adjustLowestSeen()
-	for filename := range c.M {
-		if fileToNum(filename) < c.LowestSeen {
-			delete(c.M, filename)
+	c.adjustLowestBlockNum()
+	for filename := range c.OneBlockFiles {
+		if fileToNum(filename) < c.LowestBlockNum {
+			delete(c.OneBlockFiles, filename)
 		}
 	}
 }

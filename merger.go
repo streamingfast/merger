@@ -45,7 +45,6 @@ type Merger struct {
 	grpcListenAddr                 string
 	seenBlocks                     *SeenBlockCache
 	progressFilename               string
-	minimalBlockNum                uint64
 	stopBlockNum                   uint64
 	writersLeewayDuration          time.Duration // 0 during reprocessing, 25 secs during live.
 	deleteBlocksBefore             bool
@@ -61,7 +60,10 @@ func NewMerger(
 	sourceStore dstore.Store,
 	destStore dstore.Store,
 	writersLeewayDuration time.Duration,
-	minimalBlockNum uint64,
+	chunkSize uint64,
+	seenBlocks *SeenBlockCache,
+	startBlockNum uint64,
+	stopBlockNum uint64,
 	timeBetweenStoreLookups time.Duration,
 	grpcListenAddr string,
 	oneBlockDeletionThreads int,
@@ -71,8 +73,10 @@ func NewMerger(
 		Shutter:                        shutter.New(),
 		sourceStore:                    sourceStore,
 		destStore:                      destStore,
-		chunkSize:                      100,
-		minimalBlockNum:                minimalBlockNum,
+		chunkSize:                      chunkSize,
+		bundle:                         NewBundle(startBlockNum-(startBlockNum%chunkSize), chunkSize),
+		stopBlockNum:                   stopBlockNum,
+		seenBlocks:                     seenBlocks,
 		writersLeewayDuration:          writersLeewayDuration,
 		bundleLock:                     &sync.Mutex{},
 		grpcListenAddr:                 grpcListenAddr,
@@ -226,11 +230,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 	}
 }
 
-func (m *Merger) Launch(start, stop uint64, seenCache *SeenBlockCache) {
-	m.bundle = NewBundle(start-(start%m.chunkSize), m.chunkSize)
-	m.stopBlockNum = stop
-	m.seenBlocks = seenCache
-
+func (m *Merger) Launch() {
 	// figure out where to start merging based on dest store
 	zlog.Info("starting merger", zap.Uint64("lower_block_num", m.bundle.lowerBlock))
 
@@ -424,7 +424,7 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 	})
 
 	zlog.Info("retrieved list of files",
-		zap.Uint64("seenblock_low_boundary", m.seenBlocks.LowestSeen),
+		zap.Uint64("seenblock_low_boundary", m.seenBlocks.LowestBlockNum),
 		zap.Uint64("bundle_lower_block", m.bundle.lowerBlock),
 		zap.Int("seen_files_count", len(seenInCache)),
 		zap.Int("too_old_files_count", len(tooOld)),
