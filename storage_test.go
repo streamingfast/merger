@@ -157,8 +157,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			m := &Merger{destStore: s, chunkSize: test.chunkSize, minimalBlockNum: test.minimalBlockNum}
-			i, err := m.FindNextBaseBlock()
+			i, err := FindNextBaseBlock(s, test.minimalBlockNum, test.chunkSize)
 			require.NoError(t, err)
 
 			assert.Equal(t, int(test.expectedBaseBlock), int(i))

@@ -98,9 +98,19 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	dst, err = dstore.NewDBinStore(dstdir)
 	require.NoError(t, err)
 
-	m = NewMerger(src, dst, 0*time.Second, 0, "", false, "/tmp/testmergergob", 0, 999999, "", 2, 100)
-	m.chunkSize = 5
-	m.bundle = NewBundle(100, 100)
+	m = NewMerger(
+		src,
+		dst,
+		0,
+		5,
+		NewSeenBlockCacheInMemory(100, 0),
+		100,
+		0,
+		0,
+		"",
+		2,
+		100,
+	)
 
 	return m, src, dst, func() {
 		os.RemoveAll(srcdir)

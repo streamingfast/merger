@@ -25,26 +25,26 @@ import (
 	"go.uber.org/zap"
 )
 
-// findNextBaseBlock will return an error if there is a gap found ...
-func (m *Merger) FindNextBaseBlock() (uint64, error) {
+// FindNextBaseBlock will return an error if there is a gap found ...
+func FindNextBaseBlock(store dstore.Store, minimalBlockNum uint64, chunkSize uint64) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 	defer cancel()
 
-	prefix, err := highestFilePrefix(ctx, m.destStore, m.minimalBlockNum, m.chunkSize)
+	prefix, err := highestFilePrefix(ctx, store, minimalBlockNum, chunkSize)
 	if err != nil {
 		return 0, err
 	}
 	zlog.Debug("find_next_base looking with prefix", zap.String("prefix", prefix))
 	var lastNumber uint64
 	foundAny := false
-	err = m.destStore.Walk(ctx, prefix, ".tmp", func(filename string) error {
+	err = store.Walk(ctx, prefix, ".tmp", func(filename string) error {
 		fileNumberVal, err := strconv.ParseUint(filename, 10, 32)
 		if err != nil {
 			zlog.Warn("findNextBaseBlock skipping unknown file", zap.String("filename", filename))
 			return nil
 		}
 		fileNumber := fileNumberVal
-		if fileNumber < m.minimalBlockNum {
+		if fileNumber < minimalBlockNum {
 			return nil
 		}
 		foundAny = true
@@ -52,7 +52,7 @@ func (m *Merger) FindNextBaseBlock() (uint64, error) {
 		if lastNumber == 0 {
 			lastNumber = fileNumber
 		} else {
-			if fileNumber != lastNumber+m.chunkSize {
+			if fileNumber != lastNumber+chunkSize {
 				return fmt.Errorf("hole was found between %d and %d", lastNumber, fileNumber)
 			}
 			lastNumber = fileNumber
@@ -63,10 +63,10 @@ func (m *Merger) FindNextBaseBlock() (uint64, error) {
 		err = nil
 	}
 	if !foundAny {
-		return m.minimalBlockNum, err
+		return minimalBlockNum, err
 	}
 
-	return lastNumber + m.chunkSize, err
+	return lastNumber + chunkSize, err
 }
 
 func getLeadingZeroes(blockNum uint64) (leadingZeros int) {

@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"strings"
 	"sync"
@@ -44,8 +45,6 @@ type Merger struct {
 	grpcListenAddr                 string
 	seenBlocks                     *SeenBlockCache
 	progressFilename               string
-	liveMode                       bool
-	minimalBlockNum                uint64
 	stopBlockNum                   uint64
 	writersLeewayDuration          time.Duration // 0 during reprocessing, 25 secs during live.
 	deleteBlocksBefore             bool
@@ -61,12 +60,11 @@ func NewMerger(
 	sourceStore dstore.Store,
 	destStore dstore.Store,
 	writersLeewayDuration time.Duration,
-	minimalBlockNum uint64,
-	progressFilename string,
-	deleteBlocksBefore bool,
-	seenCacheFilename string,
+	chunkSize uint64,
+	seenBlocks *SeenBlockCache,
+	startBlockNum uint64,
+	stopBlockNum uint64,
 	timeBetweenStoreLookups time.Duration,
-	maxFixableFork uint64,
 	grpcListenAddr string,
 	oneBlockDeletionThreads int,
 	maxOneBlockOperationsBatchSize int,
@@ -74,15 +72,14 @@ func NewMerger(
 	return &Merger{
 		Shutter:                        shutter.New(),
 		sourceStore:                    sourceStore,
-		progressFilename:               progressFilename,
 		destStore:                      destStore,
-		chunkSize:                      100,
-		minimalBlockNum:                minimalBlockNum,
+		chunkSize:                      chunkSize,
+		bundle:                         NewBundle(startBlockNum-(startBlockNum%chunkSize), chunkSize),
+		stopBlockNum:                   stopBlockNum,
+		seenBlocks:                     seenBlocks,
 		writersLeewayDuration:          writersLeewayDuration,
 		bundleLock:                     &sync.Mutex{},
-		deleteBlocksBefore:             deleteBlocksBefore,
 		grpcListenAddr:                 grpcListenAddr,
-		seenBlocks:                     NewSeenBlockCache(seenCacheFilename, maxFixableFork),
 		timeBetweenStoreLookups:        timeBetweenStoreLookups,
 		oneBlockDeletionThreads:        oneBlockDeletionThreads,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
@@ -163,21 +160,6 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 	return nil
 }
 
-func (m *Merger) SetupBundle(start, stop uint64) {
-	zlog.Info("Setting up bundle", zap.Uint64("start", start), zap.Uint64("stop", stop), zap.Uint64("chunk_size", m.chunkSize))
-	m.liveMode = stop == 0
-	m.bundle = NewBundle(start-(start%m.chunkSize), m.chunkSize)
-	m.stopBlockNum = stop
-
-	if m.CacheInvalid() {
-		m.seenBlocks.Reset()
-	}
-}
-
-func (m *Merger) CacheInvalid() bool {
-	return m.bundle.lowerBlock > m.seenBlocks.HighestSeen+1
-}
-
 func newOneBlockFilesDeleter(store dstore.Store) *oneBlockFilesDeleter {
 	return &oneBlockFilesDeleter{
 		store: store,
@@ -234,7 +216,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 
 		var err error
 		for i := 0; i < 3; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
 			err = od.store.DeleteObject(ctx, file)
 			cancel()
 			if err == nil {
@@ -260,49 +242,87 @@ func (m *Merger) Launch() {
 	m.Shutdown(err)
 }
 
+func fetchMergedFile(store dstore.Store, lowBlockNum uint64) (io.ReadCloser, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
+	defer cancel()
+
+	return store.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
+}
+
+func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
+	defer file.Close()
+
+	prevLower := m.bundle.lowerBlock
+	newLower := prevLower + m.chunkSize
+	zlog.Info("bumping bundle, destination file already exists",
+		zap.Uint64("previous_lowerblock", prevLower),
+		zap.Uint64("new_lowerblock", newLower),
+	)
+
+	blkReader, err := bstream.GetBlockReaderFactory.New(file)
+	if err != nil {
+		return err
+	}
+
+	seenBlocks := []string{}
+	var lastSeenBlockNum uint64
+	for {
+		block, err := blkReader.Read()
+		if block == nil {
+			if err == io.EOF {
+				break
+			}
+			return err
+		}
+		seenBlocks = append(seenBlocks, blockFileName(block))
+		lastSeenBlockNum = block.Num()
+	}
+	if lastSeenBlockNum != prevLower+m.chunkSize-1 {
+		return fmt.Errorf("remote merged block file for blocks %d (length:%d) end on block %d", prevLower, m.chunkSize, lastSeenBlockNum)
+	}
+
+	m.bundleLock.Lock()
+	defer m.bundleLock.Unlock()
+	m.bundle = NewBundle(newLower, m.chunkSize)
+	for _, seenblk := range seenBlocks {
+		m.seenBlocks.Add(seenblk)
+	}
+	if err := m.seenBlocks.Save(); err != nil {
+		zlog.Error("cannot save SeenBlockCache", zap.Error(err))
+	}
+	m.seenBlocks.Truncate()
+
+	return nil
+}
+
 func (m *Merger) launch() (err error) {
 	var oneBlockFiles []string
 	od := newOneBlockFilesDeleter(m.sourceStore)
 	od.Start(m.oneBlockDeletionThreads, m.maxOneBlockOperationsBatchSize)
 
 	for {
-
 		if m.IsTerminating() {
 			return nil
 		}
 
-		if len(oneBlockFiles) == 0 {
-			zlog.Debug("verifying if bundle file already exist in store")
-			baseBlockNum, err := m.FindNextBaseBlock()
+		zlog.Debug("verifying if bundle file already exist in store")
+		if remoteMergedFile, err := fetchMergedFile(m.destStore, m.bundle.lowerBlock); err == nil {
+			err := m.processRemoteMergedFile(remoteMergedFile)
 			if err != nil {
-				zlog.Warn("an error occured on find next base block", zap.Error(err))
-				select {
-				case <-time.After(m.timeBetweenStoreLookups):
-					continue
-				case <-m.Terminating():
-					return m.Err()
-				}
+				zlog.Error("error processing remote file to bump bundle", zap.Error(err), zap.Uint64("bundle_lowerblock", m.bundle.lowerBlock))
+			} else {
+				continue // keep bumping
 			}
-			if baseBlockNum > m.bundle.lowerBlock {
-				zlog.Info("bumping bundle, destination file already exists",
-					zap.Uint64("previous_lowerblock", m.bundle.lowerBlock),
-					zap.Uint64("new_lowerblock", baseBlockNum),
-				)
-				m.bundleLock.Lock()
-				m.bundle = NewBundle(baseBlockNum, m.chunkSize)
-				if m.CacheInvalid() {
-					m.seenBlocks.Reset()
-				}
-				m.bundleLock.Unlock()
-			}
+		}
 
-			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
-			defer cancel()
-
+		if len(oneBlockFiles) == 0 {
 			zlog.Debug("One block file list empty, building list")
 			var tooOldFiles []string
 			var seenFiles []string
+
+			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 			tooOldFiles, seenFiles, oneBlockFiles, err = m.retrieveListOfFiles(ctx)
+			cancel()
 			if err != nil {
 				return err
 			}
@@ -310,14 +330,13 @@ func (m *Merger) launch() (err error) {
 			if m.deleteBlocksBefore {
 				od.Delete(append(tooOldFiles, seenFiles...))
 			}
-		}
-
-		if len(oneBlockFiles) == 0 {
-			select {
-			case <-time.After(m.timeBetweenStoreLookups):
-				continue
-			case <-m.Terminating():
-				return m.Err()
+			if len(oneBlockFiles) == 0 {
+				select {
+				case <-time.After(m.timeBetweenStoreLookups):
+					continue
+				case <-m.Terminating():
+					return m.Err()
+				}
 			}
 		}
 
@@ -340,8 +359,12 @@ func (m *Merger) launch() (err error) {
 		if incompleteBundle {
 			zlog.Info("waiting for more files to complete bundle", zap.Uint64("bundle_lowerblock", m.bundle.lowerBlock), zap.Int("bundle_length", len(m.bundle.fileList)), zap.String("bundle_upper_block_id", m.bundle.upperBlockID))
 			oneBlockFiles = nil
-			time.Sleep(1 * time.Second)
-			continue
+			select {
+			case <-time.After(m.timeBetweenStoreLookups):
+				continue
+			case <-m.Terminating():
+				return m.Err()
+			}
 		}
 
 		zlog.Info("merging bundle",
@@ -354,7 +377,7 @@ func (m *Merger) launch() (err error) {
 			return err
 		}
 		if err := m.seenBlocks.Save(); err != nil {
-			zlog.Error("cannot save SeenBlockCache", zap.String("filename", m.seenBlocks.filename), zap.Error(err))
+			zlog.Error("cannot save SeenBlockCache", zap.Error(err))
 		}
 		m.seenBlocks.Truncate()
 
@@ -367,6 +390,7 @@ func (m *Merger) launch() (err error) {
 		m.bundleLock.Unlock()
 	}
 }
+
 func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seenInCache []string, good []string, err error) {
 	var count int
 
@@ -376,8 +400,6 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 			return nil
 		}
 		switch {
-		case m.seenBlocks.lowBoundary() == 0 && num < m.bundle.lowerBlock: // edge case: no "seenblock cache"
-			tooOld = append(tooOld, filename)
 		case m.seenBlocks.IsTooOld(num):
 			tooOld = append(tooOld, filename)
 		case m.seenBlocks.SeenBefore(filename):
@@ -402,7 +424,7 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 	})
 
 	zlog.Info("retrieved list of files",
-		zap.Uint64("seenblock_low_boundary", m.seenBlocks.lowBoundary()),
+		zap.Uint64("seenblock_low_boundary", m.seenBlocks.LowestBlockNum),
 		zap.Uint64("bundle_lower_block", m.bundle.lowerBlock),
 		zap.Int("seen_files_count", len(seenInCache)),
 		zap.Int("too_old_files_count", len(tooOld)),
@@ -505,4 +527,21 @@ func removeFilesFromArray(in []string, seen map[string]bool) (out []string) {
 		}
 	}
 	return
+}
+
+func blockFileName(block *bstream.Block) string {
+	blockTime := block.Time()
+	blockTimeString := fmt.Sprintf("%s.%01d", blockTime.Format("20060102T150405"), blockTime.Nanosecond()/100000000)
+
+	blockID := block.ID()
+	if len(blockID) > 8 {
+		blockID = blockID[len(blockID)-8:]
+	}
+
+	previousID := block.PreviousID()
+	if len(previousID) > 8 {
+		previousID = previousID[len(previousID)-8:]
+	}
+
+	return fmt.Sprintf("%010d-%s-%s-%s", block.Num(), blockTimeString, blockID, previousID)
 }
