@@ -242,11 +242,15 @@ func (m *Merger) Launch() {
 	m.Shutdown(err)
 }
 
-func fetchMergedFile(store dstore.Store, lowBlockNum uint64) (io.ReadCloser, error) {
+func fetchMergedFile(store dstore.Store, lowBlockNum uint64) (io.ReadCloser, func(), error) {
 	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
-	defer cancel()
 
-	return store.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
+	out, err := store.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
+	if err != nil {
+		cancel()
+		return out, nil, err
+	}
+	return out, cancel, nil
 }
 
 func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
@@ -306,8 +310,9 @@ func (m *Merger) launch() (err error) {
 		}
 
 		zlog.Debug("verifying if bundle file already exist in store")
-		if remoteMergedFile, err := fetchMergedFile(m.destStore, m.bundle.lowerBlock); err == nil {
+		if remoteMergedFile, cancel, err := fetchMergedFile(m.destStore, m.bundle.lowerBlock); err == nil {
 			err := m.processRemoteMergedFile(remoteMergedFile)
+			cancel()
 			if err != nil {
 				zlog.Error("error processing remote file to bump bundle", zap.Error(err), zap.Uint64("bundle_lowerblock", m.bundle.lowerBlock))
 			} else {
