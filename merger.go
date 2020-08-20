@@ -24,8 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"cloud.google.com/go/storage"
-	"github.com/abourget/llerrgroup"
 	"github.com/dfuse-io/bstream"
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	"github.com/dfuse-io/shutter"
@@ -47,7 +45,6 @@ type Merger struct {
 	progressFilename               string
 	stopBlockNum                   uint64
 	writersLeewayDuration          time.Duration // 0 during reprocessing, 25 secs during live.
-	deleteBlocksBefore             bool
 	timeBetweenStoreLookups        time.Duration // should be very low on local filesystem
 	oneBlockDeletionThreads        int
 	maxOneBlockOperationsBatchSize int
@@ -302,7 +299,7 @@ func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
 func (m *Merger) launch() (err error) {
 	var oneBlockFiles []string
 	od := newOneBlockFilesDeleter(m.sourceStore)
-	od.Start(m.oneBlockDeletionThreads, m.maxOneBlockOperationsBatchSize)
+	od.Start(m.oneBlockDeletionThreads, 100000)
 
 	for {
 		if m.IsTerminating() {
@@ -332,9 +329,7 @@ func (m *Merger) launch() (err error) {
 				return err
 			}
 
-			if m.deleteBlocksBefore {
-				od.Delete(append(tooOldFiles, seenFiles...))
-			}
+			od.Delete(append(tooOldFiles, seenFiles...))
 			if len(oneBlockFiles) == 0 {
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
@@ -378,8 +373,13 @@ func (m *Merger) launch() (err error) {
 			zap.Duration("real_time_drift", time.Since(m.bundle.upperBlockTime)),
 		)
 		m.bundleLock.Lock() // we call mergeUpload AND change the bundle, both need locking VS PreMergedBlocks
-		if err = m.mergeUploadAndDelete(); err != nil {
+
+		uploaded, err := m.mergeUpload()
+		if err != nil {
 			return err
+		}
+		if uploaded != nil {
+			od.Delete(uploaded)
 		}
 		if err := m.seenBlocks.Save(); err != nil {
 			zlog.Error("cannot save SeenBlockCache", zap.Error(err))
@@ -468,7 +468,7 @@ func (m *Merger) waitedEnoughForUpperBound() bool {
 	return !m.bundle.upperBlockTime.IsZero() && time.Since(m.bundle.upperBlockTime) > m.writersLeewayDuration
 }
 
-func (m *Merger) mergeUploadAndDelete() error {
+func (m *Merger) mergeUpload() (uploaded []string, err error) {
 	b := m.bundle
 
 	t0 := time.Now()
@@ -476,9 +476,9 @@ func (m *Merger) mergeUploadAndDelete() error {
 	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 	defer cancel()
 
-	err := m.destStore.WriteObject(ctx, fileNameForBlocksBundle(b.lowerBlock), NewBundleReader(ctx, b, m.sourceStore))
+	err = m.destStore.WriteObject(ctx, fileNameForBlocksBundle(b.lowerBlock), NewBundleReader(ctx, b, m.sourceStore))
 	if err != nil {
-		return fmt.Errorf("write object error: %s", err)
+		return nil, fmt.Errorf("write object error: %s", err)
 	}
 
 	metrics.HeadBlockTimeDrift.SetBlockTime(b.upperBlockTime)
@@ -495,34 +495,10 @@ func (m *Merger) mergeUploadAndDelete() error {
 
 	for filename := range b.fileList {
 		m.seenBlocks.Add(filename) // add them to 'seenbefore' right before deleting them on gs
-	}
-	zlog.Debug("deleting oneblock files")
-	eg := llerrgroup.New(64)
-	for filename := range b.fileList {
-		if eg.Stop() {
-			break
-		}
-
-		f := filename
-		eg.Go(func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
-			defer cancel()
-
-			err = m.sourceStore.DeleteObject(ctx, f)
-			if err != nil && err.Error() != storage.ErrObjectNotExist.Error() {
-				zlog.Error("cannot delete onefile object after merging", zap.String("filename", f), zap.Error(err))
-			}
-			return nil
-		})
-	}
-	err = eg.Wait()
-	if err != nil {
-		zlog.Warn("cannot delete oneblockfile", zap.Error(err))
-	} else {
-		zlog.Debug("done deleting one-block files", zap.Int("len_filelist", len(b.fileList)))
+		uploaded = append(uploaded, filename)
 	}
 
-	return nil
+	return
 }
 
 func removeFilesFromArray(in []string, seen map[string]bool) (out []string) {

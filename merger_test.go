@@ -118,7 +118,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	}
 }
 
-func TestMergeUploadAndDelete(t *testing.T) {
+func TestMergeUpload(t *testing.T) {
 	bstream.GetBlockWriterHeaderLen = 0 //because GetBlockWriterFactory return a writer that do not add the header
 
 	m, oneStore, multiStore, cleanup := setupMerger(t)
@@ -167,8 +167,8 @@ func TestMergeUploadAndDelete(t *testing.T) {
 	})
 
 	fmt.Println("Triage completed")
-	m.mergeUploadAndDelete()
-	fmt.Println("Upload and delete files completed")
+	m.mergeUpload()
+	fmt.Println("Upload files completed")
 
 	readBack, err := multiStore.OpenObject(context.Background(), "0000000100")
 	require.NoError(t, err)
