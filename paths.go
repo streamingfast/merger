@@ -25,15 +25,23 @@ func blockNumToStr(blockNum uint64) (blockStr string) {
 	return fmt.Sprintf("%010d", blockNum)
 }
 
+func canonicalFilename(filename string) (string, error) {
+	_, _, _, _, n, err := parseFilename(filename)
+	return n, err
+}
+
 // parseFilename parses file names formatted like:
 // * 0000000100-20170701T122141.0-24a07267-e5914b39
-// * 0000000101-20170701T122141.5-dbda3f44-09f6d693
-func parseFilename(filename string) (blockNum uint64, blockTime time.Time, blockIDSuffix string, previousBlockIDSuffix string, err error) {
+// * 0000000101-20170701T122141.5-dbda3f44-24a07267-mindread1
+// * 0000000101-20170701T122141.5-dbda3f44-24a07267-mindread2
+// * 0000000102-20170701T122142.0-948232ea-dbda3f44
+func parseFilename(filename string) (blockNum uint64, blockTime time.Time, blockIDSuffix string, previousBlockIDSuffix string, canonicalName string, err error) {
 	parts := strings.Split(filename, "-")
-	if len(parts) != 4 {
+	if len(parts) < 4 || len(parts) > 5 {
 		err = fmt.Errorf("wrong filename format: %q", filename)
 		return
 	}
+
 	blockNumVal, err := strconv.ParseUint(parts[0], 10, 32)
 	if err != nil {
 		err = fmt.Errorf("failed parsing %q: %s", parts[0], err)
@@ -49,5 +57,9 @@ func parseFilename(filename string) (blockNum uint64, blockTime time.Time, block
 
 	blockIDSuffix = parts[2]
 	previousBlockIDSuffix = parts[3]
+	canonicalName = filename
+	if len(parts) == 5 {
+		canonicalName = strings.Join(parts[0:4], "-")
+	}
 	return
 }

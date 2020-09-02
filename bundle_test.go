@@ -32,6 +32,109 @@ func contiguousBlocksGetter(from, to uint64) func() map[string]*OneBlockFile {
 	}
 }
 
+func TestAdd(t *testing.T) {
+
+	blockFile100 := &OneBlockFile{
+		canonicalName: "0000000100-20170701T122141.0-24a07267-e5914b39",
+		filenames:     []string{"0000000100-20170701T122141.0-24a07267-e5914b39"},
+		blockTime:     mustParseTime("20170701T122141.0"),
+		id:            "24a07267",
+		num:           100,
+		previousID:    "e5914b39",
+	}
+	blockFile101Mindread1 := &OneBlockFile{
+		canonicalName: "0000000101-20170701T122141.5-dbda3f44-24a07267",
+		filenames:     []string{"0000000101-20170701T122141.5-dbda3f44-24a07267-mindread1"},
+		blockTime:     mustParseTime("20170701T122141.5"),
+		id:            "dbda3f44",
+		num:           101,
+		previousID:    "24a07267",
+	}
+	blockFile101Mindread2 := &OneBlockFile{
+		canonicalName: "0000000101-20170701T122141.5-dbda3f44-24a07267",
+		filenames:     []string{"0000000101-20170701T122141.5-dbda3f44-24a07267-mindread2"},
+		blockTime:     mustParseTime("20170701T122141.5"),
+		id:            "dbda3f44",
+		num:           101,
+		previousID:    "24a07267",
+	}
+
+	tests := []struct {
+		name           string
+		addFiles       []*OneBlockFile
+		expectFileList map[string]*OneBlockFile
+	}{
+		{
+			name: "two different files",
+			addFiles: []*OneBlockFile{
+				blockFile100,
+				blockFile101Mindread1,
+			},
+			expectFileList: map[string]*OneBlockFile{
+				"0000000100-20170701T122141.0-24a07267-e5914b39": blockFile100,
+				"0000000101-20170701T122141.5-dbda3f44-24a07267": blockFile101Mindread1,
+			},
+		},
+		{
+			name: "two equivalent files",
+			addFiles: []*OneBlockFile{
+				blockFile101Mindread1,
+				blockFile101Mindread2,
+			},
+			expectFileList: map[string]*OneBlockFile{
+				"0000000101-20170701T122141.5-dbda3f44-24a07267": &OneBlockFile{
+					canonicalName: blockFile101Mindread1.canonicalName,
+					filenames:     append(blockFile101Mindread1.filenames, blockFile101Mindread2.filenames[0]),
+					blockTime:     blockFile101Mindread1.blockTime,
+					id:            blockFile101Mindread1.id,
+					num:           blockFile101Mindread1.num,
+					previousID:    blockFile101Mindread1.previousID,
+				},
+			},
+		},
+		{
+			name: "a single file, two equivalent files, then repeat",
+			addFiles: []*OneBlockFile{
+				blockFile100,
+				blockFile101Mindread1,
+				blockFile101Mindread2,
+				blockFile100,
+				blockFile101Mindread1,
+				blockFile101Mindread2,
+			},
+			expectFileList: map[string]*OneBlockFile{
+				"0000000100-20170701T122141.0-24a07267-e5914b39": blockFile100,
+				"0000000101-20170701T122141.5-dbda3f44-24a07267": &OneBlockFile{
+					canonicalName: blockFile101Mindread1.canonicalName,
+					filenames:     append(blockFile101Mindread1.filenames, blockFile101Mindread2.filenames[0]),
+					blockTime:     blockFile101Mindread1.blockTime,
+					id:            blockFile101Mindread1.id,
+					num:           blockFile101Mindread1.num,
+					previousID:    blockFile101Mindread1.previousID,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			b := &Bundle{
+				fileList: make(map[string]*OneBlockFile),
+			}
+			for _, f := range test.addFiles {
+				b.add(f.filenames[0],
+					f.num,
+					f.blockTime,
+					f.id,
+					f.previousID,
+					f.canonicalName,
+				)
+			}
+			assert.Equal(t, test.expectFileList, b.fileList)
+		})
+	}
+
+}
+
 func TestIsComplete(t *testing.T) {
 
 	tests := []struct {
@@ -115,10 +218,11 @@ func testBlkFile(num uint64, fork string) *OneBlockFile {
 	prev := numToID(num-1, "a")
 	blocktime := time.Now().Add((time.Duration(num) - 1000) * time.Second)
 	return &OneBlockFile{
-		name:       fmt.Sprintf("%s-%s-%s", id, prev, blocktime),
-		blockTime:  blocktime,
-		id:         id,
-		previousID: prev,
-		num:        num,
+		canonicalName: fmt.Sprintf("%s-%s-%s", id, prev, blocktime),
+		filenames:     []string{fmt.Sprintf("%s-%s-%s", id, prev, blocktime)},
+		blockTime:     blocktime,
+		id:            id,
+		previousID:    prev,
+		num:           num,
 	}
 }

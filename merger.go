@@ -342,7 +342,7 @@ func (m *Merger) launch() (err error) {
 
 		lastFile := oneBlockFiles[len(oneBlockFiles)-1]
 		zlog.Debug("Last file", zap.String("file_name", lastFile))
-		blockNum, blockTime, _, _, err := parseFilename(lastFile)
+		blockNum, blockTime, _, _, _, err := parseFilename(lastFile)
 		if err == nil && blockNum < m.bundle.upperBlock() { // will still drift if there is a hole and lastFile is advancing
 			metrics.HeadBlockTimeDrift.SetBlockTime(blockTime)
 		}
@@ -397,32 +397,25 @@ func (m *Merger) launch() (err error) {
 }
 
 func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seenInCache []string, good []string, err error) {
-	var count int
+
+	canonicalGoodFiles := make(map[string]struct{})
 
 	err = m.sourceStore.Walk(ctx, "", ".tmp", func(filename string) error {
-		num, _, _, _, err := parseFilename(filename)
+		num, _, _, _, canonical, err := parseFilename(filename)
 		if err != nil {
 			return nil
 		}
 		switch {
 		case m.seenBlocks.IsTooOld(num):
 			tooOld = append(tooOld, filename)
-		case m.seenBlocks.SeenBefore(filename):
+		case m.seenBlocks.SeenBefore(canonical):
 			seenInCache = append(seenInCache, filename)
 		default:
 			good = append(good, filename)
+			canonicalGoodFiles[canonical] = struct{}{} // good files, deduped by their canonical name
 		}
-		if count%100 == 0 {
-			//zlog.Debug("walking over file",
-			//	zap.String("filename", filename),
-			//	zap.Int("len_too_old", len(tooOld)),
-			//	zap.Int("len_seen_in_cache", len(seenInCache)),
-			//	zap.Int("len_good", len(good)),
-			//)
-		}
-		count++
 
-		if len(good) >= m.maxOneBlockOperationsBatchSize {
+		if len(canonicalGoodFiles) >= m.maxOneBlockOperationsBatchSize {
 			return dstore.StopIteration
 		}
 		return nil
@@ -493,9 +486,9 @@ func (m *Merger) mergeUpload() (uploaded []string, err error) {
 
 	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(b.lowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
-	for filename := range b.fileList {
-		m.seenBlocks.Add(filename) // add them to 'seenbefore' right before deleting them on gs
-		uploaded = append(uploaded, filename)
+	for _, obf := range b.fileList {
+		m.seenBlocks.Add(obf.canonicalName) // add them to 'seenbefore' right before deleting them on gs
+		uploaded = append(uploaded, obf.canonicalName)
 	}
 
 	return

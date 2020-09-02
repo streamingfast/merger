@@ -95,7 +95,7 @@ func (c *SeenBlockCache) Add(filename string) {
 }
 
 func fileToNum(filename string) uint64 {
-	blockNum, _, _, _, _ := parseFilename(filename)
+	blockNum, _, _, _, _, _ := parseFilename(filename)
 	return blockNum
 }
 

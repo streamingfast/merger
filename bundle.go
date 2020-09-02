@@ -90,20 +90,14 @@ func (b *Bundle) triage(filename string, sourceStore dstore.Store, seenCache *Se
 		return true, nil
 	}
 
-	blockNum, blockTime, blockIDSuffix, previousIDSuffix, err := parseFilename(filename)
+	blockNum, blockTime, blockIDSuffix, previousIDSuffix, canonicalName, err := parseFilename(filename)
 	if err != nil {
 		return false, err
 	}
 
 	if blockNum < b.upperBlock() {
 		zlog.Debug("adding and downloading file", zap.String("filename", filename), zap.Time("blocktime", blockTime), zap.Uint64("blockNum", blockNum))
-		b.add(&OneBlockFile{
-			name:       filename,
-			blockTime:  blockTime,
-			id:         blockIDSuffix,
-			num:        blockNum,
-			previousID: previousIDSuffix,
-		}, sourceStore)
+		b.add(filename, blockNum, blockTime, blockIDSuffix, previousIDSuffix, canonicalName)
 		return true, nil
 	}
 
@@ -128,6 +122,23 @@ func (b *Bundle) containsFilename(filename string) bool {
 	return found
 }
 
-func (b *Bundle) add(oneBlock *OneBlockFile, sourceStore dstore.Store) {
-	b.fileList[oneBlock.name] = oneBlock
+func (b *Bundle) add(filename string, blockNum uint64, blockTime time.Time, blockIDSuffix string, previousIDSuffix string, canonicalName string) {
+	if obf, ok := b.fileList[canonicalName]; ok {
+		for _, f := range obf.filenames {
+			if f == filename {
+				return
+			}
+		}
+		obf.filenames = append(obf.filenames, filename)
+		return
+	}
+	obf := &OneBlockFile{
+		canonicalName: canonicalName,
+		filenames:     []string{filename},
+		blockTime:     blockTime,
+		id:            blockIDSuffix,
+		num:           blockNum,
+		previousID:    previousIDSuffix,
+	}
+	b.fileList[canonicalName] = obf
 }
