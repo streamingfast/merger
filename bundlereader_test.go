@@ -99,7 +99,7 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
 	time.Sleep(100 * time.Millisecond)
 	return &OneBlockFile{
 		canonicalName: fileName,
-		filenames:     []string{fileName},
+		filenames:     map[string]struct{}{fileName: Empty},
 		blockTime:     time.Now(),
 		id:            "",
 		num:           0,

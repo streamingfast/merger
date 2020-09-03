@@ -22,6 +22,8 @@ import (
 	"gopkg.in/olivere/elastic.v3/backoff"
 )
 
+var Empty struct{}
+
 func Retry(attempts int, sleep time.Duration, callback func() error) (err error) {
 	b := backoff.NewExponentialBackoff(sleep, 5*time.Second)
 	for i := 0; ; i++ {

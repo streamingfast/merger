@@ -124,21 +124,18 @@ func (b *Bundle) containsFilename(filename string) bool {
 
 func (b *Bundle) add(filename string, blockNum uint64, blockTime time.Time, blockIDSuffix string, previousIDSuffix string, canonicalName string) {
 	if obf, ok := b.fileList[canonicalName]; ok {
-		for _, f := range obf.filenames {
-			if f == filename {
-				return
-			}
-		}
-		obf.filenames = append(obf.filenames, filename)
+		obf.filenames[filename] = Empty
 		return
 	}
 	obf := &OneBlockFile{
 		canonicalName: canonicalName,
-		filenames:     []string{filename},
-		blockTime:     blockTime,
-		id:            blockIDSuffix,
-		num:           blockNum,
-		previousID:    previousIDSuffix,
+		filenames: map[string]struct{}{
+			filename: Empty,
+		},
+		blockTime:  blockTime,
+		id:         blockIDSuffix,
+		num:        blockNum,
+		previousID: previousIDSuffix,
 	}
 	b.fileList[canonicalName] = obf
 }

@@ -16,7 +16,6 @@ package merger
 
 import (
 	"fmt"
-	_ "net/http/pprof"
 	"testing"
 	"time"
 

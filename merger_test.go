@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	_ "net/http/pprof"
 	"os"
 	"testing"
 	"time"

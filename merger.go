@@ -190,7 +190,7 @@ func (od *oneBlockFilesDeleter) Delete(files []string) {
 	for empty := false; !empty; {
 		select {
 		case f := <-od.toProcess:
-			deletable[f] = struct{}{}
+			deletable[f] = Empty
 		default:
 			empty = true
 		}
@@ -203,7 +203,7 @@ func (od *oneBlockFilesDeleter) Delete(files []string) {
 		if _, exists := deletable[file]; !exists {
 			od.toProcess <- file
 		}
-		deletable[file] = struct{}{}
+		deletable[file] = Empty
 	}
 }
 
@@ -412,7 +412,7 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 			seenInCache = append(seenInCache, filename)
 		default:
 			good = append(good, filename)
-			canonicalGoodFiles[canonical] = struct{}{} // good files, deduped by their canonical name
+			canonicalGoodFiles[canonical] = Empty // good files, deduped by their canonical name
 		}
 
 		if len(canonicalGoodFiles) >= m.maxOneBlockOperationsBatchSize {
@@ -427,6 +427,7 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 		zap.Int("seen_files_count", len(seenInCache)),
 		zap.Int("too_old_files_count", len(tooOld)),
 		zap.Int("good_files_count", len(good)),
+		zap.Int("canonical_good_files_count", len(canonicalGoodFiles)),
 	)
 
 	return

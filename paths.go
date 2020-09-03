@@ -25,11 +25,6 @@ func blockNumToStr(blockNum uint64) (blockStr string) {
 	return fmt.Sprintf("%010d", blockNum)
 }
 
-func canonicalFilename(filename string) (string, error) {
-	_, _, _, _, n, err := parseFilename(filename)
-	return n, err
-}
-
 // parseFilename parses file names formatted like:
 // * 0000000100-20170701T122141.0-24a07267-e5914b39
 // * 0000000101-20170701T122141.5-dbda3f44-24a07267-mindread1

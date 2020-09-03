@@ -25,7 +25,7 @@ import (
 
 type OneBlockFile struct {
 	canonicalName string
-	filenames     []string
+	filenames     map[string]struct{}
 	blockTime     time.Time
 	id            string
 	num           uint64
@@ -45,7 +45,7 @@ func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error)
 
 func (f *OneBlockFile) downloadFile(ctx context.Context, s dstore.Store) error {
 	var err error
-	for _, filename := range f.filenames { // will try to get data from any of those files
+	for filename := range f.filenames { // will try to get data from any of those files
 		var out io.ReadCloser
 		out, err = s.OpenObject(ctx, filename)
 		if err != nil {
@@ -64,5 +64,5 @@ func (f *OneBlockFile) downloadFile(ctx context.Context, s dstore.Store) error {
 			return nil
 		}
 	}
-	return err
+	return err // last error seen during attempts (OpenObject or ReadAll)
 }
