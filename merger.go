@@ -489,7 +489,9 @@ func (m *Merger) mergeUpload() (uploaded []string, err error) {
 
 	for _, obf := range b.fileList {
 		m.seenBlocks.Add(obf.canonicalName) // add them to 'seenbefore' right before deleting them on gs
-		uploaded = append(uploaded, obf.canonicalName)
+		for filename := range obf.filenames {
+			uploaded = append(uploaded, filename)
+		}
 	}
 
 	return
