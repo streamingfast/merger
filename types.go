@@ -16,6 +16,7 @@ package merger
 
 import (
 	"context"
+	"io"
 	"io/ioutil"
 	"time"
 
@@ -23,12 +24,13 @@ import (
 )
 
 type OneBlockFile struct {
-	name       string
-	blockTime  time.Time
-	id         string
-	num        uint64
-	previousID string
-	data       []byte
+	canonicalName string
+	filenames     map[string]struct{}
+	blockTime     time.Time
+	id            string
+	num           uint64
+	previousID    string
+	data          []byte
 }
 
 func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error) {
@@ -42,18 +44,25 @@ func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error)
 }
 
 func (f *OneBlockFile) downloadFile(ctx context.Context, s dstore.Store) error {
-	out, err := s.OpenObject(ctx, f.name)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
+	var err error
+	for filename := range f.filenames { // will try to get data from any of those files
+		var out io.ReadCloser
+		out, err = s.OpenObject(ctx, filename)
+		if err != nil {
+			continue
+		}
+		defer out.Close()
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 
-	f.data, err = ioutil.ReadAll(out)
-	return err
+		f.data, err = ioutil.ReadAll(out)
+		if err == nil {
+			return nil
+		}
+	}
+	return err // last error seen during attempts (OpenObject or ReadAll)
 }

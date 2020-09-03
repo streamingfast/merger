@@ -20,25 +20,25 @@ import (
 func NewTestBundle() *Bundle {
 	bt := time.Time{}
 	o1 := &OneBlockFile{
-		name:      "o1",
-		blockTime: bt,
-		data:      []byte{0x1, 0x2},
+		canonicalName: "o1",
+		blockTime:     bt,
+		data:          []byte{0x1, 0x2},
 	}
 	o2 := &OneBlockFile{
-		name:      "o2",
-		blockTime: bt.Local().Add(1 * time.Second),
-		data:      []byte{0x3, 0x4},
+		canonicalName: "o2",
+		blockTime:     bt.Local().Add(1 * time.Second),
+		data:          []byte{0x3, 0x4},
 	}
 	o3 := &OneBlockFile{
-		name:      "o3",
-		blockTime: bt.Local().Add(2 * time.Second),
-		data:      []byte{0x5, 0x6},
+		canonicalName: "o3",
+		blockTime:     bt.Local().Add(2 * time.Second),
+		data:          []byte{0x5, 0x6},
 	}
 	return &Bundle{
 		fileList: map[string]*OneBlockFile{
-			o1.name: o1,
-			o2.name: o2,
-			o3.name: o3,
+			o1.canonicalName: o1,
+			o2.canonicalName: o2,
+			o3.canonicalName: o3,
 		},
 	}
 }
@@ -98,12 +98,13 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
 	require.NoError(t, err)
 	time.Sleep(100 * time.Millisecond)
 	return &OneBlockFile{
-		name:       fileName,
-		blockTime:  time.Now(),
-		id:         "",
-		num:        0,
-		previousID: "",
-		data:       data,
+		canonicalName: fileName,
+		filenames:     map[string]struct{}{fileName: Empty},
+		blockTime:     time.Now(),
+		id:            "",
+		num:           0,
+		previousID:    "",
+		data:          data,
 	}
 }
 
