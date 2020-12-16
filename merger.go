@@ -355,8 +355,12 @@ func (m *Merger) launch() (err error) {
 		oneBlockFiles = remaining
 		m.bundleLock.Unlock()
 
-		incompleteBundle := !m.waitedEnoughForUpperBound() || !m.bundle.isComplete()
-		if incompleteBundle {
+		completeBundle := m.bundle.isComplete() && m.waitedEnoughForUpperBound()
+
+		// special case, if we set a stop block because we are running a batch job 1000->2000, we can end last bundle after reading blocks 1900->1999 even if another batch job deleted the block 2000
+		finalBatchBundle := m.stopBlockNum == m.bundle.lowerBlock+100 && len(m.bundle.fileList) == 100
+
+		if !completeBundle && !finalBatchBundle {
 			zlog.Info("waiting for more files to complete bundle", zap.Uint64("bundle_lowerblock", m.bundle.lowerBlock), zap.Int("bundle_length", len(m.bundle.fileList)), zap.String("bundle_upper_block_id", m.bundle.upperBlockID))
 			oneBlockFiles = nil
 			select {
@@ -400,12 +404,15 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 
 	canonicalGoodFiles := make(map[string]struct{})
 
+	isBatchMode := m.stopBlockNum != 0
 	err = m.sourceStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		num, _, _, _, canonical, err := parseFilename(filename)
 		if err != nil {
 			return nil
 		}
 		switch {
+		case isBatchMode && num < m.bundle.lowerBlock:
+			return nil
 		case m.seenBlocks.IsTooOld(num):
 			tooOld = append(tooOld, filename)
 		case m.seenBlocks.SeenBefore(canonical):
