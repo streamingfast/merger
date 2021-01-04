@@ -318,7 +318,7 @@ func (m *Merger) launch() (err error) {
 		}
 
 		if len(oneBlockFiles) == 0 {
-			zlog.Debug("One block file list empty, building list")
+			zlog.Debug("one block file list empty, building list")
 			var tooOldFiles []string
 			var seenFiles []string
 
@@ -341,7 +341,7 @@ func (m *Merger) launch() (err error) {
 		}
 
 		lastFile := oneBlockFiles[len(oneBlockFiles)-1]
-		zlog.Debug("Last file", zap.String("file_name", lastFile))
+		zlog.Debug("last file", zap.String("file_name", lastFile))
 		blockNum, blockTime, _, _, _, err := parseFilename(lastFile)
 		if err == nil && blockNum < m.bundle.upperBlock() { // will still drift if there is a hole and lastFile is advancing
 			metrics.HeadBlockTimeDrift.SetBlockTime(blockTime)
@@ -444,6 +444,7 @@ func (m *Merger) triageNewOneBlockFiles(in []string) (remaining []string, err er
 	if len(in) > 0 {
 		zlog.Debug("entering triage", zap.String("first_file", in[0]), zap.String("last_file", in[len(in)-1]))
 	}
+
 	included := make(map[string]bool)
 	for _, filename := range in {
 		var fileIncluded bool
@@ -505,6 +506,7 @@ func (m *Merger) mergeUpload() (uploaded []string, err error) {
 }
 
 func removeFilesFromArray(in []string, seen map[string]bool) (out []string) {
+	out = make([]string, 0, len(in)-len(seen))
 	for _, entry := range in {
 		if !seen[entry] {
 			out = append(out, entry)

@@ -37,19 +37,24 @@ func (b *Bundle) upperBlock() uint64 {
 }
 
 func NewBundle(lowerBlockNum, chunkSize uint64) *Bundle {
-	zlog.Info("Creating new bundle", zap.Uint64("lower_block_num", lowerBlockNum), zap.Uint64("chunk_size", chunkSize))
+	zlog.Info("creating new bundle", zap.Uint64("lower_block_num", lowerBlockNum), zap.Uint64("chunk_size", chunkSize))
 	b := &Bundle{
 		chunkSize:  chunkSize,
 		lowerBlock: lowerBlockNum,
-		fileList:   make(map[string]*OneBlockFile),
+		fileList:   make(map[string]*OneBlockFile, chunkSize),
 	}
 	return b
 }
 
 func (b *Bundle) timeSortedFiles() (files []*OneBlockFile) {
+	files = make([]*OneBlockFile, len(b.fileList))
+
+	i := 0
 	for _, b := range b.fileList {
-		files = append(files, b)
+		files[i] = b
+		i++
 	}
+
 	sort.SliceStable(files, func(i, j int) bool {
 		return files[i].blockTime.Before(files[j].blockTime)
 	})
@@ -65,7 +70,7 @@ func (b *Bundle) isComplete() (complete bool) {
 		if files[i].id == prevID {
 			prevID = files[i].previousID
 			lowestContiguous = files[i]
-			zlog.Debug("setting lowestContiguous to", zap.Uint64("block_num", lowestContiguous.num), zap.String("block_id", lowestContiguous.id), zap.String("previous_id", lowestContiguous.previousID))
+			zlog.Debug("setting lowest contiguous to", zap.Uint64("block_num", lowestContiguous.num), zap.String("block_id", lowestContiguous.id), zap.String("previous_id", lowestContiguous.previousID))
 		}
 		continue
 	}
