@@ -20,10 +20,12 @@ import (
 
 	"github.com/dfuse-io/dstore"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Bundle struct {
-	fileList map[string]*OneBlockFile // key: "0000000100-20170701T122141.0-24a07267-e5914b39" ->
+	fileList           map[string]*OneBlockFile // key: "0000000100-20170701T122141.0-24a07267-e5914b39" ->
+	timeSortedFileList []*OneBlockFile
 
 	lowerBlock uint64 // base NewTestBlock number for bundle, like 38918100 (always % chunkSize)
 	chunkSize  uint64
@@ -56,6 +58,10 @@ func (b *Bundle) timeSortedFiles() (files []*OneBlockFile) {
 	}
 
 	sort.SliceStable(files, func(i, j int) bool {
+		if files[i].blockTime.Equal(files[j].blockTime) {
+			return files[i].num < files[j].num
+		}
+
 		return files[i].blockTime.Before(files[j].blockTime)
 	})
 	return
@@ -70,16 +76,22 @@ func (b *Bundle) isComplete() (complete bool) {
 		if files[i].id == prevID {
 			prevID = files[i].previousID
 			lowestContiguous = files[i]
-			zlog.Debug("setting lowest contiguous to", zap.Uint64("block_num", lowestContiguous.num), zap.String("block_id", lowestContiguous.id), zap.String("previous_id", lowestContiguous.previousID))
+			zlog.Debug("setting lowest contiguous to",
+				zap.Uint64("block_num", lowestContiguous.num),
+				zap.String("block_id", lowestContiguous.id),
+				zap.String("previous_id", lowestContiguous.previousID),
+			)
 		}
 		continue
 	}
 
 	if lowestContiguous == nil {
-		zlog.Debug("did not find upperBlockID", zap.String("upper_block_id", b.upperBlockID))
-		return false //did not find upper previousID
+		zlog.Debug("did not find upper block", zap.String("upper_block_id", b.upperBlockID))
+		return false
 	}
-	if lowestContiguous.num <= b.lowerBlock { // accept blocks that are lower...
+
+	// Accept blocks that are lower...
+	if lowestContiguous.num <= b.lowerBlock {
 		return true
 	}
 	if b.lowerBlock == 0 && lowestContiguous.num <= 2 {
@@ -107,13 +119,13 @@ func (b *Bundle) triage(filename string, sourceStore dstore.Store, seenCache *Se
 	}
 
 	if blockNum+b.chunkSize < b.lowerBlock {
-		zlog.Warn("including an unseen NewTestBlock that is far before lower NewTestBlock number, should reprocess to make it cleaner", zap.Uint64("delta", b.lowerBlock-blockNum))
-		// TODO add that NewTestBlock to the previous bundle automatically to help with future replays-from-blockfile
+		zlog.Warn("including an unseen block that is far before lower block number, should reprocess to make it cleaner", zap.Uint64("delta", b.lowerBlock-blockNum))
+		// TODO add that block to the previous bundle automatically to help with future replays-from-blockfile
 	}
 
 	if blockNum == b.upperBlock() {
 		if b.upperBlockTime.IsZero() || blockTime.Before(b.upperBlockTime) {
-			zlog.Debug("upper NewTestBlock time stretched", zap.Time("block_time", blockTime))
+			zlog.Debug("upper block time stretched", zap.Time("block_time", blockTime))
 			b.upperBlockID = previousIDSuffix
 			b.upperBlockTime = blockTime
 		}
@@ -143,4 +155,11 @@ func (b *Bundle) add(filename string, blockNum uint64, blockTime time.Time, bloc
 		previousID: previousIDSuffix,
 	}
 	b.fileList[canonicalName] = obf
+}
+
+func (b *Bundle) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddUint64("lower_block_num", b.lowerBlock)
+	encoder.AddUint64("upper_block_num", b.upperBlock())
+	encoder.AddInt("file_count", len(b.fileList))
+	return nil
 }

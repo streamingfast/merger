@@ -76,7 +76,7 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
 
-	destArchiveStore, err := dstore.NewDBinStore(a.config.StorageMergedBlocksFilesPath)
+	mergedBlocksStore, err := dstore.NewDBinStore(a.config.StorageMergedBlocksFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
@@ -94,7 +94,7 @@ func (a *App) Run() error {
 		if seenBlocks.HighestBlockNum != 0 {
 			startBlockNum = seenBlocks.HighestBlockNum + 1
 		} else {
-			startBlockNum, err = merger.FindNextBaseBlock(destArchiveStore, a.config.MinimalBlockNum, 100)
+			startBlockNum, err = merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
 			if err != nil {
 				return fmt.Errorf("finding where to start: %w", err)
 			}
@@ -103,7 +103,7 @@ func (a *App) Run() error {
 
 	m := merger.NewMerger(
 		sourceArchiveStore,
-		destArchiveStore,
+		mergedBlocksStore,
 		a.config.WritersLeewayDuration,
 		100,
 		seenBlocks,

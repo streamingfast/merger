@@ -25,19 +25,17 @@ import (
 	"time"
 
 	"github.com/dfuse-io/bstream"
-	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
-	"github.com/dfuse-io/shutter"
-	"google.golang.org/grpc/metadata"
-
-	//_ "github.com/dfuse-io/bstream/codecs/deth"
 	"github.com/dfuse-io/dstore"
 	"github.com/dfuse-io/merger/metrics"
+	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
+	"github.com/dfuse-io/shutter"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/metadata"
 )
 
 type Merger struct {
 	*shutter.Shutter
-	sourceStore                    dstore.Store
+	oneBlocksStore                 dstore.Store
 	destStore                      dstore.Store
 	chunkSize                      uint64
 	grpcListenAddr                 string
@@ -68,7 +66,7 @@ func NewMerger(
 ) *Merger {
 	return &Merger{
 		Shutter:                        shutter.New(),
-		sourceStore:                    sourceStore,
+		oneBlocksStore:                 sourceStore,
 		destStore:                      destStore,
 		chunkSize:                      chunkSize,
 		bundle:                         NewBundle(startBlockNum-(startBlockNum%chunkSize), chunkSize),
@@ -119,7 +117,7 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 		if oneBlock.num < req.LowBlockNum {
 			continue
 		}
-		data, err := oneBlock.Data(server.Context(), m.sourceStore)
+		data, err := oneBlock.Data(server.Context(), m.oneBlocksStore)
 		if err != nil {
 			return fmt.Errorf("unable to get one block data: %w", err)
 		}
@@ -298,7 +296,7 @@ func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
 
 func (m *Merger) launch() (err error) {
 	var oneBlockFiles []string
-	od := newOneBlockFilesDeleter(m.sourceStore)
+	od := newOneBlockFilesDeleter(m.oneBlocksStore)
 	od.Start(m.oneBlockDeletionThreads, 100000)
 
 	for {
@@ -405,7 +403,7 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 	canonicalGoodFiles := make(map[string]struct{})
 
 	isBatchMode := m.stopBlockNum != 0
-	err = m.sourceStore.Walk(ctx, "", ".tmp", func(filename string) error {
+	err = m.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		num, _, _, _, canonical, err := parseFilename(filename)
 		if err != nil {
 			return nil
@@ -448,7 +446,7 @@ func (m *Merger) triageNewOneBlockFiles(in []string) (remaining []string, err er
 	included := make(map[string]bool)
 	for _, filename := range in {
 		var fileIncluded bool
-		fileIncluded, err = m.bundle.triage(filename, m.sourceStore, m.seenBlocks)
+		fileIncluded, err = m.bundle.triage(filename, m.oneBlocksStore, m.seenBlocks)
 		if err != nil {
 			return nil, err
 		}
@@ -478,7 +476,9 @@ func (m *Merger) mergeUpload() (uploaded []string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 	defer cancel()
 
-	err = m.destStore.WriteObject(ctx, fileNameForBlocksBundle(b.lowerBlock), NewBundleReader(ctx, b, m.sourceStore))
+	bundleFilename := fileNameForBlocksBundle(b.lowerBlock)
+	zlog.Debug("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Object("bundle", b))
+	err = m.destStore.WriteObject(ctx, bundleFilename, NewBundleReader(ctx, b, m.oneBlocksStore))
 	if err != nil {
 		return nil, fmt.Errorf("write object error: %s", err)
 	}
