@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBundleReader_Read(t *testing.T) {
+func TestBundleReader_ReadSimpleFiles(t *testing.T) {
 	bundle := NewTestBundle()
 
 	r := NewBundleReader(context.Background(), bundle, nil)
@@ -40,6 +40,28 @@ func TestBundleReader_Read(t *testing.T) {
 	read, err = r.Read(r1)
 	assert.Equal(t, 0, read)
 	assert.Equal(t, err, io.EOF)
+}
+
+func TestBundleReader_ReadByChunk(t *testing.T) {
+	bundle := NewTestBundle()
+
+	r := NewBundleReader(context.Background(), bundle, nil)
+	r1 := make([]byte, 1)
+
+	read, err := r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 1)
+	assert.Equal(t, r1, []byte{0x1})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 1)
+	assert.Equal(t, r1, []byte{0x2})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 1)
+	assert.Equal(t, r1, []byte{0x3})
 }
 
 func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
