@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/dfuse-io/bstream"
-
 	"github.com/dfuse-io/dstore"
+	"go.uber.org/zap"
 )
 
 type BundleReader struct {
@@ -29,7 +29,7 @@ func NewBundleReader(ctx context.Context, b *Bundle, oneBlockFileStore dstore.St
 
 func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 	for {
-		if r.readBuffer != nil  {
+		if r.readBuffer != nil {
 			break
 		}
 
@@ -38,8 +38,8 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 		}
 
 		obf := r.oneBlockFiles[0]
-		r.oneBlockFiles =  r.oneBlockFiles[1:]
-		fmt.Println("Downlaoding a new one", obf.canonicalName)
+		r.oneBlockFiles = r.oneBlockFiles[1:]
+		zlog.Debug("downloading one block file", zap.String("canonical_name", obf.canonicalName))
 		data, err := obf.Data(r.ctx, r.oneBlockFileStore)
 		if err != nil {
 			return 0, err
