@@ -11,13 +11,56 @@ import (
 	"time"
 
 	"github.com/dfuse-io/bstream"
-
 	"github.com/dfuse-io/dbin"
-
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func TestBundleReader_Read(t *testing.T) {
+	bundle := NewTestBundle()
+
+	r := NewBundleReader(context.Background(), bundle, nil)
+	r1 := make([]byte, 4)
+
+	read, err := r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 2)
+	assert.Equal(t, r1, []byte{0x1, 0x2, 0x0, 0x0})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 2)
+	assert.Equal(t, r1, []byte{0x3, 0x4, 0x0, 0x0})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 2)
+	assert.Equal(t, r1, []byte{0x5, 0x6, 0x0, 0x0})
+
+	read, err = r.Read(r1)
+	assert.Equal(t, 0, read)
+	assert.Equal(t, err, io.EOF)
+}
+
+func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
+	t.Helper()
+	data, err := ioutil.ReadFile(path.Join("test_data", fileName))
+	require.NoError(t, err)
+	time.Sleep(100 * time.Millisecond)
+	return &OneBlockFile{
+		canonicalName: fileName,
+		filenames:     map[string]struct{}{fileName: Empty},
+		blockTime:     time.Now(),
+		id:            "",
+		num:           0,
+		previousID:    "",
+		data:          data,
+	}
+}
+
 func NewTestBundle() *Bundle {
+	bstream.GetBlockWriterHeaderLen = 0
+
 	bt := time.Time{}
 	o1 := &OneBlockFile{
 		canonicalName: "o1",
@@ -40,71 +83,6 @@ func NewTestBundle() *Bundle {
 			o2.canonicalName: o2,
 			o3.canonicalName: o3,
 		},
-	}
-}
-
-func TestBundleReader_Read(t *testing.T) {
-	bundle := NewTestBundle()
-	testCases := []struct {
-		name         string
-		bundle       *Bundle
-		readLength   int
-		expectedData []byte
-	}{
-		{
-			name:         "full",
-			bundle:       bundle,
-			readLength:   6,
-			expectedData: []byte{0x1, 0x2, 0x3, 0x4, 0x5, 0x6},
-		},
-		{
-			name:         "full and more",
-			bundle:       bundle,
-			readLength:   10,
-			expectedData: []byte{0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x0, 0x0, 0x0, 0x0},
-		},
-		{
-			name:         "2 files",
-			bundle:       bundle,
-			readLength:   4,
-			expectedData: []byte{0x1, 0x2, 0x3, 0x4},
-		},
-	}
-
-	for _, c := range testCases {
-		t.Run(c.name, func(t *testing.T) {
-			r := NewBundleReader(context.Background(), c.bundle, nil)
-			buffer := make([]byte, c.readLength)
-			_, err := r.Read(buffer)
-			require.NoError(t, err)
-			require.Equal(t, c.expectedData, buffer)
-		})
-	}
-}
-
-func TestBundleReader_Read_EOF(t *testing.T) {
-	bundle := NewTestBundle()
-	r := NewBundleReader(context.Background(), bundle, nil)
-	buffer := make([]byte, 6)
-	_, err := r.Read(buffer)
-	require.NoError(t, err)
-	_, err = r.Read(buffer)
-	require.Equal(t, io.EOF, err)
-}
-
-func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
-	t.Helper()
-	data, err := ioutil.ReadFile(path.Join("test_data", fileName))
-	require.NoError(t, err)
-	time.Sleep(100 * time.Millisecond)
-	return &OneBlockFile{
-		canonicalName: fileName,
-		filenames:     map[string]struct{}{fileName: Empty},
-		blockTime:     time.Now(),
-		id:            "",
-		num:           0,
-		previousID:    "",
-		data:          data,
 	}
 }
 

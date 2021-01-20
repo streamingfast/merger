@@ -13,9 +13,10 @@ import (
 type BundleReader struct {
 	ctx               context.Context
 	readBuffer        []byte
+	readBufferOffset  int
 	oneBlockFiles     []*OneBlockFile
 	oneBlockFileStore dstore.Store
-	headerRead        bool
+	headerPassed      bool
 }
 
 func NewBundleReader(ctx context.Context, b *Bundle, oneBlockFileStore dstore.Store) *BundleReader {
@@ -25,42 +26,48 @@ func NewBundleReader(ctx context.Context, b *Bundle, oneBlockFileStore dstore.St
 		oneBlockFiles:     b.timeSortedFiles(),
 	}
 }
+
 func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
-	bytesToRead := len(p)
-
-	//load more data if needed
-	for len(r.readBuffer) < bytesToRead {
-		var obf *OneBlockFile
-		if len(r.oneBlockFiles) > 0 {
-
-			//pop first one block file from bundle
-			obf, r.oneBlockFiles = r.oneBlockFiles[0], r.oneBlockFiles[1:]
-			data, err := obf.Data(r.ctx, r.oneBlockFileStore)
-			if err != nil {
-				return 0, err
-			}
-
-			//merge file only contain header
-			removeHeaderLength := bstream.GetBlockWriterHeaderLen
-
-			if !r.headerRead {
-				removeHeaderLength = 0
-				r.headerRead = true
-			}
-			if len(data) < removeHeaderLength {
-				return 0, fmt.Errorf("error in oneblockfile: corrupted: size is too small: %d (expected more than %d)", len(data), removeHeaderLength)
-			}
-
-			r.readBuffer = append(r.readBuffer, data[removeHeaderLength:]...)
-		} else {
-			break //no more file
+	for {
+		if r.readBuffer != nil  {
+			break
 		}
+
+		if len(r.oneBlockFiles) <= 0 {
+			return 0, io.EOF
+		}
+
+		obf := r.oneBlockFiles[0]
+		r.oneBlockFiles =  r.oneBlockFiles[1:]
+		fmt.Println("Downlaoding a new one", obf.canonicalName)
+		data, err := obf.Data(r.ctx, r.oneBlockFileStore)
+		if err != nil {
+			return 0, err
+		}
+
+		if r.headerPassed {
+			if len(data) < bstream.GetBlockWriterHeaderLen {
+				return 0, fmt.Errorf("one-block-file corrupt: expected header size of %d, but file size is only %d bytes", bstream.GetBlockWriterHeaderLen, len(data))
+			}
+			data = data[bstream.GetBlockWriterHeaderLen:]
+		} else {
+			r.headerPassed = true
+		}
+
+		if len(data) == 0 {
+			r.readBuffer = nil
+			continue
+		}
+
+		r.readBuffer = data
+		r.readBufferOffset = 0
 	}
 
-	bytesRead = copy(p, r.readBuffer)
-	if bytesRead == 0 {
-		return 0, io.EOF
+	bytesRead = copy(p, r.readBuffer[r.readBufferOffset:])
+	r.readBufferOffset += bytesRead
+	if r.readBufferOffset >= len(r.readBuffer) {
+		r.readBuffer = nil
 	}
-	r.readBuffer = r.readBuffer[bytesRead:] //remove read data from buffer
+
 	return bytesRead, nil
 }
