@@ -46,6 +46,7 @@ type Merger struct {
 	timeBetweenStoreLookups        time.Duration // should be very low on local filesystem
 	oneBlockDeletionThreads        int
 	maxOneBlockOperationsBatchSize int
+	isBatchMode                    bool
 
 	bundle     *Bundle // currently managed bundle
 	bundleLock *sync.Mutex
@@ -63,6 +64,7 @@ func NewMerger(
 	grpcListenAddr string,
 	oneBlockDeletionThreads int,
 	maxOneBlockOperationsBatchSize int,
+	isBatchMode bool,
 ) *Merger {
 	return &Merger{
 		Shutter:                        shutter.New(),
@@ -78,6 +80,7 @@ func NewMerger(
 		timeBetweenStoreLookups:        timeBetweenStoreLookups,
 		oneBlockDeletionThreads:        oneBlockDeletionThreads,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
+		isBatchMode:                    isBatchMode,
 	}
 }
 func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_PreMergedBlocksServer) error {
@@ -402,14 +405,13 @@ func (m *Merger) retrieveListOfFiles(ctx context.Context) (tooOld []string, seen
 
 	canonicalGoodFiles := make(map[string]struct{})
 
-	isBatchMode := m.stopBlockNum != 0
 	err = m.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		num, _, _, _, canonical, err := parseFilename(filename)
 		if err != nil {
 			return nil
 		}
 		switch {
-		case isBatchMode && num < m.bundle.lowerBlock:
+		case m.isBatchMode && num < m.bundle.lowerBlock:
 			return nil
 		case m.seenBlocks.IsTooOld(num):
 			tooOld = append(tooOld, filename)

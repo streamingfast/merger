@@ -109,6 +109,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 		"",
 		2,
 		100,
+		false,
 	)
 
 	return m, src, dst, func() {

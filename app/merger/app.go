@@ -90,13 +90,18 @@ func (a *App) Run() error {
 		stopBlockNum = a.config.StopBlockNum
 		seenBlocks = merger.NewSeenBlockCacheInMemory(startBlockNum, a.config.MaxFixableFork)
 	} else {
-		seenBlocks = merger.NewSeenBlockCacheFromFile(a.config.StateFile, a.config.MaxFixableFork)
-		if seenBlocks.HighestBlockNum != 0 {
-			startBlockNum = seenBlocks.HighestBlockNum + 1
+		if a.config.StartBlockNum != 0 {
+			seenBlocks = merger.NewSeenBlockCacheFromNewFile(a.config.StateFile, a.config.MaxFixableFork)
+			startBlockNum = a.config.StartBlockNum
 		} else {
-			startBlockNum, err = merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
-			if err != nil {
-				return fmt.Errorf("finding where to start: %w", err)
+			seenBlocks = merger.NewSeenBlockCacheFromFile(a.config.StateFile, a.config.MaxFixableFork)
+			if seenBlocks.HighestBlockNum != 0 {
+				startBlockNum = seenBlocks.HighestBlockNum + 1
+			} else {
+				startBlockNum, err = merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
+				if err != nil {
+					return fmt.Errorf("finding where to start: %w", err)
+				}
 			}
 		}
 	}
@@ -113,6 +118,7 @@ func (a *App) Run() error {
 		a.config.GRPCListenAddr,
 		a.config.OneBlockDeletionThreads,
 		a.config.MaxOneBlockOperationsBatchSize,
+		a.config.BatchMode,
 	)
 	zlog.Info("merger initiated")
 

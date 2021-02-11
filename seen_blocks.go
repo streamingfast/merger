@@ -59,6 +59,17 @@ func NewSeenBlockCacheFromFile(filename string, maxSize uint64) (c *SeenBlockCac
 	return
 }
 
+func NewSeenBlockCacheFromNewFile(filename string, maxSize uint64) (c *SeenBlockCache) {
+		zlog.Info("creating new seen_block_cache", zap.String("filename", filename), zap.Int("length", len(c.OneBlockFiles)))
+	c = &SeenBlockCache{
+		filename: filename,
+		OneBlockFiles: make(map[string]bool),
+		maxSize: maxSize,
+	}
+	c.adjustLowestBlockNum()
+	return c
+}
+
 // adjustLowestBlockNum will never lower the lowestSeen value, it can only go up
 func (c *SeenBlockCache) adjustLowestBlockNum() {
 	if c.HighestBlockNum < c.maxSize {
