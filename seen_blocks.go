@@ -60,11 +60,12 @@ func NewSeenBlockCacheFromFile(filename string, maxSize uint64) (c *SeenBlockCac
 }
 
 func NewSeenBlockCacheFromNewFile(filename string, maxSize uint64) (c *SeenBlockCache) {
-		zlog.Info("creating new seen_block_cache", zap.String("filename", filename), zap.Int("length", len(c.OneBlockFiles)))
+
+	zlog.Info("creating new seen_block_cache", zap.String("filename", filename), zap.Uint64("max_size", maxSize))
 	c = &SeenBlockCache{
-		filename: filename,
+		filename:      filename,
 		OneBlockFiles: make(map[string]bool),
-		maxSize: maxSize,
+		maxSize:       maxSize,
 	}
 	c.adjustLowestBlockNum()
 	return c
