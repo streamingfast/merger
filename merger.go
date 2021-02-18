@@ -475,12 +475,14 @@ func (m *Merger) mergeUpload() (uploaded []string, err error) {
 
 	t0 := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
-	defer cancel()
-
 	bundleFilename := fileNameForBlocksBundle(b.lowerBlock)
 	zlog.Debug("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Object("bundle", b))
-	err = m.destStore.WriteObject(ctx, bundleFilename, NewBundleReader(ctx, b, m.oneBlocksStore))
+
+	err = Retry(5, 500*time.Millisecond, func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+		defer cancel()
+		return m.destStore.WriteObject(ctx, bundleFilename, NewBundleReader(ctx, b, m.oneBlocksStore))
+	})
 	if err != nil {
 		return nil, fmt.Errorf("write object error: %s", err)
 	}
