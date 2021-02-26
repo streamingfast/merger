@@ -359,9 +359,26 @@ func (m *Merger) launch() (err error) {
 		completeBundle := m.bundle.isComplete() && m.waitedEnoughForUpperBound()
 
 		// special case, if we set a stop block because we are running a batch job 1000->2000, we can end last bundle after reading blocks 1900->1999 even if another batch job deleted the block 2000
-		finalBatchBundle := m.stopBlockNum == m.bundle.lowerBlock+100 && len(m.bundle.fileList) == 100
+		if m.stopBlockNum == m.bundle.lowerBlock+100 && len(m.bundle.fileList) >= 100 && !completeBundle {
+			var foundUpperIDs []string
+			for _, f := range m.bundle.timeSortedFiles() {
+				if f.num == m.bundle.upperBlock()-1 {
+					foundUpperIDs = append(foundUpperIDs, f.id)
+				}
+			}
 
-		if !completeBundle && !finalBatchBundle {
+			// recalculate after we've set arbitrary upper block ID
+			for _, upperID := range foundUpperIDs {
+				m.bundle.upperBlockID = upperID
+				completeBundle = m.bundle.isComplete()
+				if completeBundle {
+					break
+				}
+				m.bundle.upperBlockID = ""
+			}
+		}
+
+		if !completeBundle {
 			zlog.Info("waiting for more files to complete bundle", zap.Uint64("bundle_lowerblock", m.bundle.lowerBlock), zap.Int("bundle_length", len(m.bundle.fileList)), zap.String("bundle_upper_block_id", m.bundle.upperBlockID))
 			oneBlockFiles = nil
 			select {
