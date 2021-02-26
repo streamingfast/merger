@@ -267,7 +267,8 @@ func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
 	}
 
 	seenBlocks := []string{}
-	var lastSeenBlockNum uint64
+	targetEndBlock := prevLower + m.chunkSize - 1
+	var seenTargetEndBlock bool
 	for {
 		block, err := blkReader.Read()
 		if block == nil {
@@ -277,10 +278,12 @@ func (m *Merger) processRemoteMergedFile(file io.ReadCloser) (err error) {
 			return err
 		}
 		seenBlocks = append(seenBlocks, blockFileName(block))
-		lastSeenBlockNum = block.Num()
+		if block.Num() == targetEndBlock {
+			seenTargetEndBlock = true
+		}
 	}
-	if lastSeenBlockNum != prevLower+m.chunkSize-1 {
-		return fmt.Errorf("remote merged block file for blocks %d (length:%d) end on block %d", prevLower, m.chunkSize, lastSeenBlockNum)
+	if !seenTargetEndBlock {
+		return fmt.Errorf("remote merged block file for blocks %d (length:%d) does not contain block %d", prevLower, m.chunkSize, targetEndBlock)
 	}
 
 	m.bundleLock.Lock()
