@@ -22,5 +22,5 @@ import (
 var zlog *zap.Logger
 
 func init() {
-	logging.Register("github.com/dfuse-io/merger/app/merger", &zlog)
+	logging.Register("github.com/streamingfast/merger/app/merger", &zlog)
 }

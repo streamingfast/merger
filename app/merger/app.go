@@ -20,11 +20,11 @@ import (
 	"time"
 
 	"github.com/dfuse-io/dmetrics"
-	"github.com/dfuse-io/merger/metrics"
+	"github.com/streamingfast/merger/metrics"
 
 	"github.com/dfuse-io/dgrpc"
 	"github.com/dfuse-io/dstore"
-	"github.com/dfuse-io/merger"
+	"github.com/streamingfast/merger"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
 	"github.com/dfuse-io/shutter"
 	"go.uber.org/zap"
