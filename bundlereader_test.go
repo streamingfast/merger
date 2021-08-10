@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/dfuse-io/bstream"
-	"github.com/dfuse-io/dbin"
+	"github.com/streamingfast/dbin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
