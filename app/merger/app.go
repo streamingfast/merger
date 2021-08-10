@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dfuse-io/dmetrics"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/merger/metrics"
 
 	"github.com/streamingfast/dgrpc"
