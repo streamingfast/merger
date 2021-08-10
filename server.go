@@ -6,7 +6,7 @@ import (
 
 	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
-	"github.com/dfuse-io/dgrpc"
+	"github.com/streamingfast/dgrpc"
 	"go.uber.org/zap"
 )
 

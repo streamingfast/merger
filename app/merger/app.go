@@ -22,7 +22,7 @@ import (
 	"github.com/dfuse-io/dmetrics"
 	"github.com/streamingfast/merger/metrics"
 
-	"github.com/dfuse-io/dgrpc"
+	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger"
 	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
