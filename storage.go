@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dfuse-io/dstore"
+	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 

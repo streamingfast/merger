@@ -20,7 +20,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/dfuse-io/dstore"
+	"github.com/streamingfast/dstore"
 )
 
 type OneBlockFile struct {

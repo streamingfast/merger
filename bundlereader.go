@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/dfuse-io/bstream"
-	"github.com/dfuse-io/dstore"
+	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 
