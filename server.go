@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
-	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"
+	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/dgrpc"
 	"go.uber.org/zap"
 )

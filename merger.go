@@ -27,7 +27,7 @@ import (
 	"github.com/dfuse-io/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger/metrics"
-	pbmerge "github.com/dfuse-io/pbgo/dfuse/merger/v1"
+	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"

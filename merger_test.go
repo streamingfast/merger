@@ -29,8 +29,8 @@ import (
 	"github.com/dfuse-io/bstream"
 	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
-	pbbstream "github.com/dfuse-io/pbgo/dfuse/bstream/v1"
-	pb "github.com/dfuse-io/pbgo/dfuse/merger/v1"
+	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
+	pb "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -25,7 +25,7 @@ import (
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger"
-	pbhealth "github.com/dfuse-io/pbgo/grpc/health/v1"
+	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
