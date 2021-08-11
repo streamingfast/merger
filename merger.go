@@ -24,7 +24,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dfuse-io/bstream"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger/metrics"
 	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"

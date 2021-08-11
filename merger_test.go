@@ -26,7 +26,7 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"github.com/dfuse-io/bstream"
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
 	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
