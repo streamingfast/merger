@@ -31,6 +31,7 @@ type OneBlockFile struct {
 	num           uint64
 	previousID    string
 	data          []byte
+	merged        bool
 }
 
 func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error) {
