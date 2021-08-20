@@ -18,6 +18,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -94,7 +95,7 @@ func (b *Bundle) isComplete() (complete bool) {
 	if lowestContiguous.num <= b.lowerBlock {
 		return true
 	}
-	if b.lowerBlock == 0 && lowestContiguous.num <= 2 {
+	if b.lowerBlock == 0 && lowestContiguous.num <= bstream.GetProtocolFirstStreamableBlock {
 		return true
 	}
 
