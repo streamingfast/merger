@@ -98,13 +98,13 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	require.NoError(t, err)
 
 	m = NewMerger(
-		src,
-		dst,
 		NewBundler(100, 100, 100, ""),
 		0,
 		"",
-		2,
-		100,
+		func(lowBlockNum uint64) ([]*OneBlockFile, error) { return nil, nil },
+		func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error) { return },
+		func(fileNames []*OneBlockFile) {},
+		func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error) { return },
 	)
 
 	return m, src, dst, func() {
@@ -162,7 +162,7 @@ func TestMergeUpload(t *testing.T) {
 	}
 
 	fmt.Println("Triage completed")
-	err := m.mergeUpload(100, oneBlockFiles)
+	err := m.mergeUploadFunc(100, oneBlockFiles)
 	require.NoError(t, err)
 	fmt.Println("Upload files completed")
 

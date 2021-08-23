@@ -7,10 +7,9 @@ import (
 	"sort"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
+	"go.uber.org/zap"
 )
 
 type Bundler struct {
@@ -57,6 +56,51 @@ func NewBundlerFromFile(filename string) (bundler *Bundler, err error) {
 	zlog.Info("loaded bundler", zap.String("filename", filename), zap.Stringer("bundler", bundler))
 	bundler.filename = filename
 	return
+}
+
+func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+	lowBlockNum := b.InclusiveLowerBlock()
+	optimizeStopOnSingleRoot := false
+	for {
+		zlog.Info("fetching one block files", zap.Uint64("at_low_block_num", lowBlockNum))
+
+		oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lowBlockNum)
+		if err != nil {
+			return fmt.Errorf("fetching one block files with low block num: %d: %w", lowBlockNum, err)
+		}
+		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].num > oneBlockFiles[j].num })
+
+		for _, f := range oneBlockFiles {
+			f.merged = true
+			b.AddOneBlockFile(f)
+			if optimizeStopOnSingleRoot {
+				if b.hasSingleRoot() {
+					return nil
+				}
+			}
+		}
+
+		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum))
+
+		if b.hasSingleRoot() {
+			break
+		}
+
+		// we got multiple roots we need more block from earlier merge file
+		lowBlockNum = lowBlockNum - b.bundleSize
+		optimizeStopOnSingleRoot = true
+	}
+	b.resetMemoize()
+	return nil
+}
+
+func (b *Bundler) hasSingleRoot() bool {
+	roots, err := b.db.Roots()
+	if err != nil {
+		return false
+	}
+
+	return len(roots) == 1
 }
 
 func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, canonicalName string) {
@@ -184,7 +228,11 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) ([]*OneBlockFile, 
 	return out, nil
 }
 
-func (b *Bundler) Commit(oneBlockFiles []*OneBlockFile) { //todo: this is a bit fragile. maybe we should call ToBundle instead of receive file from an outside source
+func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) error {
+	oneBlockFiles, err := b.ToBundle(inclusiveHighestBlockLimit)
+	if err != nil {
+		return err
+	}
 	var highestBlock *forkable.Block
 
 	for _, file := range oneBlockFiles {
@@ -196,6 +244,7 @@ func (b *Bundler) Commit(oneBlockFiles []*OneBlockFile) { //todo: this is a bit 
 
 	b.exclusiveHighestBlockLimit += b.bundleSize
 	b.lastMergeBlock = highestBlock
+	return nil
 }
 
 func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) error {

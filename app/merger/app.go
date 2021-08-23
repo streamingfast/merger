@@ -67,7 +67,7 @@ func (a *App) Run() error {
 
 	dmetrics.Register(metrics.MetricSet)
 
-	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
+	oneBlockStoreStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
@@ -87,14 +87,17 @@ func (a *App) Run() error {
 		bundler = merger.NewBundler(100, a.config.MaxFixableFork, nextExclusiveHighestBlockLimit, a.config.StateFile)
 	}
 
+	io := merger.NewMergerIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize)
+	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
+
 	m := merger.NewMerger(
-		sourceArchiveStore,
-		mergedBlocksStore,
 		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.GRPCListenAddr,
-		a.config.OneBlockDeletionThreads,
-		a.config.MaxOneBlockOperationsBatchSize,
+		io.FetchMergeFile,
+		io.FetchOneBlockFiles,
+		filesDeleter.Delete,
+		io.MergeUpload,
 	)
 	zlog.Info("merger initiated")
 
@@ -107,6 +110,7 @@ func (a *App) Run() error {
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
 
+	filesDeleter.Start(a.config.OneBlockDeletionThreads, 100000)
 	go m.Launch()
 
 	zlog.Info("merger running")
