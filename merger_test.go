@@ -100,8 +100,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	m = NewMerger(
 		src,
 		dst,
-		5,
-		100,
+		NewBundler(100, 100, ""),
 		0,
 		"",
 		2,

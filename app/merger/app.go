@@ -34,9 +34,6 @@ type Config struct {
 	StorageOneBlockFilesPath       string
 	StorageMergedBlocksFilesPath   string
 	GRPCListenAddr                 string
-	BatchMode                      bool
-	StartBlockNum                  uint64
-	StopBlockNum                   uint64
 	MinimalBlockNum                uint64
 	WritersLeewayDuration          time.Duration
 	TimeBetweenStoreLookups        time.Duration
@@ -81,44 +78,24 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	var startBlockNum uint64
-	var stopBlockNum uint64
-	var seenBlocks *merger.SeenBlockCache
-
-	if a.config.BatchMode {
-		startBlockNum = a.config.StartBlockNum
-		stopBlockNum = a.config.StopBlockNum
-		seenBlocks = merger.NewSeenBlockCacheInMemory(startBlockNum, a.config.MaxFixableFork)
-	} else {
-		if a.config.StartBlockNum != 0 {
-			seenBlocks = merger.NewSeenBlockCacheFromNewFile(a.config.StateFile, a.config.MaxFixableFork)
-			startBlockNum = a.config.StartBlockNum
-		} else {
-			seenBlocks = merger.NewSeenBlockCacheFromFile(a.config.StateFile, a.config.MaxFixableFork)
-			if seenBlocks.HighestBlockNum != 0 {
-				startBlockNum = seenBlocks.HighestBlockNum + 1
-			} else {
-				startBlockNum, err = merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
-				if err != nil {
-					return fmt.Errorf("finding where to start: %w", err)
-				}
-			}
+	bundler, err := merger.NewBundlerFromFile(a.config.StateFile)
+	if err != nil {
+		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
+		nextExclusiveHighestBlockLimit, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
+		if err != nil {
+			return fmt.Errorf("finding where to start: %w", err)
 		}
+		bundler = merger.NewBundler(100, nextExclusiveHighestBlockLimit, a.config.StateFile)
 	}
 
 	m := merger.NewMerger(
 		sourceArchiveStore,
 		mergedBlocksStore,
-		a.config.WritersLeewayDuration,
-		100,
-		seenBlocks,
-		startBlockNum,
-		stopBlockNum,
+		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.GRPCListenAddr,
 		a.config.OneBlockDeletionThreads,
 		a.config.MaxOneBlockOperationsBatchSize,
-		a.config.BatchMode,
 	)
 	zlog.Info("merger initiated")
 

@@ -48,8 +48,7 @@ type Merger struct {
 func NewMerger(
 	sourceStore dstore.Store,
 	destStore dstore.Store,
-	chunkSize uint64,
-	firstExclusiveHighestBlockLimit uint64,
+	bundler *Bundler,
 	timeBetweenStoreLookups time.Duration,
 	grpcListenAddr string,
 	oneBlockDeletionThreads int,
@@ -59,8 +58,7 @@ func NewMerger(
 		Shutter:                        shutter.New(),
 		oneBlocksStore:                 sourceStore,
 		destStore:                      destStore,
-		chunkSize:                      chunkSize,
-		bundler:                        NewBundler(chunkSize, firstExclusiveHighestBlockLimit),
+		bundler:                        bundler,
 		bundleLock:                     &sync.Mutex{},
 		grpcListenAddr:                 grpcListenAddr,
 		timeBetweenStoreLookups:        timeBetweenStoreLookups,
@@ -275,17 +273,12 @@ func (m *Merger) addExistingMergedFileBlocksToBundler(file io.ReadCloser) (err e
 		zap.Uint64("highest_block", highestBlock),
 	)
 
-	//if !seenTargetEndBlock {
-	//	return fmt.Errorf("remote merged block file for blocks %d (length:%d) does not contain block %d", prevLower, m.chunkSize, targetEndBlock)
-	//}
-
 	m.bundleLock.Lock()
 	defer m.bundleLock.Unlock()
-	//todo: should we save the bundler forkdb/bundler here?
-	//if err := m.seenBlocks.Save(); err != nil {
-	//	zlog.Error("cannot save SeenBlockCache", zap.Error(err))
-	//}
-	//m.seenBlocks.Truncate()
+
+	if err := m.bundler.Save(); err != nil {
+		zlog.Error("cannot save SeenBlockCache", zap.Error(err))
+	}
 	//todo: purge here?
 
 	return nil

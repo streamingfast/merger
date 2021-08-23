@@ -1,9 +1,13 @@
 package merger
 
 import (
+	"encoding/gob"
 	"fmt"
+	"os"
 	"sort"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -18,6 +22,7 @@ type Bundler struct {
 	chains                     *forkable.ChainList
 	lastMergeBlock             *forkable.Block
 	exclusiveHighestBlockLimit uint64
+	filename                   string
 }
 
 func (b *Bundler) String() string {
@@ -33,12 +38,23 @@ func (b *Bundler) InclusiveLowerBlock() uint64 {
 	return b.exclusiveHighestBlockLimit - b.bundleSize
 }
 
-func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bundler {
+func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
 	return &Bundler{
 		bundleSize:                 bundleSize,
 		db:                         forkable.NewForkDB(),
 		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
+		filename:                   filename,
 	}
+}
+
+func NewBundlerFromFile(filename string) (bundler *Bundler, err error) {
+	bundler, err = load(filename)
+	if err != nil {
+		return nil, fmt.Errorf("loading bundler from file: %s : %w", filename, err)
+	}
+	zlog.Info("loaded bundler", zap.String("filename", filename), zap.Stringer("bundler", bundler))
+	bundler.filename = filename
+	return
 }
 
 func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, canonicalName string) {
@@ -137,8 +153,6 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) ([]*OneBlockFile, 
 
 	seen := map[string]bool{}
 	var out []*OneBlockFile
-	var highestBlockNum uint64
-	var highestBlock *forkable.Block
 	for _, chain := range chains.Chains {
 		for _, blockID := range chain {
 			if found := seen[blockID]; found {
@@ -148,19 +162,11 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) ([]*OneBlockFile, 
 			oneBlockFile := blk.Object.(*OneBlockFile)
 			blkNum := blk.BlockNum
 			if !oneBlockFile.merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files
-				if blkNum > highestBlockNum {
-					highestBlockNum = blkNum
-					highestBlock = blk
-				}
 				seen[blockID] = true
-
-				oneBlockFile.merged = true //todo: this should be done only when file is really merged
 				out = append(out, oneBlockFile)
 			}
 		}
 	}
-	b.exclusiveHighestBlockLimit += b.bundleSize //todo: this should be done only when file is really merged
-	b.lastMergeBlock = highestBlock              //todo: this should be done only when file is really merged
 
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].blockTime.Equal(out[j].blockTime) {
@@ -173,7 +179,19 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) ([]*OneBlockFile, 
 	return out, nil
 }
 
-//todo: commit func still missing
+func (b *Bundler) Commit(oneBlockFiles []*OneBlockFile) { //todo: this is a bit fragile. maybe we should call ToBundle instead of receive file from an outside source
+	var highestBlock *forkable.Block
+
+	for _, file := range oneBlockFiles {
+		if highestBlock == nil || file.num >= highestBlock.BlockNum {
+			highestBlock = b.db.BlockForID(file.id)
+		}
+		file.merged = true
+	}
+
+	b.exclusiveHighestBlockLimit += b.bundleSize
+	b.lastMergeBlock = highestBlock
+}
 
 func (b *Bundler) Purge(upToBlock uint64, callback func(purgedOneBlockFiles []*OneBlockFile)) error {
 	node, err := b.getTree()
@@ -198,9 +216,14 @@ func (b *Bundler) Purge(upToBlock uint64, callback func(purgedOneBlockFiles []*O
 //                                                             \- 110c - 111c
 
 func purge(upToBlock uint64, node *forkable.Node, longest []string, db *forkable.ForkDB, alreadyPurgedOneBlockFiles []*OneBlockFile) (purgedOneBlockFiles []*OneBlockFile, stop bool) {
-	//todo: we should not purge none merge block ...
 	purgedOneBlockFiles = alreadyPurgedOneBlockFiles
 	block := db.BlockForID(node.ID)
+	//oneBlock := block.Object.(*OneBlockFile)
+
+	//if oneBlock.merged {
+	//	return nil, false //we just skip this block, but we continue to walk the tree
+	//}
+
 	if block.BlockNum > upToBlock {
 		return nil, true
 	}
@@ -252,4 +275,29 @@ func inChain(lookupID string, chain []string) bool {
 		}
 	}
 	return false
+}
+
+func load(filename string) (bundler *Bundler, err error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	dataDecoder := gob.NewDecoder(f)
+	err = dataDecoder.Decode(&bundler)
+	return
+}
+
+func (b *Bundler) Save() error {
+	if b.filename == "" { // in memory mode
+		return nil
+	}
+	f, err := os.Create(b.filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	dataEncoder := gob.NewEncoder(f)
+	return dataEncoder.Encode(b)
 }
