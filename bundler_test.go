@@ -184,7 +184,7 @@ func TestBundler_IsComplete(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, c.blockLimit, "")
+			bundler := NewBundler(5, 100, c.blockLimit, "")
 			bundler.lastMergeBlock = &forkable.Block{
 				BlockID: c.lastMergeBlockID,
 			}
@@ -309,7 +309,7 @@ func TestBundler_MergeableFiles(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, c.blockLimit, "")
+			bundler := NewBundler(5, 100, c.blockLimit, "")
 			bundler.lastMergeBlock = &forkable.Block{BlockID: c.lastMergeBlockID}
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
@@ -364,7 +364,7 @@ func TestBundler_Complexe(t *testing.T) {
 		MustTestNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a"),
 	}
 
-	bundler := NewBundler(5, 105, "")
+	bundler := NewBundler(5, 100, 105, "")
 	bundler.lastMergeBlock = &forkable.Block{BlockID: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
@@ -421,7 +421,7 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
 	}
 
-	bundler := NewBundler(5, 105, "")
+	bundler := NewBundler(5, 100, 105, "")
 	bundler.lastMergeBlock = &forkable.Block{BlockID: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
@@ -483,7 +483,7 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 		"00000109b", "00000106a"}, ids)
 }
 
-func TestBundler_Purge(t *testing.T) {
+func TestBundler_purge(t *testing.T) {
 
 	largeFileSet := []*OneBlockFile{
 		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
@@ -595,12 +595,143 @@ func TestBundler_Purge(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, 105, "")
+			bundler := NewBundler(5, 100, 105, "")
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}
 
-			err := bundler.Purge(c.upToBlock, func(purgedOneBlockFiles []*OneBlockFile) {
+			err := bundler.purge(c.upToBlock, func(purgedOneBlockFiles []*OneBlockFile) {
+				require.Equal(t, c.expectedPurgedFileCount, len(purgedOneBlockFiles))
+			})
+			require.NoError(t, err)
+
+			roots, err := bundler.db.Roots()
+
+			if c.expectedLongestFirstBlock == "" && c.expectedTreeSize == 0 {
+				require.Errorf(t, err, "no link")
+				return
+			}
+			require.NoError(t, err)
+			fmt.Println("roots:", roots)
+
+			tree, err := bundler.getTree()
+			require.NoError(t, err) //this will mean that we created multiple root.
+			longest := tree.Chains().LongestChain()
+			require.Equal(t, c.expectedLongestFirstBlock, longest[0])
+			require.Equal(t, c.expectedTreeSize, tree.Size())
+		})
+	}
+}
+func TestBundler_Purge(t *testing.T) {
+
+	largeFileSet := []*OneBlockFile{
+		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
+		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
+		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a"),
+		MustTestNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a"),
+		MustTestNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b"),
+		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a"),
+		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a"),
+		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
+		MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a"),
+		MustTestNewOneBlockFile("0000000108-20210728T105016.10-00000108b-00000107a"),
+		MustTestNewOneBlockFile("0000000109-20210728T105016.11-00000109b-00000108b"),
+		MustTestNewOneBlockFile("0000000110-20210728T105016.12-00000110b-00000109b"),
+		MustTestNewOneBlockFile("0000000110-20210728T105016.13-00000110c-00000109b"),
+		MustTestNewOneBlockFile("0000000111-20210728T105016.14-00000111c-00000110c"),
+		MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a"),
+		MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a"),
+		MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a"),
+		MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a"),
+		MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a"),
+		MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a"),
+		MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a"),
+		MustTestNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a"),
+		MustTestNewOneBlockFile("0000000116-20210728T105016.23-00000116a-00000115a"),
+		MustTestNewOneBlockFile("0000000117-20210728T105016.24-00000117a-00000116a"),
+		MustTestNewOneBlockFile("0000000118-20210728T105016.25-00000118a-00000117a"),
+		MustTestNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a"),
+	}
+
+	//                                  |                           |                                  |                           |
+	// 100a - 101a - 102a - 103a - 104a - 106a - 107a - 108a - 109a - 110a - 111a - 112a - 113a - 114a - 115a - 116a - 117a - 118a - 120a
+	//            \- 102b - 103b                     \- 108b - 109b - 110b
+	//                                                             \- 110c - 111c
+
+	cases := []struct {
+		name                      string
+		files                     []*OneBlockFile
+		expectedTreeSize          int
+		expectedPurgedFileCount   int
+		expectedLongestFirstBlock string
+		maxFixableFork            uint64
+	}{
+		{
+			name:                      "First block no fork",
+			files:                     largeFileSet,
+			maxFixableFork:            18, //100a
+			expectedLongestFirstBlock: "00000101a",
+			expectedTreeSize:          25,
+			expectedPurgedFileCount:   1,
+		},
+		{
+			name:                      "Only one block because of unpurgeable fork",
+			files:                     largeFileSet,
+			maxFixableFork:            16, //102a
+			expectedLongestFirstBlock: "00000101a",
+			expectedTreeSize:          25,
+			expectedPurgedFileCount:   1,
+		},
+		{
+			name:                      "end of fork",
+			files:                     largeFileSet,
+			maxFixableFork:            15, //103a
+			expectedLongestFirstBlock: "00000104a",
+			expectedTreeSize:          20,
+			expectedPurgedFileCount:   6,
+		},
+		{
+			name:                      "after fork",
+			files:                     largeFileSet,
+			maxFixableFork:            14, //104a
+			expectedLongestFirstBlock: "00000106a",
+			expectedTreeSize:          19,
+			expectedPurgedFileCount:   7,
+		},
+		{
+			name:                      "not enough",
+			files:                     largeFileSet,
+			maxFixableFork:            20, //nada
+			expectedLongestFirstBlock: "00000100a",
+			expectedTreeSize:          26,
+			expectedPurgedFileCount:   0,
+		},
+		{
+			name:                      "keep 1",
+			files:                     largeFileSet,
+			maxFixableFork:            1, //118a
+			expectedLongestFirstBlock: "00000120a",
+			expectedTreeSize:          1,
+			expectedPurgedFileCount:   25,
+		},
+		{
+			name:                      "remove all",
+			files:                     largeFileSet,
+			maxFixableFork:            0, //120a
+			expectedLongestFirstBlock: "",
+			expectedTreeSize:          0,
+			expectedPurgedFileCount:   26,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bundler := NewBundler(5, c.maxFixableFork, 105, "")
+			for _, f := range c.files {
+				bundler.AddOneBlockFile(f)
+			}
+
+			err := bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
 				require.Equal(t, c.expectedPurgedFileCount, len(purgedOneBlockFiles))
 			})
 			require.NoError(t, err)

@@ -19,12 +19,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/merger/metrics"
-
 	"github.com/streamingfast/dgrpc"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger"
+	"github.com/streamingfast/merger/metrics"
 	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -85,7 +84,7 @@ func (a *App) Run() error {
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}
-		bundler = merger.NewBundler(100, nextExclusiveHighestBlockLimit, a.config.StateFile)
+		bundler = merger.NewBundler(100, a.config.MaxFixableFork, nextExclusiveHighestBlockLimit, a.config.StateFile)
 	}
 
 	m := merger.NewMerger(

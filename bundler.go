@@ -23,6 +23,7 @@ type Bundler struct {
 	lastMergeBlock             *forkable.Block
 	exclusiveHighestBlockLimit uint64
 	filename                   string
+	maxFixableFork             uint64
 }
 
 func (b *Bundler) String() string {
@@ -38,9 +39,10 @@ func (b *Bundler) InclusiveLowerBlock() uint64 {
 	return b.exclusiveHighestBlockLimit - b.bundleSize
 }
 
-func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
+func NewBundler(bundleSize uint64, maxFixableFork uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
 	return &Bundler{
 		bundleSize:                 bundleSize,
+		maxFixableFork:             maxFixableFork,
 		db:                         forkable.NewForkDB(),
 		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
 		filename:                   filename,
@@ -58,6 +60,9 @@ func NewBundlerFromFile(filename string) (bundler *Bundler, err error) {
 }
 
 func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, canonicalName string) {
+
+	//todo: panic on maxFixableFork failure
+
 	if block := b.db.BlockForID(blockID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		obf.filenames[filename] = Empty
@@ -193,7 +198,31 @@ func (b *Bundler) Commit(oneBlockFiles []*OneBlockFile) { //todo: this is a bit 
 	b.lastMergeBlock = highestBlock
 }
 
-func (b *Bundler) Purge(upToBlock uint64, callback func(purgedOneBlockFiles []*OneBlockFile)) error {
+func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) error {
+	chainLists, err := b.getChains()
+	if err != nil {
+		//todo: maybe log info ...
+		return nil
+	}
+
+	longestChain := chainLists.LongestChain()
+	longestChainLength := uint64(len(longestChain))
+	if longestChainLength == 0 {
+		return nil
+	}
+
+	if longestChainLength < b.maxFixableFork {
+		return nil
+	}
+
+	delta := longestChainLength - b.maxFixableFork
+	upToBlockID := longestChain[delta-1]
+	upToBlock := b.db.BlockForID(upToBlockID)
+
+	return b.purge(upToBlock.BlockNum, callback)
+}
+
+func (b *Bundler) purge(upToBlock uint64, callback func(purgedOneBlockFiles []*OneBlockFile)) error {
 	node, err := b.getTree()
 	if err != nil {
 		return err
@@ -202,7 +231,7 @@ func (b *Bundler) Purge(upToBlock uint64, callback func(purgedOneBlockFiles []*O
 	chains := node.Chains()
 	longest := chains.LongestChain()
 	purgedOneBlockFiles := make([]*OneBlockFile, 0)
-	purgedOneBlockFiles, _ = purge(upToBlock, node, longest, b.db, purgedOneBlockFiles)
+	purgedOneBlockFiles, _ = recursivePurge(upToBlock, node, longest, b.db, purgedOneBlockFiles)
 	b.resetMemoize()
 
 	callback(purgedOneBlockFiles)
@@ -215,14 +244,14 @@ func (b *Bundler) Purge(upToBlock uint64, callback func(purgedOneBlockFiles []*O
 //            \- 102b - 103b                     \- 108b - 109b - 110b
 //                                                             \- 110c - 111c
 
-func purge(upToBlock uint64, node *forkable.Node, longest []string, db *forkable.ForkDB, alreadyPurgedOneBlockFiles []*OneBlockFile) (purgedOneBlockFiles []*OneBlockFile, stop bool) {
+func recursivePurge(upToBlock uint64, node *forkable.Node, longest []string, db *forkable.ForkDB, alreadyPurgedOneBlockFiles []*OneBlockFile) (purgedOneBlockFiles []*OneBlockFile, stop bool) {
 	purgedOneBlockFiles = alreadyPurgedOneBlockFiles
-	block := db.BlockForID(node.ID)
-	//oneBlock := block.Object.(*OneBlockFile)
 
-	//if oneBlock.merged {
-	//	return nil, false //we just skip this block, but we continue to walk the tree
-	//}
+	block := db.BlockForID(node.ID)
+	oneBlock := block.Object.(*OneBlockFile)
+	if oneBlock.merged {
+		return nil, false //we just skip this block, but we continue to walk the tree
+	}
 
 	if block.BlockNum > upToBlock {
 		return nil, true
@@ -237,7 +266,7 @@ func purge(upToBlock uint64, node *forkable.Node, longest []string, db *forkable
 	}
 
 	for _, child := range node.Children {
-		purgedOneBlockFiles, stop = purge(upToBlock, child, longest, db, purgedOneBlockFiles)
+		purgedOneBlockFiles, stop = recursivePurge(upToBlock, child, longest, db, purgedOneBlockFiles)
 		if stop {
 			break
 		}

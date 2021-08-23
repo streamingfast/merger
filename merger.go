@@ -279,7 +279,14 @@ func (m *Merger) addExistingMergedFileBlocksToBundler(file io.ReadCloser) (err e
 	if err := m.bundler.Save(); err != nil {
 		zlog.Error("cannot save SeenBlockCache", zap.Error(err))
 	}
-	//todo: purge here?
+
+	err = m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
+		//todo: call deleter stuff
+	})
+
+	if err != nil {
+		//todo: log warn?
+	}
 
 	return nil
 }
@@ -297,7 +304,7 @@ func (m *Merger) launch() (err error) {
 		if remoteMergedFile, cancel, err := fetchMergedFile(m.destStore, m.bundler.InclusiveLowerBlock()); err == nil {
 			err := m.addExistingMergedFileBlocksToBundler(remoteMergedFile)
 			//todo: commit here
-			//todo: we should call bundler purge func here.
+			//todo: we should call bundler recursivePurge func here.
 			cancel()
 			if err != nil {
 				zlog.Error("error processing remote file to bump bundle", zap.Error(err), zap.Uint64("start_block_num", m.bundler.InclusiveLowerBlock()))
@@ -319,7 +326,7 @@ func (m *Merger) launch() (err error) {
 		}
 		m.bundleLock.Unlock()
 
-		//todo: replace this block by bundler.purge with call back
+		//todo: replace this block by bundler.recursivePurge with call back
 		filesDeleter.Delete(tooOldFiles)
 		if lastOneBlockFileAdded == nil {
 			select {
@@ -367,7 +374,7 @@ func (m *Merger) launch() (err error) {
 			return err
 		}
 
-		//todo: purge here using "filesDeleter.Delete(uploaded)" make sure to delete all filenames for oneblock file.
+		//todo: recursivePurge here using "filesDeleter.Delete(uploaded)" make sure to delete all filenames for oneblock file.
 		//todo bundler commit
 
 		//todo: update metrics and progressFilename
