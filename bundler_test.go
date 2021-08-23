@@ -184,14 +184,12 @@ func TestBundler_IsComplete(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5)
+			bundler := NewBundler(5, c.blockLimit)
 			bundler.lastMergeBlock = &forkable.Block{
 				BlockID: c.lastMergeBlockID,
 			}
-			bundler.exclusiveHighestBlockLimit = c.blockLimit
 			for _, f := range c.files {
-				err := bundler.AddOneBlockFile(MustTestNewOneBlockFile(f))
-				require.NoError(t, err)
+				bundler.AddOneBlockFile(MustTestNewOneBlockFile(f))
 			}
 			completed, highestBlockLimit := bundler.isComplete()
 			require.Equal(t, c.expectedCompleted, completed)
@@ -217,7 +215,7 @@ func MustTestNewOneBlockFile(fileName string) *OneBlockFile {
 		previousID: previousBlockID,
 	}
 }
-func MustTestNewMergerOneBlockFile(fileName string) *OneBlockFile {
+func MustTestNewMergedOneBlockFile(fileName string) *OneBlockFile {
 	fi := MustTestNewOneBlockFile(fileName)
 	fi.merged = true
 	return fi
@@ -273,14 +271,14 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		{
 			name: "file 10",
 			files: []*OneBlockFile{
-				MustTestNewMergerOneBlockFile("0000000107-20210728T105016.01-00000107a-00000106a"),
-				MustTestNewMergerOneBlockFile("0000000108-20210728T105016.02-00000108b-00000107a"),
-				MustTestNewMergerOneBlockFile("0000000109-20210728T105016.03-00000109b-00000108b"),
+				MustTestNewMergedOneBlockFile("0000000107-20210728T105016.01-00000107a-00000106a"),
+				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.02-00000108b-00000107a"),
+				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.03-00000109b-00000108b"),
 				MustTestNewOneBlockFile("0000000110-20210728T105016.04-00000110b-00000109b"),
 				MustTestNewOneBlockFile("0000000110-20210728T105016.05-00000110c-00000109b"),
 				MustTestNewOneBlockFile("0000000111-20210728T105016.06-00000111c-00000110c"),
-				MustTestNewMergerOneBlockFile("0000000108-20210728T105016.07-00000108a-00000107a"),
-				MustTestNewMergerOneBlockFile("0000000109-20210728T105016.08-00000109a-00000108a"),
+				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.07-00000108a-00000107a"),
+				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.08-00000109a-00000108a"),
 				MustTestNewOneBlockFile("0000000110-20210728T105016.09-00000110a-00000109a"),
 				MustTestNewOneBlockFile("0000000111-20210728T105016.10-00000111a-00000110a"),
 				MustTestNewOneBlockFile("0000000112-20210728T105016.11-00000112a-00000111a"),
@@ -311,16 +309,14 @@ func TestBundler_MergeableFiles(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5)
+			bundler := NewBundler(5, c.blockLimit)
 			bundler.lastMergeBlock = &forkable.Block{BlockID: c.lastMergeBlockID}
-			bundler.exclusiveHighestBlockLimit = c.blockLimit
 			for _, f := range c.files {
-				err := bundler.AddOneBlockFile(f)
-				require.NoError(t, err)
+				bundler.AddOneBlockFile(f)
 			}
 			completed, highestBlockLimit := bundler.isComplete()
 			require.True(t, completed)
-			files, err := bundler.MergeableFiles(highestBlockLimit)
+			files, err := bundler.ToBundle(highestBlockLimit)
 			require.NoError(t, err)
 
 			ids := toIDs(files)
@@ -368,38 +364,36 @@ func TestBundler_Complexe(t *testing.T) {
 		MustTestNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a"),
 	}
 
-	bundler := NewBundler(5)
+	bundler := NewBundler(5, 105)
 	bundler.lastMergeBlock = &forkable.Block{BlockID: "00000099a"}
-	bundler.exclusiveHighestBlockLimit = 105
 	for _, f := range files {
-		err := bundler.AddOneBlockFile(f)
-		require.NoError(t, err)
+		bundler.AddOneBlockFile(f)
 	}
 
 	completed, highestBlockLimit := bundler.isComplete()
 	require.True(t, completed)
-	mergeable, err := bundler.MergeableFiles(highestBlockLimit)
+	mergeable, err := bundler.ToBundle(highestBlockLimit)
 	require.NoError(t, err)
 	ids := toIDs(mergeable)
 	require.Equal(t, []string{"00000100a", "00000101a", "00000102a", "00000102b", "00000103b", "00000103a", "00000104a"}, ids)
 
 	completed, highestBlockLimit = bundler.isComplete()
 	require.True(t, completed)
-	mergeable, err = bundler.MergeableFiles(highestBlockLimit)
+	mergeable, err = bundler.ToBundle(highestBlockLimit)
 	require.NoError(t, err)
 	ids = toIDs(mergeable)
 	require.Equal(t, []string{"00000106a", "00000107a", "00000108b", "00000109b", "00000108a", "00000109a"}, ids)
 
 	completed, highestBlockLimit = bundler.isComplete()
 	require.True(t, completed)
-	mergeable, err = bundler.MergeableFiles(highestBlockLimit)
+	mergeable, err = bundler.ToBundle(highestBlockLimit)
 	require.NoError(t, err)
 	ids = toIDs(mergeable)
 	require.Equal(t, []string{"00000110b", "00000110c", "00000111c", "00000110a", "00000111a", "00000112a", "00000113a", "00000114a"}, ids)
 
 	completed, highestBlockLimit = bundler.isComplete()
 	require.True(t, completed)
-	mergeable, err = bundler.MergeableFiles(highestBlockLimit)
+	mergeable, err = bundler.ToBundle(highestBlockLimit)
 	require.NoError(t, err)
 	ids = toIDs(mergeable)
 	require.Equal(t, []string{"00000115a", "00000116a", "00000117a", "00000118a"}, ids)
@@ -408,12 +402,12 @@ func TestBundler_Complexe(t *testing.T) {
 func TestBundler_BackToTheFuture(t *testing.T) {
 	// load forkdb with some history ...
 	files := []*OneBlockFile{
-		MustTestNewMergerOneBlockFile("0000000094-20210728T105016.01-00000094a-00000093a"),
-		MustTestNewMergerOneBlockFile("0000000095-20210728T105016.01-00000095a-00000094a"),
-		MustTestNewMergerOneBlockFile("0000000096-20210728T105016.01-00000096a-00000095a"),
-		MustTestNewMergerOneBlockFile("0000000097-20210728T105016.01-00000097a-00000096a"),
-		MustTestNewMergerOneBlockFile("0000000098-20210728T105016.01-00000098a-00000097a"),
-		MustTestNewMergerOneBlockFile("0000000099-20210728T105016.01-00000099a-00000098a"),
+		MustTestNewMergedOneBlockFile("0000000094-20210728T105016.01-00000094a-00000093a"),
+		MustTestNewMergedOneBlockFile("0000000095-20210728T105016.01-00000095a-00000094a"),
+		MustTestNewMergedOneBlockFile("0000000096-20210728T105016.01-00000096a-00000095a"),
+		MustTestNewMergedOneBlockFile("0000000097-20210728T105016.01-00000097a-00000096a"),
+		MustTestNewMergedOneBlockFile("0000000098-20210728T105016.01-00000098a-00000097a"),
+		MustTestNewMergedOneBlockFile("0000000099-20210728T105016.01-00000099a-00000098a"),
 
 		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
 		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
@@ -423,24 +417,22 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
 	}
 
-	bundler := NewBundler(5)
+	bundler := NewBundler(5, 105)
 	bundler.lastMergeBlock = &forkable.Block{BlockID: "00000099a"}
-	bundler.exclusiveHighestBlockLimit = 105
 	for _, f := range files {
-		err := bundler.AddOneBlockFile(f)
-		require.NoError(t, err)
+		bundler.AddOneBlockFile(f)
 	}
 
 	// Let's merge a first back of block from 100 to 104
 	completed, highestBlockLimit := bundler.isComplete()
 	require.True(t, completed)
-	mergeable, err := bundler.MergeableFiles(highestBlockLimit)
+	mergeable, err := bundler.ToBundle(highestBlockLimit)
 	require.NoError(t, err)
 	ids := toIDs(mergeable)
 	require.Equal(t, []string{"00000100a", "00000101a", "00000102a", "00000103a", "00000104a"}, ids)
 
 	// Add a very old file
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000095-20210728T105015.01-00000095b-00000094a"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000095-20210728T105015.01-00000095b-00000094a"))
 	require.NoError(t, err)
 
 	//that new file should not trigger a merge
@@ -448,32 +440,32 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 	require.False(t, completed)
 
 	// Add missing file for this back in time fork
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000096-20210728T105015.02-00000096b-00000095b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000097-20210728T105015.03-00000097b-00000096b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000098-20210728T105015.04-00000098b-00000097b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000099-20210728T105015.05-00000099b-00000098b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000100-20210728T105015.06-00000100b-00000099b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000101-20210728T105015.07-00000101b-00000100b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000102-20210728T105015.08-00000102b-00000101b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000103-20210728T105015.09-00000103b-00000102b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000104-20210728T105015.10-00000104b-00000103b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000105-20210728T105015.11-00000105b-00000104b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000106-20210728T105015.12-00000106b-00000105b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000107-20210728T105015.12-00000107b-00000106b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000108-20210728T105015.12-00000108b-00000107b"))
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000109-20210728T105015.12-00000109b-00000108b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000096-20210728T105015.02-00000096b-00000095b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000097-20210728T105015.03-00000097b-00000096b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000098-20210728T105015.04-00000098b-00000097b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000099-20210728T105015.05-00000099b-00000098b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000100-20210728T105015.06-00000100b-00000099b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000101-20210728T105015.07-00000101b-00000100b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000102-20210728T105015.08-00000102b-00000101b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000103-20210728T105015.09-00000103b-00000102b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000104-20210728T105015.10-00000104b-00000103b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000105-20210728T105015.11-00000105b-00000104b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000106-20210728T105015.12-00000106b-00000105b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000107-20210728T105015.12-00000107b-00000106b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000108-20210728T105015.12-00000108b-00000107b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000109-20210728T105015.12-00000109b-00000108b"))
 
 	completed, highestBlockLimit = bundler.isComplete()
 	//should not trigger merge yet
 	require.False(t, completed)
 
-	err = bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000110-20210728T105015.12-00000110b-00000109b"))
+	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000110-20210728T105015.12-00000110b-00000109b"))
 
 	completed, highestBlockLimit = bundler.isComplete()
 	//here we go!
 	require.True(t, completed)
 
-	mergeable, err = bundler.MergeableFiles(highestBlockLimit)
+	mergeable, err = bundler.ToBundle(highestBlockLimit)
 	require.NoError(t, err)
 	ids = toIDs(mergeable)
 	require.Equal(t, []string{
@@ -528,6 +520,7 @@ func TestBundler_Purge(t *testing.T) {
 		files                     []*OneBlockFile
 		upToBlock                 uint64
 		expectedTreeSize          int
+		expectedPurgedFileCount   int
 		expectedLongestFirstBlock string
 	}{
 		{
@@ -536,6 +529,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 100,
 			expectedLongestFirstBlock: "00000101a",
 			expectedTreeSize:          25,
+			expectedPurgedFileCount:   1,
 		},
 		{
 			name:                      "None purgeable fork",
@@ -543,6 +537,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 102,
 			expectedLongestFirstBlock: "00000101a",
 			expectedTreeSize:          25,
+			expectedPurgedFileCount:   1,
 		},
 		{
 			name:                      "Purging past fork",
@@ -550,6 +545,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 104,
 			expectedLongestFirstBlock: "00000106a",
 			expectedTreeSize:          19,
+			expectedPurgedFileCount:   7,
 		},
 		{
 			name:                      "Purging right at fork end",
@@ -557,6 +553,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 103,
 			expectedLongestFirstBlock: "00000104a",
 			expectedTreeSize:          20,
+			expectedPurgedFileCount:   6,
 		},
 		{
 			name:                      "Purging middle of second fork",
@@ -564,6 +561,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 109,
 			expectedLongestFirstBlock: "00000107a",
 			expectedTreeSize:          18,
+			expectedPurgedFileCount:   8,
 		},
 		{
 			name:                      "Purging middle of second fork fork",
@@ -571,6 +569,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 110,
 			expectedLongestFirstBlock: "00000107a",
 			expectedTreeSize:          18,
+			expectedPurgedFileCount:   8,
 		},
 		{
 			name:                      "Purging on end of second fork",
@@ -578,6 +577,7 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 111,
 			expectedLongestFirstBlock: "00000112a",
 			expectedTreeSize:          8,
+			expectedPurgedFileCount:   18,
 		},
 		{
 			name:                      "Purging all",
@@ -585,18 +585,20 @@ func TestBundler_Purge(t *testing.T) {
 			upToBlock:                 120,
 			expectedLongestFirstBlock: "",
 			expectedTreeSize:          0,
+			expectedPurgedFileCount:   26,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5)
+			bundler := NewBundler(5, 105)
 			for _, f := range c.files {
-				err := bundler.AddOneBlockFile(f)
-				require.NoError(t, err)
+				bundler.AddOneBlockFile(f)
 			}
 
-			err := bundler.Purge(c.upToBlock)
+			err := bundler.Purge(c.upToBlock, func(purgedOneBlockFiles []*OneBlockFile) {
+				require.Equal(t, c.expectedPurgedFileCount, len(purgedOneBlockFiles))
+			})
 			require.NoError(t, err)
 
 			roots, err := bundler.db.Roots()

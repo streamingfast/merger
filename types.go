@@ -34,6 +34,23 @@ type OneBlockFile struct {
 	merged        bool
 }
 
+func MustNewOneBlockFile(fileName string) *OneBlockFile {
+	blockNum, blockTime, blockID, previousBlockID, canonicalName, err := parseFilename(fileName)
+	if err != nil {
+		panic(err)
+	}
+	return &OneBlockFile{
+		canonicalName: canonicalName,
+		filenames: map[string]struct{}{
+			fileName: Empty,
+		},
+		blockTime:  blockTime,
+		id:         blockID,
+		num:        blockNum,
+		previousID: previousBlockID,
+	}
+}
+
 func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error) {
 	if len(f.data) == 0 {
 		err := f.downloadFile(ctx, s)

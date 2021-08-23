@@ -19,11 +19,11 @@ type BundleReader struct {
 	headerPassed      bool
 }
 
-func NewBundleReader(ctx context.Context, b *Bundle, oneBlockFileStore dstore.Store) *BundleReader {
+func NewBundleReader(ctx context.Context, oneBlockFiles []*OneBlockFile, oneBlockFileStore dstore.Store) *BundleReader {
 	return &BundleReader{
 		ctx:               ctx,
 		oneBlockFileStore: oneBlockFileStore,
-		oneBlockFiles:     b.timeSortedFiles(),
+		oneBlockFiles:     oneBlockFiles,
 	}
 }
 
