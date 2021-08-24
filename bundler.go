@@ -56,26 +56,17 @@ func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
 }
 
 func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
-	//todo: bootstrap using libNum ....
-	//initialLowBlockNum := b.BundleInclusiveLowerBlock()
-	//blockNumToReach := b.exclusiveHighestBlockLimit - b.maxFixableFork
-	//firstStreamableBlockNum := bstream.GetProtocolFirstStreamableBlock
-	//
-	//if blockNumToReach < firstStreamableBlockNum {
-	//	blockNumToReach = firstStreamableBlockNum
-	//}
-	//
-	//err := b.loadOneBlocks(initialLowBlockNum, blockNumToReach, fetchOneBlockFilesFromMergedFile)
-	//if err != nil {
-	//	return fmt.Errorf("loading one block files")
-	//}
+	initialLowBlockNum := b.BundleInclusiveLowerBlock()
+	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
+	if err != nil {
+		return fmt.Errorf("loading one block files")
+	}
 	return nil
 }
 
-func (b *Bundler) loadOneBlocks(initialLowBlockNum, blockNumToReach uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+	libNum := uint64(math.MaxUint64)
 	lowBlockNum := initialLowBlockNum
-	optimizeStopOnSingleRoot := false
-	lowestBlockNumAdded := uint64(math.MaxUint64)
 
 	for {
 		zlog.Info("fetching one block files", zap.Uint64("at_low_block_num", lowBlockNum))
@@ -85,35 +76,22 @@ func (b *Bundler) loadOneBlocks(initialLowBlockNum, blockNumToReach uint64, fetc
 			return fmt.Errorf("failed to fetch merged file for low block num: %d: %w", lowBlockNum, err)
 		}
 		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].num > oneBlockFiles[j].num })
-
 		for _, f := range oneBlockFiles {
+			if libNum == math.MaxUint64 {
+				zlog.Info("found lib to reach", zap.Uint64("lib_block_num", libNum))
+				libNum = f.libNum
+			}
 			f.merged = true
 			b.AddOneBlockFile(f)
-			if f.num < lowestBlockNumAdded {
-				lowestBlockNumAdded = f.num
-			}
-
-			if optimizeStopOnSingleRoot {
-				if b.rootCount() == 1 {
-					return nil
-				}
+			if f.num == libNum {
+				return nil
 			}
 		}
 
-		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum))
+		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum), zap.Uint64("lib_num_to_reach", libNum))
 
 		lowBlockNum = lowBlockNum - b.bundleSize
-		if b.rootCount() != 1 && lowestBlockNumAdded <= blockNumToReach {
-			// we got multiple roots we need more block from earlier merge file
-			optimizeStopOnSingleRoot = true
-			continue
-		}
-
-		if lowestBlockNumAdded <= blockNumToReach {
-			break
-		}
 	}
-	return nil
 }
 
 func (b *Bundler) rootCount() uint64 {
@@ -147,8 +125,6 @@ func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time,
 }
 
 func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
-	//todo: should we accept before being bootstrapped
-
 	blockRef := bstream.NewBlockRef(oneBlockFile.id, oneBlockFile.num)
 	exist = b.db.AddLink(blockRef, oneBlockFile.previousID, oneBlockFile)
 	return

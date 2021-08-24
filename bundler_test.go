@@ -4,8 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/streamingfast/bstream"
-
 	"github.com/stretchr/testify/require"
 )
 
@@ -615,100 +613,67 @@ func TestBundler_Boostrap(t *testing.T) {
 		95: {
 			MustTestNewOneBlockFile("0000000095-20210728T105016.07-00000095a-00000094a-90"),
 			MustTestNewOneBlockFile("0000000096-20210728T105016.07-00000096a-00000095a-90"),
-			MustTestNewOneBlockFile("0000000097-20210728T105016.07-00000097a-00000096a-90"),
-			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098a-00000097a-90"),
-			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098b-00000097a-90"),
-			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099a-00000098a-90"),
-			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099b-00000098b-90"),
+			MustTestNewOneBlockFile("0000000097-20210728T105016.07-00000097a-00000096a-95"),
+			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098a-00000097a-95"),
+			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098b-00000097a-95"),
+			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099a-00000098a-95"),
+			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099b-00000098b-95"),
 		},
 		100: {
-			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-90"),
-			MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
-			MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
-			MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
-			MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-95"),
+			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-95"),
+			MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-98"),
+			MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-98"),
+			MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-98"),
+			MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-98"),
 		},
 		105: {
-			MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
-			MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-90"),
-			MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-90"),
-			MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-90"),
+			MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
+			MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-101"),
+			MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-101"),
+			MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-106"),
 		},
 		110: {
-			MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-90"),
-			MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-90"),
-			MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-90"),
-			MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-90"),
-			MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-90"),
-		},
-		115: {
-			MustTestNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a-90"),
-			MustTestNewOneBlockFile("0000000109-20210728T105016.23-00000109b-00000108a-90"),
-			MustTestNewOneBlockFile("0000000116-20210728T105016.24-00000116a-00000115a-90"),
-			MustTestNewOneBlockFile("0000000117-20210728T105016.25-00000117a-00000116a-90"),
-			MustTestNewOneBlockFile("0000000118-20210728T105016.26-00000118a-00000117a-90"),
-		},
-		120: {
-			MustTestNewOneBlockFile("0000000120-20210728T105016.27-00000120a-00000118a-90"),
-			MustTestNewOneBlockFile("0000000121-20210728T105016.28-00000121a-00000120a-90"),
-			MustTestNewOneBlockFile("0000000122-20210728T105016.29-00000122a-00000121a-90"),
-			MustTestNewOneBlockFile("0000000123-20210728T105016.30-00000123a-00000122a-90"),
-			MustTestNewOneBlockFile("0000000124-20210728T105016.31-00000124a-00000123a-90"),
+			MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-108"),
+			MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-108"),
+			MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-108"),
+			MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-111"),
+			MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-113"),
 		},
 	}
 
 	testCases := []struct {
 		name                            string
 		firstExclusiveHighestBlockLimit uint64
-		maxFixableFork                  uint64
-		protocolFirstStreamableBlock    uint64
 		expectedMergeFilesRead          []int
 		expectedFirstBlockNum           uint64
 		expectedErr                     bool
 	}{
 		{
 			name:                            "Sunny path",
-			firstExclusiveHighestBlockLimit: 125,
-			maxFixableFork:                  100,
-			protocolFirstStreamableBlock:    120,
-			expectedMergeFilesRead:          []int{120},
-			expectedFirstBlockNum:           120,
+			firstExclusiveHighestBlockLimit: 115,
+			expectedMergeFilesRead:          []int{110},
+			expectedFirstBlockNum:           113,
 		},
 		{
-			name:                            "Fork over 2 merge files",
-			firstExclusiveHighestBlockLimit: 120,
-			maxFixableFork:                  5,
-			protocolFirstStreamableBlock:    106,
-			expectedMergeFilesRead:          []int{115, 110, 105},
-			expectedFirstBlockNum:           108,
+			name:                            "First and last from single file",
+			firstExclusiveHighestBlockLimit: 110,
+			expectedMergeFilesRead:          []int{105},
+			expectedFirstBlockNum:           106,
 		},
 		{
-			name:                            "Fork over 1 merge file",
+			name:                            "Find lib over 2 files",
 			firstExclusiveHighestBlockLimit: 105,
-			maxFixableFork:                  5,
-			protocolFirstStreamableBlock:    95,
 			expectedMergeFilesRead:          []int{100, 95},
-			expectedFirstBlockNum:           97,
-		},
-		{
-			name:                            "missing merge file",
-			firstExclusiveHighestBlockLimit: 120,
-			maxFixableFork:                  100,
-			protocolFirstStreamableBlock:    90, //this will trigger a missing merge file error
-			expectedMergeFilesRead:          []int{115, 110, 105, 100, 95, 90},
-			expectedFirstBlockNum:           95,
-			expectedErr:                     true,
+			expectedFirstBlockNum:           98,
 		},
 	}
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			bundler := NewBundler(5, c.firstExclusiveHighestBlockLimit, "")
-			bstream.GetProtocolFirstStreamableBlock = c.protocolFirstStreamableBlock
 			var mergeFileReads []int
 			err := bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
-				//this function feed block to bundler ...
 				mergeFileReads = append(mergeFileReads, int(lowBlockNum))
 
 				if oneBlockFiles, found := mergeFiles[lowBlockNum]; found {
@@ -817,73 +782,6 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 			files:          oneBlockFilesTwoRoots,
 			blockNum:       5,
 			expectedResult: true,
-		},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, 105, "")
-			for _, f := range c.files {
-				bundler.AddOneBlockFile(f)
-			}
-			tooOld := bundler.IsBlockTooOld(c.blockNum)
-			require.Equal(t, c.expectedResult, tooOld)
-
-		})
-	}
-}
-
-func TestBundler_IsBlockTooOld_MultipleRoot(t *testing.T) {
-	singleRootNoFork := []*OneBlockFile{
-		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
-		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a"),
-		//MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a"),
-		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a"),
-		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
-	}
-
-	cases := []struct {
-		name           string
-		files          []*OneBlockFile
-		blockNum       uint64
-		expectedResult bool
-	}{
-		{
-			name:           "in the middle",
-			files:          singleRootNoFork,
-			blockNum:       102,
-			expectedResult: false,
-		},
-		{
-			name:           "in the future",
-			files:          singleRootNoFork,
-			blockNum:       200,
-			expectedResult: false,
-		},
-		{
-			name:           "at first block",
-			files:          singleRootNoFork,
-			blockNum:       100,
-			expectedResult: false,
-		},
-		{
-			name:           "before first block",
-			files:          singleRootNoFork,
-			blockNum:       99,
-			expectedResult: false,
-		},
-		{
-			name:           "too old",
-			files:          singleRootNoFork,
-			blockNum:       5,
-			expectedResult: true,
-		},
-		{
-			name:           "maxFixableFork capacity no reach",
-			files:          singleRootNoFork,
-			blockNum:       100,
-			expectedResult: false,
 		},
 	}
 
