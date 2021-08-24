@@ -59,28 +59,35 @@ func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
 	return b.exclusiveHighestBlockLimit - b.bundleSize
 }
 
-func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) {
-	b.tryLoadOneBlock(b.BundleInclusiveLowerBlock(), b.BundleInclusiveLowerBlock(), fetchOneBlockFilesFromMergedFile)
-	return
+func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+	initialLowBlockNum := b.BundleInclusiveLowerBlock()
+	blockNumToReach := b.exclusiveHighestBlockLimit - b.maxFixableFork
+	firstStreamableBlockNum := bstream.GetProtocolFirstStreamableBlock
+
+	if blockNumToReach < firstStreamableBlockNum {
+		blockNumToReach = firstStreamableBlockNum
+	}
+
+	err := b.loadOneBlocks(initialLowBlockNum, blockNumToReach, fetchOneBlockFilesFromMergedFile)
+	if err != nil {
+		return fmt.Errorf("loading one block files")
+	}
+	return nil
 }
 
-func (b *Bundler) tryLoadOneBlock(initialLowBlockNum, lowBlockNumToReach uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) {
+func (b *Bundler) loadOneBlocks(initialLowBlockNum, blockNumToReach uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
 	lowBlockNum := initialLowBlockNum
 	optimizeStopOnSingleRoot := false
 	lowestBlockNumAdded := uint64(math.MaxUint64)
+
+	b.resetMemoize()
 
 	for {
 		zlog.Info("fetching one block files", zap.Uint64("at_low_block_num", lowBlockNum))
 
 		oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lowBlockNum)
 		if err != nil {
-			zlog.Warn("**************************************************************************************")
-			zlog.Warn("failed to fetch merged file", zap.Uint64("low_block_num", lowBlockNum))
-			if b.rootCount() != 1 {
-				zlog.Warn("bundler forkdb has unstable root", zap.Uint64("root_count", b.rootCount()))
-			}
-			zlog.Warn("**************************************************************************************")
-			return
+			return fmt.Errorf("failed to fetch merged file for low block num: %d: %w", lowBlockNum, err)
 		}
 		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].num > oneBlockFiles[j].num })
 
@@ -92,23 +99,26 @@ func (b *Bundler) tryLoadOneBlock(initialLowBlockNum, lowBlockNumToReach uint64,
 			}
 
 			if optimizeStopOnSingleRoot {
-				if b.rootCount() == 1 && lowestBlockNumAdded <= lowBlockNumToReach {
-					return
+				if b.rootCount() == 1 {
+					return nil
 				}
 			}
 		}
 
 		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum))
 
-		if b.rootCount() == 1 && lowestBlockNumAdded <= lowBlockNumToReach {
-			break
+		lowBlockNum = lowBlockNum - b.bundleSize
+		if b.rootCount() != 1 && lowestBlockNumAdded <= blockNumToReach {
+			// we got multiple roots we need more block from earlier merge file
+			optimizeStopOnSingleRoot = true
+			continue
 		}
 
-		// we got multiple roots we need more block from earlier merge file
-		lowBlockNum = lowBlockNum - b.bundleSize
-		optimizeStopOnSingleRoot = true
+		if lowestBlockNumAdded <= blockNumToReach {
+			break
+		}
 	}
-	b.resetMemoize()
+	return nil
 }
 
 func (b *Bundler) rootCount() uint64 {

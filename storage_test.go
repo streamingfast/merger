@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -156,12 +158,11 @@ func TestFindNextBaseBlock(t *testing.T) {
 				err := s.WriteObject(context.Background(), filename, strings.NewReader(""))
 				require.NoError(t, err)
 			}
-
-			i, err := FindNextBaseMergedBlock(s, test.minimalBlockNum, test.chunkSize)
+			bstream.GetProtocolFirstStreamableBlock = test.minimalBlockNum
+			i, err := FindNextBaseMergedBlock(s, test.chunkSize)
 			require.NoError(t, err)
 
 			assert.Equal(t, int(test.expectedBaseBlock), int(i))
-
 		})
 	}
 }

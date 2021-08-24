@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/bstream/forkable"
 
 	"github.com/stretchr/testify/require"
@@ -812,43 +814,67 @@ func TestBundler_Boostrap(t *testing.T) {
 	testCases := []struct {
 		name                            string
 		firstExclusiveHighestBlockLimit uint64
-		expectedMergeFilesRead          []uint64
+		maxFixableFork                  uint64
+		protocolFirstStreamableBlock    uint64
+		expectedMergeFilesRead          []int
 		expectedFirstBlockNum           uint64
+		expectedErr                     bool
 	}{
 		{
 			name:                            "Sunny path",
 			firstExclusiveHighestBlockLimit: 125,
-			expectedMergeFilesRead:          []uint64{120},
+			maxFixableFork:                  100,
+			protocolFirstStreamableBlock:    120,
+			expectedMergeFilesRead:          []int{120},
 			expectedFirstBlockNum:           120,
 		},
 		{
 			name:                            "Fork over 2 merge files",
 			firstExclusiveHighestBlockLimit: 120,
-			expectedMergeFilesRead:          []uint64{115, 110, 105},
+			maxFixableFork:                  5,
+			protocolFirstStreamableBlock:    106,
+			expectedMergeFilesRead:          []int{115, 110, 105},
 			expectedFirstBlockNum:           108,
 		},
 		{
 			name:                            "Fork over 1 merge file",
 			firstExclusiveHighestBlockLimit: 105,
-			expectedMergeFilesRead:          []uint64{100, 95},
+			maxFixableFork:                  5,
+			protocolFirstStreamableBlock:    95,
+			expectedMergeFilesRead:          []int{100, 95},
 			expectedFirstBlockNum:           97,
+		},
+		{
+			name:                            "missing merge file",
+			firstExclusiveHighestBlockLimit: 120,
+			maxFixableFork:                  100,
+			protocolFirstStreamableBlock:    90, //this will trigger a missing merge file error
+			expectedMergeFilesRead:          []int{115, 110, 105, 100, 95, 90},
+			expectedFirstBlockNum:           95,
+			expectedErr:                     true,
 		},
 	}
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, 100, c.firstExclusiveHighestBlockLimit, "")
-
-			var mergeFileReads []uint64
-			bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
+			bundler := NewBundler(5, c.maxFixableFork, c.firstExclusiveHighestBlockLimit, "")
+			bstream.GetProtocolFirstStreamableBlock = c.protocolFirstStreamableBlock
+			var mergeFileReads []int
+			err := bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
 				//this function feed block to bundler ...
-				mergeFileReads = append(mergeFileReads, lowBlockNum)
+				mergeFileReads = append(mergeFileReads, int(lowBlockNum))
 
 				if oneBlockFiles, found := mergeFiles[lowBlockNum]; found {
 					return oneBlockFiles, nil
 				}
 				return nil, errors.New("merge file not found")
 			})
+
+			if c.expectedErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 
 			require.Equal(t, c.expectedMergeFilesRead, mergeFileReads)
 			firstBlockNum, err := bundler.LongestChainFirstBlockNum()

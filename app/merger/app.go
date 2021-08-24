@@ -33,7 +33,6 @@ type Config struct {
 	StorageOneBlockFilesPath       string
 	StorageMergedBlocksFilesPath   string
 	GRPCListenAddr                 string
-	MinimalBlockNum                uint64
 	WritersLeewayDuration          time.Duration
 	TimeBetweenStoreLookups        time.Duration
 	StateFile                      string
@@ -83,7 +82,7 @@ func (a *App) Run() error {
 	bundler, err := merger.NewBundlerFromFile(a.config.StateFile)
 	if err != nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
-		nextExclusiveHighestBlockLimit, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
+		nextExclusiveHighestBlockLimit, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, 100)
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}

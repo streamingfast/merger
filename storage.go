@@ -21,15 +21,17 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 
 // FindNextBaseMergedBlock will return an error if there is a gap found ...
-func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, minimalBlockNum uint64, chunkSize uint64) (uint64, error) {
+func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (uint64, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 	defer cancel()
-
+	minimalBlockNum := bstream.GetProtocolFirstStreamableBlock
 	prefix, err := highestFilePrefix(ctx, mergedBlocksStore, minimalBlockNum, chunkSize)
 	if err != nil {
 		return 0, err
