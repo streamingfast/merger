@@ -18,18 +18,14 @@ type Bundler struct {
 	bundleSize uint64
 
 	//cache
-	tree                       *forkable.Node
-	chains                     *forkable.ChainList
-	lastMergeBlock             *forkable.Block
+	lastMergeOneBlockFile      *OneBlockFile
 	exclusiveHighestBlockLimit uint64
 	filename                   string
-	maxFixableFork             uint64
 }
 
-func NewBundler(bundleSize uint64, maxFixableFork uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
+func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
 	return &Bundler{
 		bundleSize:                 bundleSize,
-		maxFixableFork:             maxFixableFork,
 		db:                         forkable.NewForkDB(),
 		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
 		filename:                   filename,
@@ -48,8 +44,8 @@ func NewBundlerFromFile(filename string) (bundler *Bundler, err error) {
 
 func (b *Bundler) String() string {
 	var lastMergeBlockNum uint64
-	if b.lastMergeBlock != nil {
-		lastMergeBlockNum = b.lastMergeBlock.BlockNum
+	if b.lastMergeOneBlockFile != nil {
+		lastMergeBlockNum = b.lastMergeOneBlockFile.num
 	}
 
 	return fmt.Sprintf("bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d", b.bundleSize, lastMergeBlockNum, b.BundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
@@ -60,18 +56,19 @@ func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
 }
 
 func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
-	initialLowBlockNum := b.BundleInclusiveLowerBlock()
-	blockNumToReach := b.exclusiveHighestBlockLimit - b.maxFixableFork
-	firstStreamableBlockNum := bstream.GetProtocolFirstStreamableBlock
-
-	if blockNumToReach < firstStreamableBlockNum {
-		blockNumToReach = firstStreamableBlockNum
-	}
-
-	err := b.loadOneBlocks(initialLowBlockNum, blockNumToReach, fetchOneBlockFilesFromMergedFile)
-	if err != nil {
-		return fmt.Errorf("loading one block files")
-	}
+	//todo: bootstrap using libNum ....
+	//initialLowBlockNum := b.BundleInclusiveLowerBlock()
+	//blockNumToReach := b.exclusiveHighestBlockLimit - b.maxFixableFork
+	//firstStreamableBlockNum := bstream.GetProtocolFirstStreamableBlock
+	//
+	//if blockNumToReach < firstStreamableBlockNum {
+	//	blockNumToReach = firstStreamableBlockNum
+	//}
+	//
+	//err := b.loadOneBlocks(initialLowBlockNum, blockNumToReach, fetchOneBlockFilesFromMergedFile)
+	//if err != nil {
+	//	return fmt.Errorf("loading one block files")
+	//}
 	return nil
 }
 
@@ -79,8 +76,6 @@ func (b *Bundler) loadOneBlocks(initialLowBlockNum, blockNumToReach uint64, fetc
 	lowBlockNum := initialLowBlockNum
 	optimizeStopOnSingleRoot := false
 	lowestBlockNumAdded := uint64(math.MaxUint64)
-
-	b.resetMemoize()
 
 	for {
 		zlog.Info("fetching one block files", zap.Uint64("at_low_block_num", lowBlockNum))
@@ -130,7 +125,7 @@ func (b *Bundler) rootCount() uint64 {
 	return uint64(len(roots))
 }
 
-func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, canonicalName string) {
+func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, libNum uint64, canonicalName string) {
 	if block := b.db.BlockForID(blockID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		obf.filenames[filename] = Empty
@@ -145,88 +140,82 @@ func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time,
 		id:         blockID,
 		num:        blockNum,
 		previousID: previousID,
+		libNum:     libNum,
 	}
 
 	b.AddOneBlockFile(obf)
 }
 
 func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
+	//todo: should we accept before being bootstrapped
+
 	blockRef := bstream.NewBlockRef(oneBlockFile.id, oneBlockFile.num)
 	exist = b.db.AddLink(blockRef, oneBlockFile.previousID, oneBlockFile)
-	b.resetMemoize()
 	return
 }
 
-func (b *Bundler) resetMemoize() {
-	b.tree = nil
-	b.chains = nil
-}
-
-func (b *Bundler) getTree() (*forkable.Node, error) {
-	if b.tree == nil {
-		t, err := b.db.BuildTree()
-		if err != nil {
-			return nil, fmt.Errorf("building tree: %w", err)
-		}
-		b.tree = t
-	}
-
-	return b.tree, nil
-}
-
-func (b *Bundler) getChains() (*forkable.ChainList, error) {
-	tree, err := b.getTree()
+func (b *Bundler) LongestChain() []string {
+	roots, err := b.db.Roots()
 	if err != nil {
-		return nil, fmt.Errorf("getting tree: %w", err)
+		return nil //this is happening when there is no links in db
 	}
-	if b.chains == nil {
-		b.chains = tree.Chains()
+
+	count := 0
+	var longestChain []string
+	for _, root := range roots {
+		tree := b.db.BuildTreeWithID(root)
+		lc := tree.Chains().LongestChain()
+
+		if len(longestChain) == len(lc) {
+			count++
+		}
+
+		if len(longestChain) < len(lc) {
+			count = 1
+			longestChain = lc
+		}
 	}
-	return b.chains, nil
+	if count > 1 { // found multiple chain with same length
+		return nil
+	}
+
+	return longestChain
 }
 
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
-	roots, err := b.db.Roots()
-	if err != nil { //if there is no root it can't be too old
-		return false
-	}
-
-	highestBlockNum := uint64(0)
-	for _, root := range roots {
-		tree := b.db.BuildTreeWithID(root)
-		longestChain := tree.Chains().LongestChain()
-		leafBlockID := longestChain[len(longestChain)-1]
-		leafBlock := b.db.BlockForID(leafBlockID)
-		if leafBlock.BlockNum > highestBlockNum {
-			highestBlockNum = leafBlock.BlockNum
-		}
-	}
-
-	acceptableBlockNum := int64(highestBlockNum - b.maxFixableFork)
-	return int64(blockNum) < acceptableBlockNum
+	panic("implement base on libNum")
+	return true
+	//roots, err := b.db.Roots()
+	//if err != nil { //if there is no root it can't be too old
+	//	return false
+	//}
+	//
+	//highestBlockNum := uint64(0)
+	//for _, root := range roots {
+	//	tree := b.db.BuildTreeWithID(root)
+	//	longestChain := tree.Chains().LongestChain()
+	//	leafBlockID := longestChain[len(longestChain)-1]
+	//	leafBlock := b.db.BlockForID(leafBlockID)
+	//	if leafBlock.BlockNum > highestBlockNum {
+	//		highestBlockNum = leafBlock.BlockNum
+	//	}
+	//}
+	//
+	//acceptableBlockNum := int64(highestBlockNum - b.maxFixableFork)
+	//return int64(blockNum) < acceptableBlockNum
 }
 
 func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
-	chains, err := b.getChains()
-	if err != nil {
-		return 0, fmt.Errorf("getting chains: %w", err)
-	}
-
-	longestChain := chains.LongestChain()
+	longestChain := b.LongestChain()
 	if len(longestChain) == 0 {
 		return 0, fmt.Errorf("no longuest chain available")
 	}
 	block := b.db.BlockForID(longestChain[0])
-	return block.BlockNum, err
+	return block.BlockNum, nil
 }
 
-func (b *Bundler) isComplete() (complete bool, highestBlockLimit uint64) {
-	chains, err := b.getChains()
-	if err != nil {
-		return false, 0
-	}
-
-	longest := chains.LongestChain()
+func (b *Bundler) IsComplete() (complete bool, highestBlockLimit uint64) {
+	longest := b.LongestChain()
 	for _, blockID := range longest {
 		blk := b.db.BlockForID(blockID)
 
@@ -235,32 +224,19 @@ func (b *Bundler) isComplete() (complete bool, highestBlockLimit uint64) {
 		}
 		highestBlockLimit = blk.BlockNum
 	}
-
 	return false, 0
 }
 
-func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) ([]*OneBlockFile, error) {
-	chains, err := b.getChains()
-	if err != nil {
-		return nil, err
-	}
-
-	seen := map[string]bool{}
+func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 	var out []*OneBlockFile
-	for _, chain := range chains.Chains {
-		for _, blockID := range chain {
-			if found := seen[blockID]; found {
-				continue
-			}
-			blk := b.db.BlockForID(blockID)
-			oneBlockFile := blk.Object.(*OneBlockFile)
-			blkNum := blk.BlockNum
-			if !oneBlockFile.merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files
-				seen[blockID] = true
-				out = append(out, oneBlockFile)
-			}
+	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
+		oneBlockFile := object.(*OneBlockFile)
+		blkNum := oneBlockFile.num
+		if !oneBlockFile.merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files
+			out = append(out, oneBlockFile)
 		}
-	}
+		return true
+	})
 
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].blockTime.Equal(out[j].blockTime) {
@@ -270,134 +246,39 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) ([]*OneBlockFile, 
 		return out[i].blockTime.Before(out[j].blockTime)
 	})
 
-	return out, nil
+	return out
 }
 
-func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) error {
-	oneBlockFiles, err := b.ToBundle(inclusiveHighestBlockLimit)
-	if err != nil {
-		return err
-	}
-	var highestBlock *forkable.Block
+func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
+	oneBlockFiles := b.ToBundle(inclusiveHighestBlockLimit)
+	var highestOneBlockFile *OneBlockFile
 
 	for _, file := range oneBlockFiles {
-		if highestBlock == nil || file.num >= highestBlock.BlockNum {
-			highestBlock = b.db.BlockForID(file.id)
+		if highestOneBlockFile == nil || file.num >= highestOneBlockFile.num {
+			highestOneBlockFile = b.db.BlockForID(file.id).Object.(*OneBlockFile)
 		}
 		file.merged = true
 	}
 
 	b.exclusiveHighestBlockLimit += b.bundleSize
-	b.lastMergeBlock = highestBlock
-	return nil
+	b.lastMergeOneBlockFile = highestOneBlockFile
+	return
 }
 
-func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) error {
-	chainLists, err := b.getChains()
-	if err != nil {
-		//todo: maybe log info ...
-		return nil
+func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
+	if b.lastMergeOneBlockFile == nil {
+		return
 	}
-
-	longestChain := chainLists.LongestChain()
-	longestChainLength := uint64(len(longestChain))
-	if longestChainLength == 0 {
-		return nil
+	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.id, b.lastMergeOneBlockFile.num), b.lastMergeOneBlockFile.libNum)
+	var purgedOneBlockFiles []*OneBlockFile
+	if libRef != bstream.BlockRefEmpty {
+		purgedBlocks := b.db.MoveLIB(libRef)
+		for _, block := range purgedBlocks {
+			purgedOneBlockFiles = append(purgedOneBlockFiles, block.Object.(*OneBlockFile))
+		}
 	}
-
-	if longestChainLength < b.maxFixableFork {
-		return nil
-	}
-
-	delta := longestChainLength - b.maxFixableFork
-	upToBlockID := longestChain[delta-1]
-	upToBlock := b.db.BlockForID(upToBlockID)
-
-	return b.purge(upToBlock.BlockNum, callback)
-}
-
-func (b *Bundler) purge(upToBlock uint64, callback func(purgedOneBlockFiles []*OneBlockFile)) error {
-	node, err := b.getTree()
-	if err != nil {
-		return err
-	}
-
-	chains := node.Chains()
-	longest := chains.LongestChain()
-	purgedOneBlockFiles := make([]*OneBlockFile, 0)
-	purgedOneBlockFiles, _ = recursivePurge(upToBlock, node, longest, b.db, purgedOneBlockFiles)
-	b.resetMemoize()
-
 	callback(purgedOneBlockFiles)
-
-	return nil
-}
-
-//                                  |                           |                                  |                           |
-// 100a - 101a - 102a - 103a - 104a - 106a - 107a - 108a - 109a - 110a - 111a - 112a - 113a - 114a - 115a - 116a - 117a - 118a - 120a
-//            \- 102b - 103b                     \- 108b - 109b - 110b
-//                                                             \- 110c - 111c
-
-func recursivePurge(upToBlock uint64, node *forkable.Node, longest []string, db *forkable.ForkDB, alreadyPurgedOneBlockFiles []*OneBlockFile) (purgedOneBlockFiles []*OneBlockFile, stop bool) {
-	purgedOneBlockFiles = alreadyPurgedOneBlockFiles
-
-	block := db.BlockForID(node.ID)
-	oneBlock := block.Object.(*OneBlockFile)
-	if oneBlock.merged {
-		return nil, false //we just skip this block, but we continue to walk the tree
-	}
-
-	if block.BlockNum > upToBlock {
-		return nil, true
-	}
-
-	forkDetected := len(node.Children) > 1
-	if forkDetected {
-		purgeableFork := isPurgeableFork(node.Children, upToBlock, longest, db)
-		if !purgeableFork {
-			return nil, true // we stop
-		}
-	}
-
-	for _, child := range node.Children {
-		purgedOneBlockFiles, stop = recursivePurge(upToBlock, child, longest, db, purgedOneBlockFiles)
-		if stop {
-			break
-		}
-	}
-
-	purgedOneBlockFiles = append(purgedOneBlockFiles, block.Object.(*OneBlockFile))
-	db.DeleteLink(block.BlockID)
-	return purgedOneBlockFiles, false
-}
-
-func isPurgeableFork(nodes []*forkable.Node, upToBlock uint64, longest []string, db *forkable.ForkDB) bool {
-	for _, node := range nodes {
-		if inChain(node.ID, longest) { //block on longest chain should always be purgeable
-			continue
-		}
-
-		block := db.BlockForID(node.ID)
-		if block.BlockNum > upToBlock {
-			return false
-		}
-
-		purgeable := isPurgeableFork(node.Children, upToBlock, longest, db)
-		if !purgeable {
-			return false
-		}
-	}
-
-	return true
-}
-
-func inChain(lookupID string, chain []string) bool {
-	for _, id := range chain {
-		if id == lookupID {
-			return true
-		}
-	}
-	return false
+	return
 }
 
 func load(filename string) (bundler *Bundler, err error) {

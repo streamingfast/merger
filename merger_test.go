@@ -97,7 +97,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	require.NoError(t, err)
 
 	m = NewMerger(
-		NewBundler(100, 100, 100, ""),
+		NewBundler(100, 100, ""),
 		0,
 		"",
 		func(lowBlockNum uint64) ([]*OneBlockFile, error) { return nil, nil },

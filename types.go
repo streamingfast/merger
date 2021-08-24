@@ -29,13 +29,14 @@ type OneBlockFile struct {
 	blockTime     time.Time
 	id            string
 	num           uint64
+	libNum        uint64
 	previousID    string
 	data          []byte
 	merged        bool
 }
 
 func MustNewOneBlockFile(fileName string) *OneBlockFile {
-	blockNum, blockTime, blockID, previousBlockID, canonicalName, err := parseFilename(fileName)
+	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := parseFilename(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -48,6 +49,7 @@ func MustNewOneBlockFile(fileName string) *OneBlockFile {
 		id:         blockID,
 		num:        blockNum,
 		previousID: previousBlockID,
+		libNum:     libNum,
 	}
 }
 

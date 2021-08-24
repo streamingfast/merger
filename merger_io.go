@@ -63,7 +63,7 @@ func blockFileName(block *bstream.Block) string {
 		previousID = previousID[len(previousID)-8:]
 	}
 
-	return fmt.Sprintf("%010d-%s-%s-%s", block.Num(), blockTimeString, blockID, previousID)
+	return fmt.Sprintf("%010d-%s-%s-%s-%d", block.Num(), blockTimeString, blockID, previousID, block.LibNum)
 }
 
 func (io *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*OneBlockFile, error) {

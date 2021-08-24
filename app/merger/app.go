@@ -36,7 +36,6 @@ type Config struct {
 	WritersLeewayDuration          time.Duration
 	TimeBetweenStoreLookups        time.Duration
 	StateFile                      string
-	MaxFixableFork                 uint64
 	OneBlockDeletionThreads        int
 	MaxOneBlockOperationsBatchSize int
 }
@@ -86,7 +85,7 @@ func (a *App) Run() error {
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}
-		bundler = merger.NewBundler(100, a.config.MaxFixableFork, nextExclusiveHighestBlockLimit, a.config.StateFile)
+		bundler = merger.NewBundler(100, nextExclusiveHighestBlockLimit, a.config.StateFile)
 		bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*merger.OneBlockFile, err error) {
 			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
 			if fetchErr != nil {

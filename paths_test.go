@@ -34,6 +34,7 @@ func TestParseFilenames(t *testing.T) {
 		expectPreviousBlockIDSuffix string
 		expectCanonicalName         string
 		expectError                 error
+		expectLibNum                uint64
 	}{
 		{
 			name:        "invalid",
@@ -42,33 +43,36 @@ func TestParseFilenames(t *testing.T) {
 		},
 		{
 			name:                        "without suffix",
-			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39",
+			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39-90",
 			expectBlockNum:              100,
+			expectLibNum:                90,
 			expectBlockTime:             mustParseTime("20170701T122141.0"),
 			expectBlockIDSuffix:         "24a07267",
 			expectPreviousBlockIDSuffix: "e5914b39",
-			expectCanonicalName:         "0000000100-20170701T122141.0-24a07267-e5914b39",
+			expectCanonicalName:         "0000000100-20170701T122141.0-24a07267-e5914b39-90",
 		},
 		{
 			name:                        "with suffix",
-			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39-mind1",
+			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39-90-mind1",
 			expectBlockNum:              100,
+			expectLibNum:                90,
 			expectBlockTime:             mustParseTime("20170701T122141.0"),
 			expectBlockIDSuffix:         "24a07267",
 			expectPreviousBlockIDSuffix: "e5914b39",
-			expectCanonicalName:         "0000000100-20170701T122141.0-24a07267-e5914b39",
+			expectCanonicalName:         "0000000100-20170701T122141.0-24a07267-e5914b39-90",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			blkNum, blkTime, blkID, prevBlkID, name, err := parseFilename(test.filename)
+			blkNum, blkTime, blkID, prevBlkID, libNum, name, err := parseFilename(test.filename)
 			if test.expectError != nil {
 				require.Equal(t, err, test.expectError)
 				return
 			}
 			require.Nil(t, err)
 			assert.Equal(t, test.expectBlockNum, blkNum)
+			assert.Equal(t, test.expectLibNum, libNum)
 			assert.Equal(t, test.expectBlockTime, blkTime)
 			assert.Equal(t, test.expectBlockIDSuffix, blkID)
 			assert.Equal(t, test.expectPreviousBlockIDSuffix, prevBlkID)

@@ -85,13 +85,9 @@ func (m *Merger) launch() (err error) {
 			for _, oneBlockFile := range oneBlockFiles {
 				m.bundler.AddOneBlockFile(oneBlockFile)
 			}
-			if complete, highestBlockLimit := m.bundler.isComplete(); complete {
-				if err := m.bundler.Commit(highestBlockLimit); err != nil {
-					return fmt.Errorf("commiting already merged block: %w", err)
-				}
-				if err := m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {}); err != nil {
-					return fmt.Errorf("purging already merged block: %w", err)
-				}
+			if complete, highestBlockLimit := m.bundler.IsComplete(); complete {
+				m.bundler.Commit(highestBlockLimit)
+				m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {})
 				continue //let try next bundle
 			} else {
 				return fmt.Errorf("bundler should have a completed a bundle at the point: bundler: %s", m.bundler)
@@ -116,11 +112,11 @@ func (m *Merger) launch() (err error) {
 			}
 		}
 
-		if lastOneBlockFileAdded.num < m.bundler.lastMergeBlock.BlockNum { // will still drift if there is a hole and lastFile is advancing
+		if lastOneBlockFileAdded.num < m.bundler.lastMergeOneBlockFile.num { // will still drift if there is a hole and lastFile is advancing
 			metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.blockTime)
 		}
 
-		isBundleComplete, highestBundleBlockNum := m.bundler.isComplete()
+		isBundleComplete, highestBundleBlockNum := m.bundler.IsComplete()
 		if !isBundleComplete {
 			zlog.Info("waiting for more files to complete bundle", zap.Stringer("bundler", m.bundler))
 
@@ -137,26 +133,17 @@ func (m *Merger) launch() (err error) {
 			zap.Stringer("bundler", m.bundler),
 		)
 
-		bundleFiles, err := m.bundler.ToBundle(highestBundleBlockNum)
-		if err != nil {
-			return err
-		}
+		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
 
 		if err := m.mergeUploadFunc(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
 			return err
 		}
 
-		if err := m.bundler.Commit(highestBundleBlockNum); err != nil {
-			return fmt.Errorf("commiting: %w", err)
-		}
+		m.bundler.Commit(highestBundleBlockNum)
 
-		err = m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
+		m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
 			m.deleteFilesFunc(purgedOneBlockFiles)
 		})
-
-		if err != nil {
-			return fmt.Errorf("purging: %w", err)
-		}
 
 		//todo: update metrics and progressFilename
 		//metrics.HeadBlockTimeDrift.SetBlockTime(b.upperBlockTime)
@@ -244,11 +231,11 @@ func (m *Merger) addOneBlockFiles(in []string) (err error) {
 	}
 
 	for _, filename := range in {
-		blockNum, blockTime, blockIDSuffix, previousIDSuffix, canonicalName, err := parseFilename(filename)
+		blockNum, blockTime, blockIDSuffix, previousIDSuffix, libNum, canonicalName, err := parseFilename(filename)
 		if err != nil {
 			return err
 		}
-		m.bundler.AddFile(filename, blockNum, blockTime, blockIDSuffix, previousIDSuffix, canonicalName)
+		m.bundler.AddFile(filename, blockNum, blockTime, blockIDSuffix, previousIDSuffix, libNum, canonicalName)
 	}
 
 	return nil
