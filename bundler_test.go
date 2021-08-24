@@ -613,48 +613,48 @@ func TestBundler_Purge(t *testing.T) {
 func TestBundler_Boostrap(t *testing.T) {
 	mergeFiles := map[uint64][]*OneBlockFile{
 		95: {
-			MustTestNewOneBlockFile("0000000095-20210728T105016.07-00000095a-00000094a"),
-			MustTestNewOneBlockFile("0000000096-20210728T105016.07-00000096a-00000095a"),
-			MustTestNewOneBlockFile("0000000097-20210728T105016.07-00000097a-00000096a"),
-			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098a-00000097a"),
-			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098b-00000097a"),
-			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099a-00000098a"),
-			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099b-00000098b"),
+			MustTestNewOneBlockFile("0000000095-20210728T105016.07-00000095a-00000094a-90"),
+			MustTestNewOneBlockFile("0000000096-20210728T105016.07-00000096a-00000095a-90"),
+			MustTestNewOneBlockFile("0000000097-20210728T105016.07-00000097a-00000096a-90"),
+			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098a-00000097a-90"),
+			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098b-00000097a-90"),
+			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099a-00000098a-90"),
+			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099b-00000098b-90"),
 		},
 		100: {
-			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
-			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b"),
-			MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
-			MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a"),
-			MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a"),
-			MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a"),
+			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-90"),
+			MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+			MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+			MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+			MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
 		},
 		105: {
-			MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
-			MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a"),
-			MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a"),
-			MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a"),
+			MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+			MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-90"),
+			MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-90"),
+			MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-90"),
 		},
 		110: {
-			MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a"),
-			MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a"),
-			MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a"),
-			MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a"),
-			MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a"),
+			MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-90"),
+			MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-90"),
+			MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-90"),
+			MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-90"),
+			MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-90"),
 		},
 		115: {
-			MustTestNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a"),
-			MustTestNewOneBlockFile("0000000109-20210728T105016.23-00000109b-00000108a"),
-			MustTestNewOneBlockFile("0000000116-20210728T105016.24-00000116a-00000115a"),
-			MustTestNewOneBlockFile("0000000117-20210728T105016.25-00000117a-00000116a"),
-			MustTestNewOneBlockFile("0000000118-20210728T105016.26-00000118a-00000117a"),
+			MustTestNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a-90"),
+			MustTestNewOneBlockFile("0000000109-20210728T105016.23-00000109b-00000108a-90"),
+			MustTestNewOneBlockFile("0000000116-20210728T105016.24-00000116a-00000115a-90"),
+			MustTestNewOneBlockFile("0000000117-20210728T105016.25-00000117a-00000116a-90"),
+			MustTestNewOneBlockFile("0000000118-20210728T105016.26-00000118a-00000117a-90"),
 		},
 		120: {
-			MustTestNewOneBlockFile("0000000120-20210728T105016.27-00000120a-00000118a"),
-			MustTestNewOneBlockFile("0000000121-20210728T105016.28-00000121a-00000120a"),
-			MustTestNewOneBlockFile("0000000122-20210728T105016.29-00000122a-00000121a"),
-			MustTestNewOneBlockFile("0000000123-20210728T105016.30-00000123a-00000122a"),
-			MustTestNewOneBlockFile("0000000124-20210728T105016.31-00000124a-00000123a"),
+			MustTestNewOneBlockFile("0000000120-20210728T105016.27-00000120a-00000118a-90"),
+			MustTestNewOneBlockFile("0000000121-20210728T105016.28-00000121a-00000120a-90"),
+			MustTestNewOneBlockFile("0000000122-20210728T105016.29-00000122a-00000121a-90"),
+			MustTestNewOneBlockFile("0000000123-20210728T105016.30-00000123a-00000122a-90"),
+			MustTestNewOneBlockFile("0000000124-20210728T105016.31-00000124a-00000123a-90"),
 		},
 	}
 
@@ -732,13 +732,23 @@ func TestBundler_Boostrap(t *testing.T) {
 }
 
 func TestBundler_IsBlockTooOld(t *testing.T) {
-	singleRootNoFork := []*OneBlockFile{
-		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
-		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a"),
-		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a"),
-		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a"),
-		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
+	oneBlockFiles := []*OneBlockFile{
+		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+	}
+
+	oneBlockFilesTwoRoots := []*OneBlockFile{
+		MustTestNewOneBlockFile("000000095-20210728T105016.01-00000095b-00000094a-90"),
+		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
 	}
 
 	cases := []struct {
@@ -750,39 +760,63 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 	}{
 		{
 			name:           "in the middle",
-			files:          singleRootNoFork,
+			files:          oneBlockFiles,
 			blockNum:       102,
 			expectedResult: false,
 		},
 		{
 			name:           "in the future",
-			files:          singleRootNoFork,
+			files:          oneBlockFiles,
 			blockNum:       200,
 			expectedResult: false,
 		},
 		{
 			name:           "at first block",
-			files:          singleRootNoFork,
+			files:          oneBlockFiles,
 			blockNum:       100,
 			expectedResult: false,
 		},
 		{
 			name:           "before first block",
-			files:          singleRootNoFork,
+			files:          oneBlockFiles,
 			blockNum:       99,
-			expectedResult: false,
+			expectedResult: true,
 		},
 		{
 			name:           "too old",
-			files:          singleRootNoFork,
+			files:          oneBlockFiles,
 			blockNum:       5,
 			expectedResult: true,
 		},
 		{
-			name:           "maxFixableFork capacity no reach",
-			files:          singleRootNoFork,
-			blockNum:       100,
+			name:           "in the middle 2 roots",
+			files:          oneBlockFilesTwoRoots,
+			blockNum:       102,
 			expectedResult: false,
+		},
+		{
+			name:           "in the future 2 roots",
+			files:          oneBlockFilesTwoRoots,
+			blockNum:       200,
+			expectedResult: false,
+		},
+		{
+			name:           "at first block 2 roots",
+			files:          oneBlockFilesTwoRoots,
+			blockNum:       95,
+			expectedResult: false,
+		},
+		{
+			name:           "before first block 2 roots",
+			files:          oneBlockFilesTwoRoots,
+			blockNum:       94,
+			expectedResult: true,
+		},
+		{
+			name:           "too old 2 roots",
+			files:          oneBlockFilesTwoRoots,
+			blockNum:       5,
+			expectedResult: true,
 		},
 	}
 

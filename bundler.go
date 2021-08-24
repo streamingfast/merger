@@ -183,26 +183,19 @@ func (b *Bundler) LongestChain() []string {
 }
 
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
-	panic("implement base on libNum")
-	return true
-	//roots, err := b.db.Roots()
-	//if err != nil { //if there is no root it can't be too old
-	//	return false
-	//}
+	roots, err := b.db.Roots()
+	if err != nil { //if there is no root it can't be too old
+		return false
+	}
 	//
-	//highestBlockNum := uint64(0)
-	//for _, root := range roots {
-	//	tree := b.db.BuildTreeWithID(root)
-	//	longestChain := tree.Chains().LongestChain()
-	//	leafBlockID := longestChain[len(longestChain)-1]
-	//	leafBlock := b.db.BlockForID(leafBlockID)
-	//	if leafBlock.BlockNum > highestBlockNum {
-	//		highestBlockNum = leafBlock.BlockNum
-	//	}
-	//}
-	//
-	//acceptableBlockNum := int64(highestBlockNum - b.maxFixableFork)
-	//return int64(blockNum) < acceptableBlockNum
+	lowestRootBlockNum := uint64(math.MaxUint64)
+	for _, root := range roots {
+		block := b.db.BlockForID(root)
+		if block.BlockNum < lowestRootBlockNum {
+			lowestRootBlockNum = block.BlockNum
+		}
+	}
+	return blockNum < lowestRootBlockNum
 }
 
 func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
