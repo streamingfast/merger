@@ -113,6 +113,7 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 }
 
 func TestMergeUpload(t *testing.T) {
+	t.Skip()
 	bstream.GetBlockWriterHeaderLen = 0 //because GetBlockWriterFactory return a writer that do not add the header
 
 	m, oneStore, multiStore, cleanup := setupMerger(t)

@@ -231,11 +231,8 @@ func (m *Merger) addOneBlockFiles(in []string) (err error) {
 	}
 
 	for _, filename := range in {
-		blockNum, blockTime, blockIDSuffix, previousIDSuffix, libNum, canonicalName, err := parseFilename(filename)
-		if err != nil {
-			return err
-		}
-		m.bundler.AddFile(filename, blockNum, blockTime, blockIDSuffix, previousIDSuffix, libNum, canonicalName)
+		oneBlockFile := MustNewOneBlockFile(filename)
+		m.bundler.AddOneBlockFile(oneBlockFile)
 	}
 
 	return nil

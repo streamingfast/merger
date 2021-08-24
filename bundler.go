@@ -6,7 +6,6 @@ import (
 	"math"
 	"os"
 	"sort"
-	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -59,7 +58,7 @@ func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uin
 	initialLowBlockNum := b.BundleInclusiveLowerBlock()
 	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
 	if err != nil {
-		return fmt.Errorf("loading one block files")
+		return fmt.Errorf("loading one block files: %w", err)
 	}
 	return nil
 }
@@ -94,37 +93,16 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 	}
 }
 
-func (b *Bundler) rootCount() uint64 {
-	roots, err := b.db.Roots()
-	if err != nil {
-		return 0
-	}
-
-	return uint64(len(roots))
-}
-
-func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, libNum uint64, canonicalName string) {
-	if block := b.db.BlockForID(blockID); block != nil {
-		obf := block.Object.(*OneBlockFile)
-		obf.filenames[filename] = Empty
-	}
-
-	obf := &OneBlockFile{
-		canonicalName: canonicalName,
-		filenames: map[string]struct{}{
-			filename: Empty,
-		},
-		blockTime:  blockTime,
-		id:         blockID,
-		num:        blockNum,
-		previousID: previousID,
-		libNum:     libNum,
-	}
-
-	b.AddOneBlockFile(obf)
-}
-
 func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
+	//todo: test that ugly patch
+	if block := b.db.BlockForID(oneBlockFile.id); block != nil {
+		obf := block.Object.(*OneBlockFile)
+		for filename, _ := range oneBlockFile.filenames { //this is an ugly patch. ash stepd ;-)
+			obf.filenames[filename] = Empty
+		}
+		return true
+	}
+
 	blockRef := bstream.NewBlockRef(oneBlockFile.id, oneBlockFile.num)
 	exist = b.db.AddLink(blockRef, oneBlockFile.previousID, oneBlockFile)
 	return
