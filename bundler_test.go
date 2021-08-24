@@ -304,6 +304,26 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			expectedIDs:              []string{"00000115a", "00000116a", "00000117a", "00000118a"},
 			expectedLastMergeBlockID: "00000118a",
 		},
+		{
+			name: "file with holes",
+			files: []*OneBlockFile{
+				MustTestNewOneBlockFile("0000000100-20210728T105016.0-00000100a-00000099a-90"),
+
+				MustTestNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90"),
+				MustTestNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90"),
+
+				MustTestNewOneBlockFile("0000000117-20210728T105016.0-00000117b-00000116b-90"),
+				MustTestNewOneBlockFile("0000000118-20210728T105016.0-00000118b-00000117b-90"),
+
+				MustTestNewOneBlockFile("0000000117-20210728T105016.1-00000117a-00000116a-90"),
+				MustTestNewOneBlockFile("0000000118-20210728T105016.1-00000118a-00000117a-90"),
+				MustTestNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90"),
+			},
+			lastMergeBlockID:         "00000114a",
+			blockLimit:               120,
+			expectedIDs:              []string{"00000100a", "00000115a", "00000116a", "00000117b", "00000118b", "00000117a", "00000118a"},
+			expectedLastMergeBlockID: "00000118a",
+		},
 	}
 
 	for _, c := range cases {
@@ -331,7 +351,7 @@ func toIDs(oneBlockFileList []*OneBlockFile) (ids []string) {
 	return ids
 }
 
-func TestBundler_Complexe(t *testing.T) {
+func TestBundler_Complicated(t *testing.T) {
 
 	files := []*OneBlockFile{
 		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
