@@ -3,6 +3,7 @@ package merger
 import (
 	"encoding/gob"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"time"
@@ -25,19 +26,6 @@ type Bundler struct {
 	maxFixableFork             uint64
 }
 
-func (b *Bundler) String() string {
-	var lastMergeBlockNum uint64
-	if b.lastMergeBlock != nil {
-		lastMergeBlockNum = b.lastMergeBlock.BlockNum
-	}
-
-	return fmt.Sprintf("bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d", b.bundleSize, lastMergeBlockNum, b.InclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
-}
-
-func (b *Bundler) InclusiveLowerBlock() uint64 {
-	return b.exclusiveHighestBlockLimit - b.bundleSize
-}
-
 func NewBundler(bundleSize uint64, maxFixableFork uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
 	return &Bundler{
 		bundleSize:                 bundleSize,
@@ -58,31 +46,61 @@ func NewBundlerFromFile(filename string) (bundler *Bundler, err error) {
 	return
 }
 
-func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
-	lowBlockNum := b.InclusiveLowerBlock()
+func (b *Bundler) String() string {
+	var lastMergeBlockNum uint64
+	if b.lastMergeBlock != nil {
+		lastMergeBlockNum = b.lastMergeBlock.BlockNum
+	}
+
+	return fmt.Sprintf("bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d", b.bundleSize, lastMergeBlockNum, b.BundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
+}
+
+func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
+	return b.exclusiveHighestBlockLimit - b.bundleSize
+}
+
+func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) {
+	b.tryLoadOneBlock(b.BundleInclusiveLowerBlock(), b.BundleInclusiveLowerBlock(), fetchOneBlockFilesFromMergedFile)
+	return
+}
+
+func (b *Bundler) tryLoadOneBlock(initialLowBlockNum, lowBlockNumToReach uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) {
+	lowBlockNum := initialLowBlockNum
 	optimizeStopOnSingleRoot := false
+	lowestBlockNumAdded := uint64(math.MaxUint64)
+
 	for {
 		zlog.Info("fetching one block files", zap.Uint64("at_low_block_num", lowBlockNum))
 
 		oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lowBlockNum)
 		if err != nil {
-			return fmt.Errorf("fetching one block files with low block num: %d: %w", lowBlockNum, err)
+			zlog.Warn("**************************************************************************************")
+			zlog.Warn("failed to fetch merged file", zap.Uint64("low_block_num", lowBlockNum))
+			if b.rootCount() != 1 {
+				zlog.Warn("bundler forkdb has unstable root", zap.Uint64("root_count", b.rootCount()))
+			}
+			zlog.Warn("**************************************************************************************")
+			return
 		}
 		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].num > oneBlockFiles[j].num })
 
 		for _, f := range oneBlockFiles {
 			f.merged = true
 			b.AddOneBlockFile(f)
+			if f.num < lowestBlockNumAdded {
+				lowestBlockNumAdded = f.num
+			}
+
 			if optimizeStopOnSingleRoot {
-				if b.hasSingleRoot() {
-					return nil
+				if b.rootCount() == 1 && lowestBlockNumAdded <= lowBlockNumToReach {
+					return
 				}
 			}
 		}
 
 		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum))
 
-		if b.hasSingleRoot() {
+		if b.rootCount() == 1 && lowestBlockNumAdded <= lowBlockNumToReach {
 			break
 		}
 
@@ -91,22 +109,18 @@ func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uin
 		optimizeStopOnSingleRoot = true
 	}
 	b.resetMemoize()
-	return nil
 }
 
-func (b *Bundler) hasSingleRoot() bool {
+func (b *Bundler) rootCount() uint64 {
 	roots, err := b.db.Roots()
 	if err != nil {
-		return false
+		return 0
 	}
 
-	return len(roots) == 1
+	return uint64(len(roots))
 }
 
 func (b *Bundler) AddFile(filename string, blockNum uint64, blockTime time.Time, blockID string, previousID string, canonicalName string) {
-
-	//todo: panic on maxFixableFork failure
-
 	if block := b.db.BlockForID(blockID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		obf.filenames[filename] = Empty
@@ -161,7 +175,28 @@ func (b *Bundler) getChains() (*forkable.ChainList, error) {
 	return b.chains, nil
 }
 
-func (b *Bundler) FirstBlockNum() (uint64, error) {
+func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
+	roots, err := b.db.Roots()
+	if err != nil { //if there is no root it can't be too old
+		return false
+	}
+
+	highestBlockNum := uint64(0)
+	for _, root := range roots {
+		tree := b.db.BuildTreeWithID(root)
+		longestChain := tree.Chains().LongestChain()
+		leafBlockID := longestChain[len(longestChain)-1]
+		leafBlock := b.db.BlockForID(leafBlockID)
+		if leafBlock.BlockNum > highestBlockNum {
+			highestBlockNum = leafBlock.BlockNum
+		}
+	}
+
+	acceptableBlockNum := int64(highestBlockNum - b.maxFixableFork)
+	return int64(blockNum) < acceptableBlockNum
+}
+
+func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 	chains, err := b.getChains()
 	if err != nil {
 		return 0, fmt.Errorf("getting chains: %w", err)

@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/metadata"
-
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
@@ -33,6 +31,7 @@ import (
 	pb "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
 )
 
 // Hopefully, this block kind value will never be used!

@@ -1,7 +1,7 @@
 package merger
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/streamingfast/bstream/forkable"
@@ -614,14 +614,13 @@ func TestBundler_purge(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			roots, err := bundler.db.Roots()
+			_, err = bundler.db.Roots()
 
 			if c.expectedLongestFirstBlock == "" && c.expectedTreeSize == 0 {
 				require.Errorf(t, err, "no link")
 				return
 			}
 			require.NoError(t, err)
-			fmt.Println("roots:", roots)
 
 			tree, err := bundler.getTree()
 			require.NoError(t, err) //this will mean that we created multiple root.
@@ -745,14 +744,13 @@ func TestBundler_Purge(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			roots, err := bundler.db.Roots()
+			_, err = bundler.db.Roots()
 
 			if c.expectedLongestFirstBlock == "" && c.expectedTreeSize == 0 {
 				require.Errorf(t, err, "no link")
 				return
 			}
 			require.NoError(t, err)
-			fmt.Println("roots:", roots)
 
 			tree, err := bundler.getTree()
 			require.NoError(t, err) //this will mean that we created multiple root.
@@ -839,21 +837,171 @@ func TestBundler_Boostrap(t *testing.T) {
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, 1000, c.firstExclusiveHighestBlockLimit, "")
+			bundler := NewBundler(5, 100, c.firstExclusiveHighestBlockLimit, "")
 
 			var mergeFileReads []uint64
-			err := bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
+			bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
 				//this function feed block to bundler ...
 				mergeFileReads = append(mergeFileReads, lowBlockNum)
-				return mergeFiles[lowBlockNum], nil
+
+				if oneBlockFiles, found := mergeFiles[lowBlockNum]; found {
+					return oneBlockFiles, nil
+				}
+				return nil, errors.New("merge file not found")
 			})
 
-			require.NoError(t, err)
-
 			require.Equal(t, c.expectedMergeFilesRead, mergeFileReads)
-			firstBlockNum, err := bundler.FirstBlockNum()
+			firstBlockNum, err := bundler.LongestChainFirstBlockNum()
 			require.NoError(t, err)
 			require.Equal(t, int(c.expectedFirstBlockNum), int(firstBlockNum))
+		})
+	}
+}
+
+func TestBundler_IsBlockTooOld(t *testing.T) {
+	singleRootNoFork := []*OneBlockFile{
+		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
+		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
+		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a"),
+		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a"),
+		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a"),
+		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
+	}
+
+	cases := []struct {
+		name           string
+		files          []*OneBlockFile
+		blockNum       uint64
+		maxFixableFork uint64
+		expectedResult bool
+	}{
+		{
+			name:           "in the middle",
+			files:          singleRootNoFork,
+			blockNum:       102,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "in the future",
+			files:          singleRootNoFork,
+			blockNum:       200,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "at first block",
+			files:          singleRootNoFork,
+			blockNum:       100,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "before first block",
+			files:          singleRootNoFork,
+			blockNum:       99,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "too old",
+			files:          singleRootNoFork,
+			blockNum:       5,
+			maxFixableFork: 100,
+			expectedResult: true,
+		},
+		{
+			name:           "maxFixableFork capacity no reach",
+			files:          singleRootNoFork,
+			blockNum:       100,
+			maxFixableFork: 1000,
+			expectedResult: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bundler := NewBundler(5, c.maxFixableFork, 105, "")
+			for _, f := range c.files {
+				bundler.AddOneBlockFile(f)
+			}
+			tooOld := bundler.IsBlockTooOld(c.blockNum)
+			require.Equal(t, c.expectedResult, tooOld)
+
+		})
+	}
+}
+
+func TestBundler_IsBlockTooOld_MultipleRoot(t *testing.T) {
+	singleRootNoFork := []*OneBlockFile{
+		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a"),
+		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a"),
+		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a"),
+		//MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a"),
+		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a"),
+		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a"),
+	}
+
+	cases := []struct {
+		name           string
+		files          []*OneBlockFile
+		blockNum       uint64
+		maxFixableFork uint64
+		expectedResult bool
+	}{
+		{
+			name:           "in the middle",
+			files:          singleRootNoFork,
+			blockNum:       102,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "in the future",
+			files:          singleRootNoFork,
+			blockNum:       200,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "at first block",
+			files:          singleRootNoFork,
+			blockNum:       100,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "before first block",
+			files:          singleRootNoFork,
+			blockNum:       99,
+			maxFixableFork: 100,
+			expectedResult: false,
+		},
+		{
+			name:           "too old",
+			files:          singleRootNoFork,
+			blockNum:       5,
+			maxFixableFork: 100,
+			expectedResult: true,
+		},
+		{
+			name:           "maxFixableFork capacity no reach",
+			files:          singleRootNoFork,
+			blockNum:       100,
+			maxFixableFork: 1000,
+			expectedResult: false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bundler := NewBundler(5, c.maxFixableFork, 105, "")
+			for _, f := range c.files {
+				bundler.AddOneBlockFile(f)
+			}
+			tooOld := bundler.IsBlockTooOld(c.blockNum)
+			require.Equal(t, c.expectedResult, tooOld)
+
 		})
 	}
 }

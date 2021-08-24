@@ -3,6 +3,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -94,4 +95,82 @@ func (io *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*On
 	)
 
 	return
+}
+
+type oneBlockFilesDeleter struct {
+	sync.Mutex
+	toProcess chan string
+	store     dstore.Store
+}
+
+func NewOneBlockFilesDeleter(store dstore.Store) *oneBlockFilesDeleter {
+	return &oneBlockFilesDeleter{
+		store: store,
+	}
+}
+
+func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
+	od.toProcess = make(chan string, maxDeletions)
+	for i := 0; i < threads; i++ {
+		go od.processDeletions()
+	}
+}
+
+func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*OneBlockFile) {
+	od.Lock()
+	defer od.Unlock()
+
+	if len(oneBlockFiles) == 0 {
+		return
+	}
+
+	var fileNames []string
+	for _, oneBlockFile := range oneBlockFiles {
+		for filename, _ := range oneBlockFile.filenames {
+			fileNames = append(fileNames, filename)
+		}
+	}
+	zlog.Info("deleting files that are too old or already seen", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
+
+	deletable := make(map[string]struct{})
+
+	// dedupe processing queue
+	for empty := false; !empty; {
+		select {
+		case f := <-od.toProcess:
+			deletable[f] = Empty
+		default:
+			empty = true
+		}
+	}
+
+	for _, file := range fileNames {
+		if len(od.toProcess) == cap(od.toProcess) {
+			break
+		}
+		if _, exists := deletable[file]; !exists {
+			od.toProcess <- file
+		}
+		deletable[file] = Empty
+	}
+}
+
+func (od *oneBlockFilesDeleter) processDeletions() {
+	for {
+		file := <-od.toProcess
+
+		var err error
+		for i := 0; i < 3; i++ {
+			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
+			err = od.store.DeleteObject(ctx, file)
+			cancel()
+			if err == nil {
+				break
+			}
+			time.Sleep(time.Duration(100*i) * time.Millisecond)
+		}
+		if err != nil {
+			zlog.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
+		}
+	}
 }
