@@ -3,7 +3,7 @@ module github.com/streamingfast/merger
 go 1.15
 
 require (
-	github.com/streamingfast/bstream v0.0.2-0.20210818191722-64ffe9f21879
+	github.com/streamingfast/bstream v0.0.2-0.20210825183030-76aac82b2da2
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dgrpc v0.0.0-20210811180351-8646818518b2
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447
@@ -18,4 +18,3 @@ require (
 )
 
 replace git.apache.org/thrift.git => github.com/apache/thrift v0.0.0-20180902110319-2566ecd5d999
-replace github.com/streamingfast/bstream => /Users/cbillett/devel/sf/bstream
