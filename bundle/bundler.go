@@ -133,6 +133,24 @@ func (b *Bundler) AddPreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {
 	b.exclusiveHighestBlockLimit += b.bundleSize
 }
 
+func (b *Bundler) LongestOneBlockFileChain() (oneBlockFiles []*OneBlockFile) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	lc := b.longestChain()
+	for _, id := range lc {
+		oneBlockFiles = append(oneBlockFiles, b.db.BlockForID(id).Object.(*OneBlockFile))
+	}
+	sort.Slice(oneBlockFiles, func(i, j int) bool {
+		if oneBlockFiles[i].BlockTime.Equal(oneBlockFiles[j].BlockTime) {
+			return oneBlockFiles[i].Num < oneBlockFiles[j].Num
+		}
+
+		return oneBlockFiles[i].BlockTime.Before(oneBlockFiles[j].BlockTime)
+	})
+
+	return
+}
 func (b *Bundler) LongestChain() []string {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()

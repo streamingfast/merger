@@ -35,12 +35,13 @@ type Merger struct {
 	timeBetweenStoreLookups time.Duration // should be very low on local filesystem
 	oneBlockDeletionThreads int
 
-	bundler             *bundle.Bundler
-	fetchMergedFileFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
-	fetchOneBlockFiles  func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
-	deleteFilesFunc     func(oneBlockFiles []*bundle.OneBlockFile)
-	mergeUploadFunc     func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
-	stateFile           string
+	bundler              *bundle.Bundler
+	fetchMergedFileFunc  func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
+	fetchOneBlockFiles   func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
+	deleteFilesFunc      func(oneBlockFiles []*bundle.OneBlockFile)
+	mergeUploadFunc      func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
+	downloadOneBlockFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
+	stateFile            string
 }
 
 func NewMerger(
@@ -51,6 +52,7 @@ func NewMerger(
 	fetchOneBlockFiles func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error),
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
 	mergeUploadFunc func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error),
+	downloadOneBlockFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error),
 	stateFile string,
 ) *Merger {
 	return &Merger{
@@ -63,6 +65,7 @@ func NewMerger(
 		deleteFilesFunc:         deleteFilesFunc,
 		mergeUploadFunc:         mergeUploadFunc,
 		stateFile:               stateFile,
+		downloadOneBlockFunc:    downloadOneBlockFunc,
 	}
 }
 

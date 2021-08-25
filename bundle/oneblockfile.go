@@ -17,13 +17,9 @@ package bundle
 import (
 	"context"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/streamingfast/dstore"
 )
 
 var Empty struct{}
@@ -64,38 +60,15 @@ func MustNewMergedOneBlockFile(fileName string) *OneBlockFile {
 	return oneBlockFile
 }
 
-func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error) {
+func (f *OneBlockFile) Data(ctx context.Context, downloadOneBlockFile func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)) ([]byte, error) {
 	if len(f.MemoizeData) == 0 {
-		err := f.downloadFile(ctx, s)
+		data, err := downloadOneBlockFile(ctx, f)
 		if err != nil {
 			return nil, err
 		}
+		f.MemoizeData = data
 	}
 	return f.MemoizeData, nil
-}
-
-func (f *OneBlockFile) downloadFile(ctx context.Context, s dstore.Store) error {
-	var err error
-	for filename := range f.Filenames { // will try to get MemoizeData from any of those files
-		var out io.ReadCloser
-		out, err = s.OpenObject(ctx, filename)
-		if err != nil {
-			continue
-		}
-		defer out.Close()
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		f.MemoizeData, err = ioutil.ReadAll(out)
-		if err == nil {
-			return nil
-		}
-	}
-	return err // last error seen during attempts (OpenObject or ReadAll)
 }
 
 // parseFilename parses file names formatted like:

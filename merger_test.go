@@ -34,7 +34,7 @@ import (
 func TestNewMerger_SunnyPath(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
 
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -77,7 +77,7 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 
 func TestNewMerger_Unlinkable_File(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
 	}
@@ -121,7 +121,7 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 
 func TestNewMerger_File_Too_Old(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
 	}
@@ -181,7 +181,7 @@ func clone(in []*bundle.OneBlockFile) (out []*bundle.OneBlockFile) {
 func TestNewMerger_Wait_For_Files(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
 
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -232,7 +232,7 @@ func TestNewMerger_Wait_For_Files(t *testing.T) {
 func TestNewMerger_Multiple_Merge(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, nil, "")
 
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -283,7 +283,7 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, nil, "")
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		0: {
@@ -328,7 +328,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		0: {
@@ -382,7 +382,7 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 	_ = os.Remove(stateFilePath)
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, stateFilePath)
+	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, stateFilePath)
 
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, nil

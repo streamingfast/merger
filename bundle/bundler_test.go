@@ -599,7 +599,7 @@ func TestBundler_Purge(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			longest := bundler.LongestChain()
+			longest := bundler.longestChain()
 			require.Equal(t, c.expectedLongestFirstBlock, longest[0])
 		})
 	}

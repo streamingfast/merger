@@ -114,6 +114,7 @@ func (a *App) Run() error {
 		io.FetchOneBlockFiles,
 		filesDeleter.Delete,
 		io.MergeUpload,
+		io.DownloadFile,
 		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")
