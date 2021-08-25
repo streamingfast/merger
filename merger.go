@@ -16,9 +16,11 @@ package merger
 
 import (
 	"context"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"math"
+	"os"
 	"time"
 
 	"github.com/streamingfast/bstream"
@@ -41,6 +43,7 @@ type Merger struct {
 	fetchOneBlockFiles  func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error)
 	deleteFilesFunc     func(fileNames []*OneBlockFile)
 	mergeUploadFunc     func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error)
+	stateFile           string
 }
 
 func NewMerger(
@@ -51,6 +54,7 @@ func NewMerger(
 	fetchOneBlockFiles func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error),
 	deleteFilesFunc func(fileNames []*OneBlockFile),
 	mergeUploadFunc func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error),
+	stateFile string,
 ) *Merger {
 	return &Merger{
 		Shutter:                 shutter.New(),
@@ -61,6 +65,7 @@ func NewMerger(
 		fetchOneBlockFiles:      fetchOneBlockFiles,
 		deleteFilesFunc:         deleteFilesFunc,
 		mergeUploadFunc:         mergeUploadFunc,
+		stateFile:               stateFile,
 	}
 }
 
@@ -312,4 +317,33 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 	//}
 	//
 	return nil
+}
+
+type State struct {
+	ExclusiveHighestBlockLimit uint64
+}
+
+func LoadState(filename string) (state *State, err error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	dataDecoder := gob.NewDecoder(f)
+	err = dataDecoder.Decode(&state)
+	return
+}
+
+func SaveState(state *State, filename string) error {
+	if filename == "" { // in memory mode
+		return nil
+	}
+	f, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	dataEncoder := gob.NewEncoder(f)
+	return dataEncoder.Encode(state)
 }

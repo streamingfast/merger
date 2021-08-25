@@ -182,7 +182,7 @@ func TestBundler_IsComplete(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, c.blockLimit, "")
+			bundler := NewBundler(5, c.blockLimit)
 			bundler.lastMergeOneBlockFile = &OneBlockFile{
 				id: c.lastMergeBlockID,
 			}
@@ -328,7 +328,7 @@ func TestBundler_MergeableFiles(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, c.blockLimit, "")
+			bundler := NewBundler(5, c.blockLimit)
 			bundler.lastMergeOneBlockFile = &OneBlockFile{id: c.lastMergeBlockID}
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
@@ -382,7 +382,7 @@ func TestBundler_Complicated(t *testing.T) {
 		MustTestNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a-90"),
 	}
 
-	bundler := NewBundler(5, 105, "")
+	bundler := NewBundler(5, 105)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{id: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
@@ -438,7 +438,7 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
 	}
 
-	bundler := NewBundler(5, 105, "")
+	bundler := NewBundler(5, 105)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{id: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
@@ -602,7 +602,7 @@ func TestBundler_Purge(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, 105, "")
+			bundler := NewBundler(5, 105)
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}
@@ -691,7 +691,7 @@ func TestBundler_Boostrap(t *testing.T) {
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, c.firstExclusiveHighestBlockLimit, "")
+			bundler := NewBundler(5, c.firstExclusiveHighestBlockLimit)
 			var mergeFileReads []int
 			err := bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
 				mergeFileReads = append(mergeFileReads, int(lowBlockNum))
@@ -807,7 +807,7 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, 105, "")
+			bundler := NewBundler(5, 105)
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}

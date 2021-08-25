@@ -78,21 +78,30 @@ func (a *App) Run() error {
 	io := merger.NewMergerIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize)
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
-	bundler, err := merger.NewBundlerFromFile(a.config.StateFile)
-	if err != nil {
+	state, err := merger.LoadState(a.config.StateFile)
+
+	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
 		nextExclusiveHighestBlockLimit, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, 100)
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}
-		bundler = merger.NewBundler(100, nextExclusiveHighestBlockLimit, a.config.StateFile)
-		bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*merger.OneBlockFile, err error) {
-			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
-			if fetchErr != nil {
-				return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)
-			}
-			return oneBlockFiles, err
-		})
+		state = &merger.State{
+			ExclusiveHighestBlockLimit: nextExclusiveHighestBlockLimit,
+		}
+	}
+
+	bundler := merger.NewBundler(100, state.ExclusiveHighestBlockLimit)
+	err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*merger.OneBlockFile, err error) {
+		oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
+		if fetchErr != nil {
+			return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)
+		}
+		return oneBlockFiles, err
+	})
+
+	if err != nil {
+		return fmt.Errorf("bundle bootstrap: %w", err)
 	}
 
 	m := merger.NewMerger(
@@ -103,6 +112,7 @@ func (a *App) Run() error {
 		io.FetchOneBlockFiles,
 		filesDeleter.Delete,
 		io.MergeUpload,
+		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")
 

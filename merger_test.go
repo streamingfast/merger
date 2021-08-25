@@ -21,8 +21,12 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/bstream/forkable"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dbin"
@@ -97,13 +101,14 @@ func setupMerger(t *testing.T) (m *Merger, src dstore.Store, dst dstore.Store, c
 	require.NoError(t, err)
 
 	m = NewMerger(
-		NewBundler(100, 100, ""),
+		NewBundler(100, 100),
 		0,
 		"",
 		func(lowBlockNum uint64) ([]*OneBlockFile, error) { return nil, nil },
 		func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error) { return },
 		func(fileNames []*OneBlockFile) {},
 		func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error) { return },
+		"",
 	)
 
 	return m, src, dst, func() {
@@ -370,4 +375,26 @@ func mustReadBlock(t *testing.T, reader bstream.BlockReader) *bstream.Block {
 	require.NoError(t, err)
 
 	return block
+}
+
+func TestBundler_Save_Load(t *testing.T) {
+	dir, err := ioutil.TempDir("", "")
+	require.NoError(t, err)
+	dirPath, err := filepath.Abs(filepath.Dir(dir))
+	require.NoError(t, err)
+	filePath := path.Join(dirPath, "bundler.test.bak")
+
+	db := forkable.NewForkDB()
+	db.AddLink(bstream.NewBlockRef("00000106a", 6), "0000010a", nil)
+	state := &State{
+		ExclusiveHighestBlockLimit: 991,
+	}
+
+	err = SaveState(state, filePath)
+	require.NoError(t, err)
+
+	reloaded, err := LoadState(filePath)
+
+	require.NoError(t, err)
+	require.Equal(t, state.ExclusiveHighestBlockLimit, reloaded.ExclusiveHighestBlockLimit)
 }
