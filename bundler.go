@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -16,6 +17,8 @@ type Bundler struct {
 
 	lastMergeOneBlockFile      *OneBlockFile
 	exclusiveHighestBlockLimit uint64
+
+	mutex sync.Mutex
 }
 
 func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bundler {
@@ -40,6 +43,9 @@ func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
 }
 
 func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	initialLowBlockNum := b.BundleInclusiveLowerBlock()
 	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
 	if err != nil {
@@ -66,7 +72,7 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 				libNum = f.libNum
 			}
 			f.merged = true
-			b.AddOneBlockFile(f)
+			b.addOneBlockFile(f)
 			if f.num == libNum {
 				return nil
 			}
@@ -79,6 +85,14 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 }
 
 func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	b.addOneBlockFile(oneBlockFile)
+	return
+}
+
+func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 	if block := b.db.BlockForID(oneBlockFile.id); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		for filename := range oneBlockFile.filenames { //this is an ugly patch. ash stepd ;-)
@@ -93,17 +107,28 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 }
 
 func (b *Bundler) AddPreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	if len(oneBlockFiles) == 0 {
 		return
 	}
 	for _, oneBlockFile := range oneBlockFiles {
-		b.AddOneBlockFile(oneBlockFile)
+		b.addOneBlockFile(oneBlockFile)
 	}
 	b.lastMergeOneBlockFile = oneBlockFiles[len(oneBlockFiles)-1]
 	b.exclusiveHighestBlockLimit += b.bundleSize
 }
 
 func (b *Bundler) LongestChain() []string {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.longestChain()
+}
+
+func (b *Bundler) longestChain() []string {
+
 	roots, err := b.db.Roots()
 	if err != nil {
 		return nil //this is happening when there is no links in db
@@ -132,6 +157,9 @@ func (b *Bundler) LongestChain() []string {
 }
 
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	roots, err := b.db.Roots()
 	if err != nil { //if there is no root it can't be too old
 		return false
@@ -148,7 +176,10 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 }
 
 func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
-	longestChain := b.LongestChain()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	longestChain := b.longestChain()
 	if len(longestChain) == 0 {
 		return 0, fmt.Errorf("no longuest chain available")
 	}
@@ -157,7 +188,10 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 }
 
 func (b *Bundler) IsComplete() (complete bool, highestBlockLimit uint64) {
-	longest := b.LongestChain()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	longest := b.longestChain()
 	for _, blockID := range longest {
 		blk := b.db.BlockForID(blockID)
 
@@ -170,6 +204,13 @@ func (b *Bundler) IsComplete() (complete bool, highestBlockLimit uint64) {
 }
 
 func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.toBundle(inclusiveHighestBlockLimit)
+}
+func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
+
 	var out []*OneBlockFile
 	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
@@ -192,7 +233,10 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 }
 
 func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
-	oneBlockFiles := b.ToBundle(inclusiveHighestBlockLimit)
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	oneBlockFiles := b.toBundle(inclusiveHighestBlockLimit)
 	var highestOneBlockFile *OneBlockFile
 
 	for _, file := range oneBlockFiles {
@@ -208,6 +252,9 @@ func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 }
 
 func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
 	if b.lastMergeOneBlockFile == nil {
 		return
 	}
