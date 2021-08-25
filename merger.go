@@ -18,14 +18,10 @@ import (
 	"context"
 	"encoding/gob"
 	"fmt"
-	"io"
-	"math"
 	"os"
 	"time"
 
 	"github.com/streamingfast/merger/metrics"
-
-	"github.com/streamingfast/bstream"
 
 	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	"github.com/streamingfast/shutter"
@@ -89,43 +85,35 @@ func (m *Merger) launch() (err error) {
 		zlog.Debug("verifying if bundle file already exist in store")
 		if oneBlockFiles, err := m.fetchMergedFileFunc(m.bundler.BundleInclusiveLowerBlock()); err == nil {
 			m.bundler.AddPreMergedOneBlockFiles(oneBlockFiles)
-			//if complete, highestBlockLimit := m.bundler.IsComplete(); complete {
-			//	m.bundler.Commit(highestBlockLimit)
-			//	m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {})
-			//	continue //let try next bundle
-			//} else {
-			//	return fmt.Errorf("bundler should have a completed a bundle at the point: bundler: %s", m.bundler)
-			//}
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
-		tooOldFiles, lastOneBlockFileAdded, err := m.retrieveOneBlockFile(ctx)
-		cancel()
-		if err != nil {
-			return fmt.Errorf("retreiving one block files: %w", err)
-		}
-
-		m.deleteFilesFunc(tooOldFiles)
-
-		if lastOneBlockFileAdded == nil {
-			select {
-			case <-time.After(m.timeBetweenStoreLookups):
-				continue
-			case <-m.Terminating():
-				return m.Err()
-			}
 		}
 
 		isBundleComplete, highestBundleBlockNum := m.bundler.IsComplete()
 		if !isBundleComplete {
-			zlog.Info("waiting for more files to complete bundle", zap.Stringer("bundler", m.bundler))
-
-			select {
-			case <-time.After(m.timeBetweenStoreLookups):
-				continue
-			case <-m.Terminating():
-				return m.Err()
+			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
+			tooOldFiles, lastOneBlockFileAdded, err := m.retrieveOneBlockFile(ctx)
+			cancel()
+			if err != nil {
+				return fmt.Errorf("retreiving one block files: %w", err)
 			}
+
+			if len(tooOldFiles) > 0 {
+				m.deleteFilesFunc(tooOldFiles)
+			}
+
+			if lastOneBlockFileAdded == nil {
+				select {
+				case <-time.After(m.timeBetweenStoreLookups):
+					continue
+				case <-m.Terminating():
+					return m.Err()
+				}
+			}
+
+			if m.bundler.lastMergeOneBlockFile != nil && lastOneBlockFileAdded.num < m.bundler.lastMergeOneBlockFile.num { // will still drift if there is a hole and lastFile is advancing
+				metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.blockTime)
+			}
+
+			continue //until not completed
 		}
 
 		zlog.Info("merging bundle",
@@ -141,10 +129,6 @@ func (m *Merger) launch() (err error) {
 
 		m.bundler.Commit(highestBundleBlockNum)
 
-		if lastOneBlockFileAdded.num < m.bundler.lastMergeOneBlockFile.num { // will still drift if there is a hole and lastFile is advancing
-			metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.blockTime)
-		}
-
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.exclusiveHighestBlockLimit}
 		zlog.Info("saving state", zap.Stringer("state", state))
 		err = SaveState(state, m.stateFile)
@@ -153,7 +137,9 @@ func (m *Merger) launch() (err error) {
 		}
 
 		m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
-			m.deleteFilesFunc(purgedOneBlockFiles)
+			if len(purgedOneBlockFiles) > 0 {
+				m.deleteFilesFunc(purgedOneBlockFiles)
+			}
 		})
 
 		//todo: update metrics and progressFilename
@@ -194,59 +180,6 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*OneBlockFi
 	)
 
 	return
-}
-
-func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*OneBlockFile, err error) {
-	defer mergeFileReader.Close()
-
-	blkReader, err := bstream.GetBlockReaderFactory.New(mergeFileReader)
-	if err != nil {
-		return nil, err
-	}
-
-	lowerBlock := uint64(math.MaxUint64)
-	highestBlock := uint64(0)
-	for {
-		block, err := blkReader.Read()
-
-		if block.Num() < lowerBlock {
-			lowerBlock = block.Num()
-		}
-
-		if block.Num() > highestBlock {
-			highestBlock = block.Num()
-		}
-
-		if block == nil {
-			if err == io.EOF {
-				break
-			}
-			return nil, err
-		}
-		fileName := blockFileName(block)
-		oneBlockFile := MustNewOneBlockFile(fileName)
-		oneBlockFile.merged = true
-		oneBlockFiles = append(oneBlockFiles, oneBlockFile)
-	}
-	zlog.Info("Processed, already existing merged file",
-		zap.Uint64("lower_block", lowerBlock),
-		zap.Uint64("highest_block", highestBlock),
-	)
-
-	return
-}
-
-func (m *Merger) addOneBlockFiles(in []string) (err error) {
-	if len(in) > 0 {
-		zlog.Debug("entering triage", zap.String("first_file", in[0]), zap.String("last_file", in[len(in)-1]))
-	}
-
-	for _, filename := range in {
-		oneBlockFile := MustNewOneBlockFile(filename)
-		m.bundler.AddOneBlockFile(oneBlockFile)
-	}
-
-	return nil
 }
 
 //todo : fix me

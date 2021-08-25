@@ -3,6 +3,8 @@ package merger
 import (
 	"context"
 	"fmt"
+	"io"
+	"math"
 	"sync"
 	"time"
 
@@ -173,4 +175,44 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 			zlog.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
 		}
 	}
+}
+
+func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*OneBlockFile, err error) {
+	defer mergeFileReader.Close()
+
+	blkReader, err := bstream.GetBlockReaderFactory.New(mergeFileReader)
+	if err != nil {
+		return nil, err
+	}
+
+	lowerBlock := uint64(math.MaxUint64)
+	highestBlock := uint64(0)
+	for {
+		block, err := blkReader.Read()
+
+		if block.Num() < lowerBlock {
+			lowerBlock = block.Num()
+		}
+
+		if block.Num() > highestBlock {
+			highestBlock = block.Num()
+		}
+
+		if block == nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, err
+		}
+		fileName := blockFileName(block)
+		oneBlockFile := MustNewOneBlockFile(fileName)
+		oneBlockFile.merged = true
+		oneBlockFiles = append(oneBlockFiles, oneBlockFile)
+	}
+	zlog.Info("Processed, already existing merged file",
+		zap.Uint64("lower_block", lowerBlock),
+		zap.Uint64("highest_block", highestBlock),
+	)
+
+	return
 }
