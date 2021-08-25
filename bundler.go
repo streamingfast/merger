@@ -1,10 +1,8 @@
 package merger
 
 import (
-	"encoding/gob"
 	"fmt"
 	"math"
-	"os"
 	"sort"
 
 	"github.com/streamingfast/bstream"
@@ -19,26 +17,14 @@ type Bundler struct {
 	//cache
 	lastMergeOneBlockFile      *OneBlockFile
 	exclusiveHighestBlockLimit uint64
-	filename                   string
 }
 
-func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64, filename string) *Bundler {
+func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bundler {
 	return &Bundler{
 		bundleSize:                 bundleSize,
 		db:                         forkable.NewForkDB(),
 		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
-		filename:                   filename,
 	}
-}
-
-func NewBundlerFromFile(filename string) (bundler *Bundler, err error) {
-	bundler, err = load(filename)
-	if err != nil {
-		return nil, fmt.Errorf("loading bundler from file: %s : %w", filename, err)
-	}
-	zlog.Info("loaded bundler", zap.String("filename", filename), zap.Stringer("bundler", bundler))
-	bundler.filename = filename
-	return
 }
 
 func (b *Bundler) String() string {
@@ -226,29 +212,4 @@ func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
 	}
 	callback(purgedOneBlockFiles)
 	return
-}
-
-func load(filename string) (bundler *Bundler, err error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	dataDecoder := gob.NewDecoder(f)
-	err = dataDecoder.Decode(&bundler)
-	return
-}
-
-func (b *Bundler) Save() error {
-	if b.filename == "" { // in memory mode
-		return nil
-	}
-	f, err := os.Create(b.filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	dataEncoder := gob.NewEncoder(f)
-	return dataEncoder.Encode(b)
 }
