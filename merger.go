@@ -146,6 +146,13 @@ func (m *Merger) launch() (err error) {
 
 		m.bundler.Commit(highestBundleBlockNum)
 
+		state := &State{ExclusiveHighestBlockLimit: m.bundler.exclusiveHighestBlockLimit}
+		zlog.Info("saving state", zap.Stringer("state", state))
+		err = SaveState(state, m.stateFile)
+		if err != nil {
+			zlog.Warn("failed to save state", zap.Error(err))
+		}
+
 		m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
 			m.deleteFilesFunc(purgedOneBlockFiles)
 		})
@@ -321,6 +328,10 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 
 type State struct {
 	ExclusiveHighestBlockLimit uint64
+}
+
+func (s *State) String() string {
+	return fmt.Sprintf("exclusive_highest_block_limit: %d", s.ExclusiveHighestBlockLimit)
 }
 
 func LoadState(filename string) (state *State, err error) {
