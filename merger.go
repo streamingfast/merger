@@ -23,9 +23,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/streamingfast/merger/metrics"
+
 	"github.com/streamingfast/bstream"
 
-	"github.com/streamingfast/merger/metrics"
 	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -41,7 +42,7 @@ type Merger struct {
 	bundler             *Bundler
 	fetchMergedFileFunc func(lowBlockNum uint64) ([]*OneBlockFile, error)
 	fetchOneBlockFiles  func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error)
-	deleteFilesFunc     func(fileNames []*OneBlockFile)
+	deleteFilesFunc     func(oneBlockFiles []*OneBlockFile)
 	mergeUploadFunc     func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error)
 	stateFile           string
 }
@@ -52,7 +53,7 @@ func NewMerger(
 	grpcListenAddr string,
 	fetchMergedFileFunc func(lowBlockNum uint64) ([]*OneBlockFile, error),
 	fetchOneBlockFiles func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error),
-	deleteFilesFunc func(fileNames []*OneBlockFile),
+	deleteFilesFunc func(oneBlockFiles []*OneBlockFile),
 	mergeUploadFunc func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error),
 	stateFile string,
 ) *Merger {
@@ -87,16 +88,14 @@ func (m *Merger) launch() (err error) {
 
 		zlog.Debug("verifying if bundle file already exist in store")
 		if oneBlockFiles, err := m.fetchMergedFileFunc(m.bundler.BundleInclusiveLowerBlock()); err == nil {
-			for _, oneBlockFile := range oneBlockFiles {
-				m.bundler.AddOneBlockFile(oneBlockFile)
-			}
-			if complete, highestBlockLimit := m.bundler.IsComplete(); complete {
-				m.bundler.Commit(highestBlockLimit)
-				m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {})
-				continue //let try next bundle
-			} else {
-				return fmt.Errorf("bundler should have a completed a bundle at the point: bundler: %s", m.bundler)
-			}
+			m.bundler.AddPreMergedOneBlockFiles(oneBlockFiles)
+			//if complete, highestBlockLimit := m.bundler.IsComplete(); complete {
+			//	m.bundler.Commit(highestBlockLimit)
+			//	m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {})
+			//	continue //let try next bundle
+			//} else {
+			//	return fmt.Errorf("bundler should have a completed a bundle at the point: bundler: %s", m.bundler)
+			//}
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
@@ -115,10 +114,6 @@ func (m *Merger) launch() (err error) {
 			case <-m.Terminating():
 				return m.Err()
 			}
-		}
-
-		if lastOneBlockFileAdded.num < m.bundler.lastMergeOneBlockFile.num { // will still drift if there is a hole and lastFile is advancing
-			metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.blockTime)
 		}
 
 		isBundleComplete, highestBundleBlockNum := m.bundler.IsComplete()
@@ -145,6 +140,10 @@ func (m *Merger) launch() (err error) {
 		}
 
 		m.bundler.Commit(highestBundleBlockNum)
+
+		if lastOneBlockFileAdded.num < m.bundler.lastMergeOneBlockFile.num { // will still drift if there is a hole and lastFile is advancing
+			metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.blockTime)
+		}
 
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.exclusiveHighestBlockLimit}
 		zlog.Info("saving state", zap.Stringer("state", state))

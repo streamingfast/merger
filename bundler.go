@@ -14,7 +14,6 @@ type Bundler struct {
 	db         *forkable.ForkDB
 	bundleSize uint64
 
-	//cache
 	lastMergeOneBlockFile      *OneBlockFile
 	exclusiveHighestBlockLimit uint64
 }
@@ -80,10 +79,9 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 }
 
 func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
-	//todo: test that ugly patch
 	if block := b.db.BlockForID(oneBlockFile.id); block != nil {
 		obf := block.Object.(*OneBlockFile)
-		for filename, _ := range oneBlockFile.filenames { //this is an ugly patch. ash stepd ;-)
+		for filename := range oneBlockFile.filenames { //this is an ugly patch. ash stepd ;-)
 			obf.filenames[filename] = Empty
 		}
 		return true
@@ -92,6 +90,17 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 	blockRef := bstream.NewBlockRef(oneBlockFile.id, oneBlockFile.num)
 	exist = b.db.AddLink(blockRef, oneBlockFile.previousID, oneBlockFile)
 	return
+}
+
+func (b *Bundler) AddPreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {
+	if len(oneBlockFiles) == 0 {
+		return
+	}
+	for _, oneBlockFile := range oneBlockFiles {
+		b.AddOneBlockFile(oneBlockFile)
+	}
+	b.lastMergeOneBlockFile = oneBlockFiles[len(oneBlockFiles)-1]
+	b.exclusiveHighestBlockLimit += b.bundleSize
 }
 
 func (b *Bundler) LongestChain() []string {

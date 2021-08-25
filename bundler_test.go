@@ -2,6 +2,7 @@ package merger
 
 import (
 	"errors"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -344,6 +345,16 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		})
 	}
 }
+func toSortedIDs(oneBlockFileList []*OneBlockFile) (ids []string) {
+	sort.Slice(oneBlockFileList, func(i, j int) bool {
+		if oneBlockFileList[i].blockTime.Equal(oneBlockFileList[j].blockTime) {
+			return oneBlockFileList[i].num < oneBlockFileList[j].num
+		}
+		return oneBlockFileList[i].blockTime.Before(oneBlockFileList[j].blockTime)
+	})
+	return toIDs(oneBlockFileList)
+}
+
 func toIDs(oneBlockFileList []*OneBlockFile) (ids []string) {
 	for _, file := range oneBlockFileList {
 		ids = append(ids, file.id)
