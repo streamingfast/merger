@@ -145,16 +145,8 @@ func (m *Merger) launch() (err error) {
 			}
 		})
 
-		//todo: update metrics and progressFilename
-		//metrics.HeadBlockTimeDrift.SetBlockTime(b.upperBlockTime)
-		//metrics.HeadBlockNumber.SetUint64(b.lowersBlock + m.chunkSize)
-		//
-		//if m.progressFilename != "" {
-		//	err := ioutil.WriteFile(m.progressFilename, []byte(fmt.Sprintf("%d", b.lowerBlock+m.chunkSize)), 0644)
-		//	if err != nil {
-		//		zlog.Warn("cannot write progress to file", zap.String("filename", m.progressFilename), zap.Error(err))
-		//	}
-		//}
+		metrics.HeadBlockTimeDrift.SetBlockTime(m.bundler.LastMergeOneBlockFile().BlockTime)
+		metrics.HeadBlockNumber.SetUint64(m.bundler.LastMergeOneBlockFile().Num)
 	}
 
 }

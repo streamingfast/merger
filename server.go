@@ -106,7 +106,7 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 
 		err = server.Send(
 			&pbmerge.Response{
-				Found: true, //todo: this is not require any more
+				Found: true,
 				Block: protoblock,
 			})
 
