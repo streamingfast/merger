@@ -13,7 +13,6 @@ require (
 	github.com/streamingfast/shutter v1.5.0
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.15.0
-	google.golang.org/grpc v1.39.1
 	gopkg.in/olivere/elastic.v3 v3.0.75
 )
 
