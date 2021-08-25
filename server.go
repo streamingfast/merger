@@ -70,12 +70,12 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 	//	if oneBlock.num < req.LowBlockNum {
 	//		continue
 	//	}
-	//	data, err := oneBlock.Data(server.Context(), m.oneBlocksStore)
+	//	MemoizeData, err := oneBlock.Data(server.Context(), m.oneBlocksStore)
 	//	if err != nil {
-	//		return fmt.Errorf("unable to get one block data: %w", err)
+	//		return fmt.Errorf("unable to get one block MemoizeData: %w", err)
 	//	}
 	//
-	//	blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
+	//	blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(MemoizeData))
 	//	if err != nil {
 	//		return fmt.Errorf("unable to read one block: %w", err)
 	//	}

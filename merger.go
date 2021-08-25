@@ -21,8 +21,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/streamingfast/merger/metrics"
+	"github.com/streamingfast/merger/bundle"
 
+	"github.com/streamingfast/merger/metrics"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
@@ -34,22 +35,22 @@ type Merger struct {
 	timeBetweenStoreLookups time.Duration // should be very low on local filesystem
 	oneBlockDeletionThreads int
 
-	bundler             *Bundler
-	fetchMergedFileFunc func(lowBlockNum uint64) ([]*OneBlockFile, error)
-	fetchOneBlockFiles  func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error)
-	deleteFilesFunc     func(oneBlockFiles []*OneBlockFile)
-	mergeUploadFunc     func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error)
+	bundler             *bundle.Bundler
+	fetchMergedFileFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
+	fetchOneBlockFiles  func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
+	deleteFilesFunc     func(oneBlockFiles []*bundle.OneBlockFile)
+	mergeUploadFunc     func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
 	stateFile           string
 }
 
 func NewMerger(
-	bundler *Bundler,
+	bundler *bundle.Bundler,
 	timeBetweenStoreLookups time.Duration,
 	grpcListenAddr string,
-	fetchMergedFileFunc func(lowBlockNum uint64) ([]*OneBlockFile, error),
-	fetchOneBlockFiles func(ctx context.Context) (oneBlockFiles []*OneBlockFile, err error),
-	deleteFilesFunc func(oneBlockFiles []*OneBlockFile),
-	mergeUploadFunc func(inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error),
+	fetchMergedFileFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error),
+	fetchOneBlockFiles func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error),
+	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
+	mergeUploadFunc func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error),
 	stateFile string,
 ) *Merger {
 	return &Merger{
@@ -66,7 +67,7 @@ func NewMerger(
 }
 
 func (m *Merger) Launch() {
-	zlog.Info("starting merger", zap.Stringer("bundler", m.bundler))
+	zlog.Info("starting merger", zap.Stringer("bundle", m.bundler))
 
 	m.startServer()
 
@@ -108,8 +109,8 @@ func (m *Merger) launch() (err error) {
 				}
 			}
 
-			if m.bundler.lastMergeOneBlockFile != nil && lastOneBlockFileAdded.num < m.bundler.lastMergeOneBlockFile.num { // will still drift if there is a hole and lastFile is advancing
-				metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.blockTime)
+			if m.bundler.LastMergeOneBlockFile() != nil && lastOneBlockFileAdded.Num < m.bundler.LastMergeOneBlockFile().Num { // will still drift if there is a hole and lastFile is advancing
+				metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.BlockTime)
 			}
 
 			continue //until not completed
@@ -117,7 +118,7 @@ func (m *Merger) launch() (err error) {
 
 		zlog.Info("merging bundle",
 			zap.Uint64("highest_bundle_block_num", highestBundleBlockNum),
-			zap.Stringer("bundler", m.bundler),
+			zap.Stringer("bundle", m.bundler),
 		)
 
 		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
@@ -128,14 +129,14 @@ func (m *Merger) launch() (err error) {
 
 		m.bundler.Commit(highestBundleBlockNum)
 
-		state := &State{ExclusiveHighestBlockLimit: m.bundler.exclusiveHighestBlockLimit}
+		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
 		zlog.Info("saving state", zap.Stringer("state", state))
 		err = SaveState(state, m.stateFile)
 		if err != nil {
 			zlog.Warn("failed to save state", zap.Error(err))
 		}
 
-		m.bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
+		m.bundler.Purge(func(purgedOneBlockFiles []*bundle.OneBlockFile) {
 			if len(purgedOneBlockFiles) > 0 {
 				m.deleteFilesFunc(purgedOneBlockFiles)
 			}
@@ -155,7 +156,7 @@ func (m *Merger) launch() (err error) {
 
 }
 
-func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*OneBlockFile, lastOneBlockFileAdded *OneBlockFile, err error) {
+func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, lastOneBlockFileAdded *bundle.OneBlockFile, err error) {
 	addedFileCount := 0
 	oneBlockFiles, err := m.fetchOneBlockFiles(ctx)
 	if err != nil {
@@ -164,7 +165,7 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*OneBlockFi
 	for _, oneBlockFile := range oneBlockFiles {
 
 		switch {
-		case m.bundler.IsBlockTooOld(oneBlockFile.num):
+		case m.bundler.IsBlockTooOld(oneBlockFile.Num):
 			tooOld = append(tooOld, oneBlockFile)
 		default:
 			m.bundler.AddOneBlockFile(oneBlockFile)

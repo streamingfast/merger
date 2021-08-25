@@ -1,4 +1,4 @@
-package merger
+package bundle
 
 import (
 	"context"
@@ -39,7 +39,7 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 
 		obf := r.oneBlockFiles[0]
 		r.oneBlockFiles = r.oneBlockFiles[1:]
-		zlog.Debug("downloading one block file", zap.String("canonical_name", obf.canonicalName))
+		zlog.Debug("downloading one block file", zap.String("canonical_name", obf.CanonicalName))
 		data, err := obf.Data(r.ctx, r.oneBlockFileStore)
 		if err != nil {
 			return 0, err

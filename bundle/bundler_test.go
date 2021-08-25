@@ -1,8 +1,7 @@
-package merger
+package bundle
 
 import (
 	"errors"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -185,10 +184,10 @@ func TestBundler_IsComplete(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			bundler := NewBundler(5, c.blockLimit)
 			bundler.lastMergeOneBlockFile = &OneBlockFile{
-				id: c.lastMergeBlockID,
+				ID: c.lastMergeBlockID,
 			}
 			for _, f := range c.files {
-				bundler.AddOneBlockFile(MustTestNewOneBlockFile(f))
+				bundler.AddOneBlockFile(MustNewOneBlockFile(f))
 			}
 			completed, highestBlockLimit := bundler.IsComplete()
 			require.Equal(t, c.expectedCompleted, completed)
@@ -198,26 +197,9 @@ func TestBundler_IsComplete(t *testing.T) {
 
 }
 
-func MustTestNewOneBlockFile(fileName string) *OneBlockFile {
-	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := parseFilename(fileName)
-	if err != nil {
-		panic(err)
-	}
-	return &OneBlockFile{
-		canonicalName: canonicalName,
-		filenames: map[string]struct{}{
-			fileName: Empty,
-		},
-		blockTime:  blockTime,
-		id:         blockID,
-		num:        blockNum,
-		previousID: previousBlockID,
-		libNum:     libNum,
-	}
-}
 func MustTestNewMergedOneBlockFile(fileName string) *OneBlockFile {
-	fi := MustTestNewOneBlockFile(fileName)
-	fi.merged = true
+	fi := MustNewOneBlockFile(fileName)
+	fi.Merged = true
 	return fi
 }
 
@@ -233,14 +215,14 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		{
 			name: "file 0",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-90"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-90"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
-				MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
-				MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+				MustNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-90"),
+				MustNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-90"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
 			},
 			lastMergeBlockID:         "00000099a",
 			blockLimit:               105,
@@ -250,18 +232,18 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		{
 			name: "file 5",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000106-20210728T105016.01-00000106a-00000104a-90"),
-				MustTestNewOneBlockFile("0000000107-20210728T105016.02-00000107a-00000106a-90"),
-				MustTestNewOneBlockFile("0000000108-20210728T105016.03-00000108b-00000107a-90"),
-				MustTestNewOneBlockFile("0000000109-20210728T105016.04-00000109b-00000108b-90"),
-				MustTestNewOneBlockFile("0000000110-20210728T105016.05-00000110b-00000109b-90"),
-				MustTestNewOneBlockFile("0000000110-20210728T105016.06-00000110c-00000109b-90"),
-				MustTestNewOneBlockFile("0000000111-20210728T105016.07-00000111c-00000110c-90"),
-				MustTestNewOneBlockFile("0000000108-20210728T105016.08-00000108a-00000107a-90"),
-				MustTestNewOneBlockFile("0000000109-20210728T105016.09-00000109a-00000108a-90"),
-				MustTestNewOneBlockFile("0000000110-20210728T105016.10-00000110a-00000109a-90"),
-				MustTestNewOneBlockFile("0000000111-20210728T105016.11-00000111a-00000110a-90"),
-				MustTestNewOneBlockFile("0000000112-20210728T105016.12-00000112a-00000111a-90"),
+				MustNewOneBlockFile("0000000106-20210728T105016.01-00000106a-00000104a-90"),
+				MustNewOneBlockFile("0000000107-20210728T105016.02-00000107a-00000106a-90"),
+				MustNewOneBlockFile("0000000108-20210728T105016.03-00000108b-00000107a-90"),
+				MustNewOneBlockFile("0000000109-20210728T105016.04-00000109b-00000108b-90"),
+				MustNewOneBlockFile("0000000110-20210728T105016.05-00000110b-00000109b-90"),
+				MustNewOneBlockFile("0000000110-20210728T105016.06-00000110c-00000109b-90"),
+				MustNewOneBlockFile("0000000111-20210728T105016.07-00000111c-00000110c-90"),
+				MustNewOneBlockFile("0000000108-20210728T105016.08-00000108a-00000107a-90"),
+				MustNewOneBlockFile("0000000109-20210728T105016.09-00000109a-00000108a-90"),
+				MustNewOneBlockFile("0000000110-20210728T105016.10-00000110a-00000109a-90"),
+				MustNewOneBlockFile("0000000111-20210728T105016.11-00000111a-00000110a-90"),
+				MustNewOneBlockFile("0000000112-20210728T105016.12-00000112a-00000111a-90"),
 			},
 			lastMergeBlockID:         "00000104a",
 			blockLimit:               110,
@@ -274,17 +256,17 @@ func TestBundler_MergeableFiles(t *testing.T) {
 				MustTestNewMergedOneBlockFile("0000000107-20210728T105016.01-00000107a-00000106a-90"),
 				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.02-00000108b-00000107a-90"),
 				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.03-00000109b-00000108b-90"),
-				MustTestNewOneBlockFile("0000000110-20210728T105016.04-00000110b-00000109b-90"),
-				MustTestNewOneBlockFile("0000000110-20210728T105016.05-00000110c-00000109b-90"),
-				MustTestNewOneBlockFile("0000000111-20210728T105016.06-00000111c-00000110c-90"),
+				MustNewOneBlockFile("0000000110-20210728T105016.04-00000110b-00000109b-90"),
+				MustNewOneBlockFile("0000000110-20210728T105016.05-00000110c-00000109b-90"),
+				MustNewOneBlockFile("0000000111-20210728T105016.06-00000111c-00000110c-90"),
 				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.07-00000108a-00000107a-90"),
 				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.08-00000109a-00000108a-90"),
-				MustTestNewOneBlockFile("0000000110-20210728T105016.09-00000110a-00000109a-90"),
-				MustTestNewOneBlockFile("0000000111-20210728T105016.10-00000111a-00000110a-90"),
-				MustTestNewOneBlockFile("0000000112-20210728T105016.11-00000112a-00000111a-90"),
-				MustTestNewOneBlockFile("0000000113-20210728T105016.12-00000113a-00000112a-90"),
-				MustTestNewOneBlockFile("0000000114-20210728T105016.13-00000114a-00000113a-90"),
-				MustTestNewOneBlockFile("0000000115-20210728T105016.14-00000115a-00000114a-90"),
+				MustNewOneBlockFile("0000000110-20210728T105016.09-00000110a-00000109a-90"),
+				MustNewOneBlockFile("0000000111-20210728T105016.10-00000111a-00000110a-90"),
+				MustNewOneBlockFile("0000000112-20210728T105016.11-00000112a-00000111a-90"),
+				MustNewOneBlockFile("0000000113-20210728T105016.12-00000113a-00000112a-90"),
+				MustNewOneBlockFile("0000000114-20210728T105016.13-00000114a-00000113a-90"),
+				MustNewOneBlockFile("0000000115-20210728T105016.14-00000115a-00000114a-90"),
 			},
 			lastMergeBlockID:         "00000109a",
 			blockLimit:               115,
@@ -294,11 +276,11 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		{
 			name: "file 15",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90"),
-				MustTestNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90"),
-				MustTestNewOneBlockFile("0000000117-20210728T105016.0-00000117a-00000116a-90"),
-				MustTestNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-90"),
-				MustTestNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90"),
+				MustNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90"),
+				MustNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90"),
+				MustNewOneBlockFile("0000000117-20210728T105016.0-00000117a-00000116a-90"),
+				MustNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-90"),
+				MustNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90"),
 			},
 			lastMergeBlockID:         "00000114a",
 			blockLimit:               120,
@@ -308,17 +290,17 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		{
 			name: "file with holes",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.0-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000100-20210728T105016.0-00000100a-00000099a-90"),
 
-				MustTestNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90"),
-				MustTestNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90"),
+				MustNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90"),
+				MustNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90"),
 
-				MustTestNewOneBlockFile("0000000117-20210728T105016.0-00000117b-00000116b-90"),
-				MustTestNewOneBlockFile("0000000118-20210728T105016.0-00000118b-00000117b-90"),
+				MustNewOneBlockFile("0000000117-20210728T105016.0-00000117b-00000116b-90"),
+				MustNewOneBlockFile("0000000118-20210728T105016.0-00000118b-00000117b-90"),
 
-				MustTestNewOneBlockFile("0000000117-20210728T105016.1-00000117a-00000116a-90"),
-				MustTestNewOneBlockFile("0000000118-20210728T105016.1-00000118a-00000117a-90"),
-				MustTestNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90"),
+				MustNewOneBlockFile("0000000117-20210728T105016.1-00000117a-00000116a-90"),
+				MustNewOneBlockFile("0000000118-20210728T105016.1-00000118a-00000117a-90"),
+				MustNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90"),
 			},
 			lastMergeBlockID:         "00000114a",
 			blockLimit:               120,
@@ -330,7 +312,7 @@ func TestBundler_MergeableFiles(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			bundler := NewBundler(5, c.blockLimit)
-			bundler.lastMergeOneBlockFile = &OneBlockFile{id: c.lastMergeBlockID}
+			bundler.lastMergeOneBlockFile = &OneBlockFile{ID: c.lastMergeBlockID}
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}
@@ -339,62 +321,46 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			mergeableFiles := bundler.ToBundle(highestBlockLimit)
 			bundler.Commit(highestBlockLimit)
 
-			ids := toIDs(mergeableFiles)
+			ids := ToIDs(mergeableFiles)
 			require.Equal(t, c.expectedIDs, ids)
-			require.Equal(t, c.expectedLastMergeBlockID, bundler.lastMergeOneBlockFile.id)
+			require.Equal(t, c.expectedLastMergeBlockID, bundler.lastMergeOneBlockFile.ID)
 		})
 	}
-}
-func toSortedIDs(oneBlockFileList []*OneBlockFile) (ids []string) {
-	sort.Slice(oneBlockFileList, func(i, j int) bool {
-		if oneBlockFileList[i].blockTime.Equal(oneBlockFileList[j].blockTime) {
-			return oneBlockFileList[i].num < oneBlockFileList[j].num
-		}
-		return oneBlockFileList[i].blockTime.Before(oneBlockFileList[j].blockTime)
-	})
-	return toIDs(oneBlockFileList)
-}
-
-func toIDs(oneBlockFileList []*OneBlockFile) (ids []string) {
-	for _, file := range oneBlockFileList {
-		ids = append(ids, file.id)
-	}
-	return ids
 }
 
 func TestBundler_Complicated(t *testing.T) {
 
 	files := []*OneBlockFile{
-		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-90"),
-		MustTestNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-90"),
-		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
-		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
-		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
-		MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-90"),
-		MustTestNewOneBlockFile("0000000108-20210728T105016.10-00000108b-00000107a-90"),
-		MustTestNewOneBlockFile("0000000109-20210728T105016.11-00000109b-00000108b-90"),
-		MustTestNewOneBlockFile("0000000110-20210728T105016.12-00000110b-00000109b-90"),
-		MustTestNewOneBlockFile("0000000110-20210728T105016.13-00000110c-00000109b-90"),
-		MustTestNewOneBlockFile("0000000111-20210728T105016.14-00000111c-00000110c-90"),
-		MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-90"),
-		MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-90"),
-		MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-90"),
-		MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-90"),
-		MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-90"),
-		MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-90"),
-		MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-90"),
-		MustTestNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a-90"),
-		MustTestNewOneBlockFile("0000000116-20210728T105016.23-00000116a-00000115a-90"),
-		MustTestNewOneBlockFile("0000000117-20210728T105016.24-00000117a-00000116a-90"),
-		MustTestNewOneBlockFile("0000000118-20210728T105016.25-00000118a-00000117a-90"),
-		MustTestNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a-90"),
+		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+		MustNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-90"),
+		MustNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-90"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+		MustNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-90"),
+		MustNewOneBlockFile("0000000108-20210728T105016.10-00000108b-00000107a-90"),
+		MustNewOneBlockFile("0000000109-20210728T105016.11-00000109b-00000108b-90"),
+		MustNewOneBlockFile("0000000110-20210728T105016.12-00000110b-00000109b-90"),
+		MustNewOneBlockFile("0000000110-20210728T105016.13-00000110c-00000109b-90"),
+		MustNewOneBlockFile("0000000111-20210728T105016.14-00000111c-00000110c-90"),
+		MustNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-90"),
+		MustNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-90"),
+		MustNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-90"),
+		MustNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-90"),
+		MustNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-90"),
+		MustNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-90"),
+		MustNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-90"),
+		MustNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a-90"),
+		MustNewOneBlockFile("0000000116-20210728T105016.23-00000116a-00000115a-90"),
+		MustNewOneBlockFile("0000000117-20210728T105016.24-00000117a-00000116a-90"),
+		MustNewOneBlockFile("0000000118-20210728T105016.25-00000118a-00000117a-90"),
+		MustNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a-90"),
 	}
 
 	bundler := NewBundler(5, 105)
-	bundler.lastMergeOneBlockFile = &OneBlockFile{id: "00000099a"}
+	bundler.lastMergeOneBlockFile = &OneBlockFile{ID: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
 	}
@@ -404,14 +370,14 @@ func TestBundler_Complicated(t *testing.T) {
 	mergeableFiles := bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
 
-	ids := toIDs(mergeableFiles)
+	ids := ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000100a", "00000101a", "00000102a", "00000102b", "00000103b", "00000103a", "00000104a"}, ids)
 
 	completed, highestBlockLimit = bundler.IsComplete()
 	require.True(t, completed)
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
-	ids = toIDs(mergeableFiles)
+	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000106a", "00000107a", "00000108b", "00000109b", "00000108a", "00000109a"}, ids)
 
 	completed, highestBlockLimit = bundler.IsComplete()
@@ -419,7 +385,7 @@ func TestBundler_Complicated(t *testing.T) {
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
 
-	ids = toIDs(mergeableFiles)
+	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000110b", "00000110c", "00000111c", "00000110a", "00000111a", "00000112a", "00000113a", "00000114a"}, ids)
 
 	completed, highestBlockLimit = bundler.IsComplete()
@@ -427,7 +393,7 @@ func TestBundler_Complicated(t *testing.T) {
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
 
-	ids = toIDs(mergeableFiles)
+	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000115a", "00000116a", "00000117a", "00000118a"}, ids)
 }
 
@@ -441,16 +407,16 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 		MustTestNewMergedOneBlockFile("0000000098-20210728T105016.01-00000098a-00000097a-90"),
 		MustTestNewMergedOneBlockFile("0000000099-20210728T105016.01-00000099a-00000098a-90"),
 
-		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
-		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
-		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
-		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
 	}
 
 	bundler := NewBundler(5, 105)
-	bundler.lastMergeOneBlockFile = &OneBlockFile{id: "00000099a"}
+	bundler.lastMergeOneBlockFile = &OneBlockFile{ID: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
 	}
@@ -459,45 +425,45 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 	completed, highestBlockLimit := bundler.IsComplete()
 	require.True(t, completed)
 	mergeableFiles := bundler.ToBundle(highestBlockLimit)
-	ids := toIDs(mergeableFiles)
+	ids := ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000100a", "00000101a", "00000102a", "00000103a", "00000104a"}, ids)
 	bundler.Commit(highestBlockLimit)
 
 	// Add a very old file
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000095-20210728T105015.01-00000095b-00000094a-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000095-20210728T105015.01-00000095b-00000094a-90"))
 
 	//that new file should not trigger a merge
 	completed, highestBlockLimit = bundler.IsComplete()
 	require.False(t, completed)
 
 	// Add missing file for this back in time fork
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000096-20210728T105015.02-00000096b-00000095b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000097-20210728T105015.03-00000097b-00000096b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000098-20210728T105015.04-00000098b-00000097b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000099-20210728T105015.05-00000099b-00000098b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000100-20210728T105015.06-00000100b-00000099b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000101-20210728T105015.07-00000101b-00000100b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000102-20210728T105015.08-00000102b-00000101b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000103-20210728T105015.09-00000103b-00000102b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000104-20210728T105015.10-00000104b-00000103b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000105-20210728T105015.11-00000105b-00000104b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000106-20210728T105015.12-00000106b-00000105b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000107-20210728T105015.12-00000107b-00000106b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000108-20210728T105015.12-00000108b-00000107b-90"))
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000109-20210728T105015.12-00000109b-00000108b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000096-20210728T105015.02-00000096b-00000095b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000097-20210728T105015.03-00000097b-00000096b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000098-20210728T105015.04-00000098b-00000097b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000099-20210728T105015.05-00000099b-00000098b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000100-20210728T105015.06-00000100b-00000099b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000101-20210728T105015.07-00000101b-00000100b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000102-20210728T105015.08-00000102b-00000101b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000103-20210728T105015.09-00000103b-00000102b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000104-20210728T105015.10-00000104b-00000103b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000105-20210728T105015.11-00000105b-00000104b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000106-20210728T105015.12-00000106b-00000105b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000107-20210728T105015.12-00000107b-00000106b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000108-20210728T105015.12-00000108b-00000107b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000109-20210728T105015.12-00000109b-00000108b-90"))
 
 	completed, highestBlockLimit = bundler.IsComplete()
 	//should not trigger merge yet
 	require.False(t, completed)
 
-	bundler.AddOneBlockFile(MustTestNewOneBlockFile("000000110-20210728T105015.12-00000110b-00000109b-90"))
+	bundler.AddOneBlockFile(MustNewOneBlockFile("000000110-20210728T105015.12-00000110b-00000109b-90"))
 
 	completed, highestBlockLimit = bundler.IsComplete()
 	//here we go!
 	require.True(t, completed)
 
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
-	ids = toIDs(mergeableFiles)
+	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{
 		"00000095b", "00000096b",
 		"00000097b", "00000098b",
@@ -522,14 +488,14 @@ func TestBundler_Purge(t *testing.T) {
 		{
 			name: "Sunny path",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
-				MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
-				MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
+				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
 			},
-			lastMergerBlock:           MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
+			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
 			expectedLongestFirstBlock: "00000101a",
 			expectedPurgedFileCount:   1,
 			expectedLibID:             "00000101a",
@@ -537,16 +503,16 @@ func TestBundler_Purge(t *testing.T) {
 		{
 			name: "Sunny path with fork",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101a-100"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103b-00000102a-100"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
-				MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
-				MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101a-100"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103b-00000102a-100"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
+				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
 			},
-			lastMergerBlock:           MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
+			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101"),
 			expectedLongestFirstBlock: "00000101a",
 			expectedPurgedFileCount:   1,
 			expectedLibID:             "00000101a",
@@ -554,16 +520,16 @@ func TestBundler_Purge(t *testing.T) {
 		{
 			name: "Purger fork",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101a-100"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103b-00000102a-100"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
-				MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
-				MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101a-100"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103b-00000102a-100"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
+				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
 			},
-			lastMergerBlock:           MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
+			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
 			expectedLongestFirstBlock: "00000103a",
 			expectedPurgedFileCount:   4,
 			expectedLibID:             "00000103a",
@@ -571,8 +537,8 @@ func TestBundler_Purge(t *testing.T) {
 		{
 			name: "Purge nothing never merged anything",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
 			},
 			lastMergerBlock:           nil,
 			expectedLongestFirstBlock: "00000100a",
@@ -582,10 +548,10 @@ func TestBundler_Purge(t *testing.T) {
 		{
 			name: "Purge nothing",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
 			},
-			lastMergerBlock:           MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+			lastMergerBlock:           MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
 			expectedLongestFirstBlock: "00000100a",
 			expectedPurgedFileCount:   0,
 			expectedLibID:             "",
@@ -593,18 +559,18 @@ func TestBundler_Purge(t *testing.T) {
 		{
 			name: "Purge multiple root",
 			files: []*OneBlockFile{
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101b-00000100b-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101b-100"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101b-00000100b-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101b-100"),
 
-				MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-				MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
-				MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
-				MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
-				MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
-				MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-103"),
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100"),
+				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-103"),
 			},
-			lastMergerBlock:           MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
+			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103"),
 			expectedLongestFirstBlock: "00000103a",
 			expectedPurgedFileCount:   6,
 			expectedLibID:             "00000103a",
@@ -642,34 +608,34 @@ func TestBundler_Purge(t *testing.T) {
 func TestBundler_Boostrap(t *testing.T) {
 	mergeFiles := map[uint64][]*OneBlockFile{
 		95: {
-			MustTestNewOneBlockFile("0000000095-20210728T105016.07-00000095a-00000094a-90"),
-			MustTestNewOneBlockFile("0000000096-20210728T105016.07-00000096a-00000095a-90"),
-			MustTestNewOneBlockFile("0000000097-20210728T105016.07-00000097a-00000096a-95"),
-			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098a-00000097a-95"),
-			MustTestNewOneBlockFile("0000000098-20210728T105016.07-00000098b-00000097a-95"),
-			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099a-00000098a-95"),
-			MustTestNewOneBlockFile("0000000099-20210728T105016.07-00000099b-00000098b-95"),
+			MustNewOneBlockFile("0000000095-20210728T105016.07-00000095a-00000094a-90"),
+			MustNewOneBlockFile("0000000096-20210728T105016.07-00000096a-00000095a-90"),
+			MustNewOneBlockFile("0000000097-20210728T105016.07-00000097a-00000096a-95"),
+			MustNewOneBlockFile("0000000098-20210728T105016.07-00000098a-00000097a-95"),
+			MustNewOneBlockFile("0000000098-20210728T105016.07-00000098b-00000097a-95"),
+			MustNewOneBlockFile("0000000099-20210728T105016.07-00000099a-00000098a-95"),
+			MustNewOneBlockFile("0000000099-20210728T105016.07-00000099b-00000098b-95"),
 		},
 		100: {
-			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-95"),
-			MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-95"),
-			MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-98"),
-			MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-98"),
-			MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-98"),
-			MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-98"),
+			MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-95"),
+			MustNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-95"),
+			MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-98"),
+			MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-98"),
+			MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-98"),
+			MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-98"),
 		},
 		105: {
-			MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
-			MustTestNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-101"),
-			MustTestNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-101"),
-			MustTestNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-106"),
+			MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101"),
+			MustNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-101"),
+			MustNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-101"),
+			MustNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-106"),
 		},
 		110: {
-			MustTestNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-108"),
-			MustTestNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-108"),
-			MustTestNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-108"),
-			MustTestNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-111"),
-			MustTestNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-113"),
+			MustNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-108"),
+			MustNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-108"),
+			MustNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-108"),
+			MustNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-111"),
+			MustNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-113"),
 		},
 	}
 
@@ -729,22 +695,22 @@ func TestBundler_Boostrap(t *testing.T) {
 
 func TestBundler_IsBlockTooOld(t *testing.T) {
 	oneBlockFiles := []*OneBlockFile{
-		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
-		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
-		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
-		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
 	}
 
 	oneBlockFilesTwoRoots := []*OneBlockFile{
-		MustTestNewOneBlockFile("000000095-20210728T105016.01-00000095b-00000094a-90"),
-		MustTestNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
-		MustTestNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
-		MustTestNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
-		MustTestNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
-		MustTestNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
-		MustTestNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
+		MustNewOneBlockFile("000000095-20210728T105016.01-00000095b-00000094a-90"),
+		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90"),
 	}
 
 	cases := []struct {

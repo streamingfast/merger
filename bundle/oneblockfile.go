@@ -12,17 +12,90 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package merger
+package bundle
 
 import (
+	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/dstore"
 )
 
-func blockNumToStr(blockNum uint64) (blockStr string) {
-	return fmt.Sprintf("%010d", blockNum)
+var Empty struct{}
+
+type OneBlockFile struct {
+	CanonicalName string
+	Filenames     map[string]struct{}
+	BlockTime     time.Time
+	ID            string
+	Num           uint64
+	libNum        uint64
+	PreviousID    string
+	MemoizeData   []byte
+	Merged        bool
+}
+
+func MustNewOneBlockFile(fileName string) *OneBlockFile {
+	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := parseFilename(fileName)
+	if err != nil {
+		panic(err)
+	}
+	return &OneBlockFile{
+		CanonicalName: canonicalName,
+		Filenames: map[string]struct{}{
+			fileName: Empty,
+		},
+		BlockTime:  blockTime,
+		ID:         blockID,
+		Num:        blockNum,
+		PreviousID: previousBlockID,
+		libNum:     libNum,
+	}
+}
+
+func MustNewMergedOneBlockFile(fileName string) *OneBlockFile {
+	oneBlockFile := MustNewOneBlockFile(fileName)
+	oneBlockFile.Merged = true
+	return oneBlockFile
+}
+
+func (f *OneBlockFile) Data(ctx context.Context, s dstore.Store) ([]byte, error) {
+	if len(f.MemoizeData) == 0 {
+		err := f.downloadFile(ctx, s)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return f.MemoizeData, nil
+}
+
+func (f *OneBlockFile) downloadFile(ctx context.Context, s dstore.Store) error {
+	var err error
+	for filename := range f.Filenames { // will try to get MemoizeData from any of those files
+		var out io.ReadCloser
+		out, err = s.OpenObject(ctx, filename)
+		if err != nil {
+			continue
+		}
+		defer out.Close()
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		f.MemoizeData, err = ioutil.ReadAll(out)
+		if err == nil {
+			return nil
+		}
+	}
+	return err // last error seen during attempts (OpenObject or ReadAll)
 }
 
 // parseFilename parses file names formatted like:

@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/merger/bundle"
+
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
@@ -91,8 +93,8 @@ func (a *App) Run() error {
 		}
 	}
 
-	bundler := merger.NewBundler(100, state.ExclusiveHighestBlockLimit)
-	err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*merger.OneBlockFile, err error) {
+	bundler := bundle.NewBundler(100, state.ExclusiveHighestBlockLimit)
+	err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 		oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
 		if fetchErr != nil {
 			return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)

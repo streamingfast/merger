@@ -1,4 +1,4 @@
-package merger
+package bundle
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bund
 func (b *Bundler) String() string {
 	var lastMergeBlockNum uint64
 	if b.lastMergeOneBlockFile != nil {
-		lastMergeBlockNum = b.lastMergeOneBlockFile.num
+		lastMergeBlockNum = b.lastMergeOneBlockFile.Num
 	}
 
 	return fmt.Sprintf("bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d", b.bundleSize, lastMergeBlockNum, b.BundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
@@ -65,15 +65,15 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 		if err != nil {
 			return fmt.Errorf("failed to fetch merged file for low block num: %d: %w", lowBlockNum, err)
 		}
-		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].num > oneBlockFiles[j].num })
+		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].Num > oneBlockFiles[j].Num })
 		for _, f := range oneBlockFiles {
 			if libNum == math.MaxUint64 {
 				zlog.Info("found lib to reach", zap.Uint64("lib_block_num", libNum))
 				libNum = f.libNum
 			}
-			f.merged = true
+			f.Merged = true
 			b.addOneBlockFile(f)
-			if f.num == libNum {
+			if f.Num == libNum {
 				return nil
 			}
 		}
@@ -82,6 +82,19 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 
 		lowBlockNum = lowBlockNum - b.bundleSize
 	}
+}
+
+func (b *Bundler) LastMergeOneBlockFile() *OneBlockFile {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.lastMergeOneBlockFile
+}
+func (b *Bundler) ExclusiveHighestBlockLimit() uint64 {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.exclusiveHighestBlockLimit
 }
 
 func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
@@ -93,16 +106,16 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 }
 
 func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
-	if block := b.db.BlockForID(oneBlockFile.id); block != nil {
+	if block := b.db.BlockForID(oneBlockFile.ID); block != nil {
 		obf := block.Object.(*OneBlockFile)
-		for filename := range oneBlockFile.filenames { //this is an ugly patch. ash stepd ;-)
-			obf.filenames[filename] = Empty
+		for filename := range oneBlockFile.Filenames { //this is an ugly patch. ash stepd ;-)
+			obf.Filenames[filename] = Empty
 		}
 		return true
 	}
 
-	blockRef := bstream.NewBlockRef(oneBlockFile.id, oneBlockFile.num)
-	exist = b.db.AddLink(blockRef, oneBlockFile.previousID, oneBlockFile)
+	blockRef := bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num)
+	exist = b.db.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
 	return
 }
 
@@ -214,19 +227,19 @@ func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 	var out []*OneBlockFile
 	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
-		blkNum := oneBlockFile.num
-		if !oneBlockFile.merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files
+		blkNum := oneBlockFile.Num
+		if !oneBlockFile.Merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files
 			out = append(out, oneBlockFile)
 		}
 		return true
 	})
 
 	sort.Slice(out, func(i, j int) bool {
-		if out[i].blockTime.Equal(out[j].blockTime) {
-			return out[i].num < out[j].num
+		if out[i].BlockTime.Equal(out[j].BlockTime) {
+			return out[i].Num < out[j].Num
 		}
 
-		return out[i].blockTime.Before(out[j].blockTime)
+		return out[i].BlockTime.Before(out[j].BlockTime)
 	})
 
 	return out
@@ -240,10 +253,10 @@ func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 	var highestOneBlockFile *OneBlockFile
 
 	for _, file := range oneBlockFiles {
-		if highestOneBlockFile == nil || file.num >= highestOneBlockFile.num {
-			highestOneBlockFile = b.db.BlockForID(file.id).Object.(*OneBlockFile)
+		if highestOneBlockFile == nil || file.Num >= highestOneBlockFile.Num {
+			highestOneBlockFile = b.db.BlockForID(file.ID).Object.(*OneBlockFile)
 		}
-		file.merged = true
+		file.Merged = true
 	}
 
 	b.exclusiveHighestBlockLimit += b.bundleSize
@@ -258,7 +271,7 @@ func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
 	if b.lastMergeOneBlockFile == nil {
 		return
 	}
-	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.id, b.lastMergeOneBlockFile.num), b.lastMergeOneBlockFile.libNum)
+	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), b.lastMergeOneBlockFile.libNum)
 	var purgedOneBlockFiles []*OneBlockFile
 	if libRef != bstream.BlockRefEmpty {
 		purgedBlocks := b.db.MoveLIB(libRef)
