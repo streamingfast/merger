@@ -65,7 +65,14 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err := merger.launch()
 	require.NoError(t, err)
 
@@ -73,6 +80,7 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 	assert.Equal(t, srcOneBlockFiles[0:1], deletedFiles)
 	assert.Len(t, mergedFiles, 4)
 	assert.Equal(t, srcOneBlockFiles[0:4], mergedFiles)
+
 }
 
 func TestNewMerger_Unlinkable_File(t *testing.T) {
@@ -108,7 +116,14 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err := merger.launch()
 	require.NoError(t, err)
 
@@ -159,7 +174,14 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err := merger.launch()
 	require.NoError(t, err)
 
@@ -219,7 +241,14 @@ func TestNewMerger_Wait_For_Files(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err := merger.launch()
 	require.NoError(t, err)
 
@@ -273,7 +302,14 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err := merger.launch()
 	require.NoError(t, err)
 	require.Equal(t, 2, mergeUploadFuncCallCount)
@@ -318,7 +354,14 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err := merger.launch()
 	require.NoError(t, err)
 
@@ -413,7 +456,14 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 		return nil
 	}
 
-	//todo: should add a timer and failed if to long
+	go func() {
+		select {
+		case <-time.After(time.Second):
+			panic("too long")
+		case <-merger.Terminated():
+		}
+	}()
+
 	err = merger.launch()
 	require.NoError(t, err)
 
