@@ -22,7 +22,7 @@ type Bundler struct {
 }
 
 func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bundler {
-	zlog.Info("New Bundler", zap.Uint64("first_exclusive_highest_block_limit", bundleSize))
+	zlog.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("first_exclusive_highest_block_limit", firstExclusiveHighestBlockLimit))
 	return &Bundler{
 		bundleSize:                 bundleSize,
 		db:                         forkable.NewForkDB(),
