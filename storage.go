@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/streamingfast/bstream"
-
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
@@ -65,7 +64,7 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 		err = nil
 	}
 	if !foundAny {
-		return (minimalBlockNum / chunkSize) * chunkSize, err
+		return ((minimalBlockNum / chunkSize) * chunkSize) + chunkSize, err
 	}
 
 	return lastNumber + chunkSize, err
