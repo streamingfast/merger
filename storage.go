@@ -65,7 +65,7 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 		err = nil
 	}
 	if !foundAny {
-		return minimalBlockNum, err
+		return (minimalBlockNum / chunkSize) * chunkSize, err
 	}
 
 	return lastNumber + chunkSize, err
