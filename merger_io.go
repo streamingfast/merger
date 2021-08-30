@@ -1,6 +1,7 @@
 package merger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -85,6 +86,25 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 	fileCount := 0
 	err = m.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		oneBlockFile := bundle.MustNewOneBlockFile(filename)
+		if oneBlockFile.InnerLibNum == nil {
+			data, err := oneBlockFile.Data(ctx, m.DownloadFile)
+			if err != nil {
+				return fmt.Errorf("getting one block file data: %w", err)
+			}
+
+			blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
+			if err != nil {
+				return fmt.Errorf("unable to read one block: %w", err)
+			}
+
+			block, err := blockReader.Read()
+			if block == nil {
+				return err
+			}
+
+			oneBlockFile.InnerLibNum = &block.LibNum
+
+		}
 		oneBlockFiles = append(oneBlockFiles, oneBlockFile)
 
 		if fileCount >= m.maxOneBlockOperationsBatchSize {

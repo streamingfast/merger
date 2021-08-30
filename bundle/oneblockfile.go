@@ -30,7 +30,7 @@ type OneBlockFile struct {
 	BlockTime     time.Time
 	ID            string
 	Num           uint64
-	libNum        uint64
+	InnerLibNum   *uint64 //never use this field directly
 	PreviousID    string
 	MemoizeData   []byte
 	Merged        bool
@@ -46,11 +46,11 @@ func MustNewOneBlockFile(fileName string) *OneBlockFile {
 		Filenames: map[string]struct{}{
 			fileName: Empty,
 		},
-		BlockTime:  blockTime,
-		ID:         blockID,
-		Num:        blockNum,
-		PreviousID: previousBlockID,
-		libNum:     libNum,
+		BlockTime:   blockTime,
+		ID:          blockID,
+		Num:         blockNum,
+		PreviousID:  previousBlockID,
+		InnerLibNum: libNum,
 	}
 }
 
@@ -71,14 +71,23 @@ func (f *OneBlockFile) Data(ctx context.Context, downloadOneBlockFile func(ctx c
 	return f.MemoizeData, nil
 }
 
+func (f *OneBlockFile) LibNum() uint64 {
+	if f.InnerLibNum == nil {
+		panic("one block file lib num not set")
+	}
+	return *f.InnerLibNum
+}
+
 // parseFilename parses file names formatted like:
-// * 0000000100-20170701T122141.0-24a07267-e5914b39-99
+// * 0000000100-20170701T122141.0-24a07267-e5914b39
+// * 0000000101-20170701T122141.5-dbda3f44-24a07267-mindread1
+
 // * 0000000101-20170701T122141.5-dbda3f44-24a07267-100-mindread1
 // * 0000000101-20170701T122141.5-dbda3f44-24a07267-101-mindread2
-// * 0000000102-20170701T122142.0-948232ea-dbda3f44-102
-func parseFilename(filename string) (blockNum uint64, blockTime time.Time, blockIDSuffix string, previousBlockIDSuffix string, libNum uint64, canonicalName string, err error) {
+
+func parseFilename(filename string) (blockNum uint64, blockTime time.Time, blockIDSuffix string, previousBlockIDSuffix string, libNum *uint64, canonicalName string, err error) {
 	parts := strings.Split(filename, "-")
-	if len(parts) < 5 || len(parts) > 6 {
+	if len(parts) < 4 || len(parts) > 6 {
 		err = fmt.Errorf("wrong filename format: %q", filename)
 		return
 	}
@@ -98,17 +107,16 @@ func parseFilename(filename string) (blockNum uint64, blockTime time.Time, block
 
 	blockIDSuffix = parts[2]
 	previousBlockIDSuffix = parts[3]
-
-	libNumVal, err := strconv.ParseUint(parts[4], 10, 32)
-	if err != nil {
-		err = fmt.Errorf("failed parsing lib num %q: %s", parts[4], err)
-		return
-	}
-	libNum = libNumVal
-
 	canonicalName = filename
 	if len(parts) == 6 {
+		libNumVal, parseErr := strconv.ParseUint(parts[4], 10, 32)
+		if parseErr != nil {
+			err = fmt.Errorf("failed parsing lib num %q: %s", parts[4], parseErr)
+			return
+		}
+		libNum = &libNumVal
 		canonicalName = strings.Join(parts[0:5], "-")
 	}
+
 	return
 }

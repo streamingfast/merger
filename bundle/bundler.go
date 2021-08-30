@@ -69,7 +69,7 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 		for _, f := range oneBlockFiles {
 			if libNum == math.MaxUint64 {
 				zlog.Info("found lib to reach", zap.Uint64("lib_block_num", libNum))
-				libNum = f.libNum
+				libNum = f.LibNum()
 			}
 			f.Merged = true
 			b.addOneBlockFile(f)
@@ -290,7 +290,7 @@ func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
 	if b.lastMergeOneBlockFile == nil {
 		return
 	}
-	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), b.lastMergeOneBlockFile.libNum)
+	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), b.lastMergeOneBlockFile.LibNum())
 	var purgedOneBlockFiles []*OneBlockFile
 	if libRef != bstream.BlockRefEmpty {
 		purgedBlocks := b.db.MoveLIB(libRef)

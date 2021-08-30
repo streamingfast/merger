@@ -24,7 +24,7 @@ import (
 )
 
 func TestParseFilenames(t *testing.T) {
-
+	lib := func(num uint64) *uint64 { lib := num; return &lib }
 	tests := []struct {
 		name                        string
 		filename                    string
@@ -34,7 +34,7 @@ func TestParseFilenames(t *testing.T) {
 		expectPreviousBlockIDSuffix string
 		expectCanonicalName         string
 		expectError                 error
-		expectLibNum                uint64
+		expectLibNum                *uint64
 	}{
 		{
 			name:        "invalid",
@@ -42,20 +42,20 @@ func TestParseFilenames(t *testing.T) {
 			expectError: fmt.Errorf("wrong filename format: \"invalid-filename\""),
 		},
 		{
-			name:                        "without suffix",
-			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39-90",
+			name:                        "without lib",
+			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39",
 			expectBlockNum:              100,
-			expectLibNum:                90,
+			expectLibNum:                nil,
 			expectBlockTime:             mustParseTime("20170701T122141.0"),
 			expectBlockIDSuffix:         "24a07267",
 			expectPreviousBlockIDSuffix: "e5914b39",
-			expectCanonicalName:         "0000000100-20170701T122141.0-24a07267-e5914b39-90",
+			expectCanonicalName:         "0000000100-20170701T122141.0-24a07267-e5914b39",
 		},
 		{
 			name:                        "with suffix",
 			filename:                    "0000000100-20170701T122141.0-24a07267-e5914b39-90-mind1",
 			expectBlockNum:              100,
-			expectLibNum:                90,
+			expectLibNum:                lib(90),
 			expectBlockTime:             mustParseTime("20170701T122141.0"),
 			expectBlockIDSuffix:         "24a07267",
 			expectPreviousBlockIDSuffix: "e5914b39",
