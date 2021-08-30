@@ -80,8 +80,8 @@ func (a *App) Run() error {
 	io := merger.NewMergerIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize)
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
-	state, err := merger.LoadState(a.config.StateFile)
 	foundAny := false
+	state, err := merger.LoadState(a.config.StateFile)
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
 		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, 100)
@@ -103,10 +103,9 @@ func (a *App) Run() error {
 			}
 			return oneBlockFiles, err
 		})
-	}
-
-	if err != nil {
-		return fmt.Errorf("bundle bootstrap: %w", err)
+		if err != nil {
+			return fmt.Errorf("bundle bootstrap: %w", err)
+		}
 	}
 
 	m := merger.NewMerger(
