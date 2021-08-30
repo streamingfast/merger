@@ -85,7 +85,9 @@ func (m *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*bundle.OneBlockFile, e
 func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 	fileCount := 0
 	err = m.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
+		fileCount++
 		oneBlockFile := bundle.MustNewOneBlockFile(filename)
+
 		if oneBlockFile.InnerLibNum == nil {
 			data, err := oneBlockFile.Data(ctx, m.DownloadFile)
 			if err != nil {
