@@ -12,49 +12,6 @@ import (
 //            \- 102b - 103b                     \- 108b - 109b - 110b
 //                                                             \- 110c - 111c
 
-//File 0
-//	100a - 101a - 102a - 103a - 104a
-//             \- 102b - 103b
-
-//File 5 with skipped block 5a
-//	106a - 107a - 108a - 109a
-//             \- 108b - 109b
-
-//File 10 with multiple block 10
-// 	  110a - 111a - 112a - 113a - 114a
-// \- 110b
-// \- 110c - 111c
-
-//File 15 with missing last block 19
-// 115a - 116a - 117a - 118a
-
-//"0000000100-20210728T105016.0-00000100a-00000099a",
-//"0000000101-20210728T105016.0-00000101a-00000100a",
-//"0000000102-20210728T105016.0-00000102a-00000101a",
-//"0000000102-20210728T105016.0-00000102b-00000101a",
-//"0000000103-20210728T105016.0-00000103b-00000102b",
-//"0000000103-20210728T105016.0-00000103a-00000102a",
-//"0000000104-20210728T105016.0-00000104a-00000103a",
-//"0000000106-20210728T105016.0-00000106a-00000104a",
-//"0000000107-20210728T105016.0-00000107a-00000106a",
-//"0000000108-20210728T105016.0-00000108b-00000107a",
-//"0000000109-20210728T105016.0-00000109b-00000108b",
-//"0000000110-20210728T105016.0-00000110b-00000109b",
-//"0000000110-20210728T105016.0-00000110c-00000109b",
-//"0000000111-20210728T105016.0-00000111c-00000110c",
-//"0000000108-20210728T105016.0-00000108a-00000107a",
-//"0000000109-20210728T105016.0-00000109a-00000108a",
-//"0000000110-20210728T105016.0-00000110a-00000109a",
-//"0000000111-20210728T105016.0-00000111a-00000110a",
-//"0000000112-20210728T105016.0-00000112a-00000111a",
-//"0000000113-20210728T105016.0-00000113a-00000112a",
-//"0000000114-20210728T105016.0-00000114a-00000113a",
-//"0000000115-20210728T105016.0-00000115a-00000114a",
-//"0000000116-20210728T105016.0-00000116a-00000115a",
-//"0000000117-20210728T105016.0-00000117a-00000116a",
-//"0000000118-20210728T105016.0-00000118a-00000117a",
-//"0000000120-20210728T105016.0-00000120a-00000118a",
-
 func TestBundler_IsComplete(t *testing.T) {
 
 	cases := []struct {
@@ -78,10 +35,9 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000104-20210728T105016.0-00000104a-00000103a-90",
 				"0000000106-20210728T105016.0-00000106a-00000104a-90",
 			},
-			lastMergeBlockID:  "00000099a",
-			blockLimit:        105,
-			expectedCompleted: true,
-			//expectedLowerBlockNumLimit: 100,
+			lastMergeBlockID:          "00000099a",
+			blockLimit:                105,
+			expectedCompleted:         true,
 			expectedHighestBlockLimit: 104,
 		},
 		{
@@ -95,10 +51,9 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000103-20210728T105016.0-00000103a-00000102a-90",
 				"0000000104-20210728T105016.0-00000104a-00000103a-90",
 			},
-			lastMergeBlockID:  "00000099a",
-			blockLimit:        105,
-			expectedCompleted: false,
-			//expectedLowerBlockNumLimit: 0,
+			lastMergeBlockID:          "00000099a",
+			blockLimit:                105,
+			expectedCompleted:         false,
 			expectedHighestBlockLimit: 0,
 		},
 		{
@@ -111,10 +66,9 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000103-20210728T105016.0-00000103b-00000102b-90",
 				"0000000103-20210728T105016.0-00000103a-00000102a-90",
 			},
-			lastMergeBlockID:  "00000099a",
-			blockLimit:        105,
-			expectedCompleted: false,
-			//expectedLowerBlockNumLimit: 0,
+			lastMergeBlockID:          "00000099a",
+			blockLimit:                105,
+			expectedCompleted:         false,
 			expectedHighestBlockLimit: 0,
 		},
 		{
@@ -133,10 +87,9 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000111-20210728T105016.0-00000111a-00000110a-90",
 				"0000000112-20210728T105016.0-00000112a-00000111a-90",
 			},
-			lastMergeBlockID:  "00000104a",
-			blockLimit:        110,
-			expectedCompleted: true,
-			//expectedLowerBlockNumLimit: 106,
+			lastMergeBlockID:          "00000104a",
+			blockLimit:                110,
+			expectedCompleted:         true,
 			expectedHighestBlockLimit: 109,
 		},
 		{
@@ -157,10 +110,9 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000114-20210728T105016.13-00000114a-00000113a-90",
 				"0000000115-20210728T105016.14-00000115a-00000114a-90",
 			},
-			lastMergeBlockID:  "00000109a",
-			blockLimit:        115,
-			expectedCompleted: true,
-			//expectedLowerBlockNumLimit: 110,
+			lastMergeBlockID:          "00000109a",
+			blockLimit:                115,
+			expectedCompleted:         true,
 			expectedHighestBlockLimit: 114,
 		},
 		{
@@ -172,10 +124,9 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000118-20210728T105016.0-00000118a-00000117a-90",
 				"0000000120-20210728T105016.0-00000120a-00000118a-90",
 			},
-			lastMergeBlockID:  "00000114a",
-			blockLimit:        120,
-			expectedCompleted: true,
-			//expectedLowerBlockNumLimit: 115,
+			lastMergeBlockID:          "00000114a",
+			blockLimit:                120,
+			expectedCompleted:         true,
 			expectedHighestBlockLimit: 118,
 		},
 	}

@@ -80,10 +80,12 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 		return err
 	}
 
-	for _, oneBlock := range longestChain {
+	oneBlockFiles := m.bundler.ToBundle(highestBlock.Num)
+	for _, oneBlock := range oneBlockFiles {
 		if oneBlock.Num < req.LowBlockNum {
 			continue
 		}
+
 		data, err := oneBlock.Data(server.Context(), m.downloadOneBlockFunc)
 		if err != nil {
 			return fmt.Errorf("unable to get one block data: %w", err)
@@ -99,23 +101,19 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 			return err
 		}
 
-		protoblock, err := block.ToProto()
-		if protoblock == nil || err != nil {
+		protoBlock, err := block.ToProto()
+		if protoBlock == nil || err != nil {
 			return err
 		}
 
 		err = server.Send(
 			&pbmerge.Response{
 				Found: true,
-				Block: protoblock,
+				Block: protoBlock,
 			})
 
 		if err != nil {
 			return fmt.Errorf("unable send response to client: %w", err)
-		}
-
-		if strings.HasSuffix(req.HighBlockID, oneBlock.ID) {
-			break
 		}
 	}
 

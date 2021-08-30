@@ -203,7 +203,7 @@ func clone(in []*bundle.OneBlockFile) (out []*bundle.OneBlockFile) {
 func TestNewMerger_Wait_For_Files(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
-	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
+	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, nil, "")
 
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")

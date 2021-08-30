@@ -90,6 +90,7 @@ func (b *Bundler) LastMergeOneBlockFile() *OneBlockFile {
 
 	return b.lastMergeOneBlockFile
 }
+
 func (b *Bundler) ExclusiveHighestBlockLimit() uint64 {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()

@@ -9,11 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/streamingfast/merger/bundle"
-
-	"github.com/streamingfast/dstore"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/merger/bundle"
 	"go.uber.org/zap"
 )
 
