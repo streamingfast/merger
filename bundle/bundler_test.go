@@ -593,25 +593,59 @@ func TestBundler_Boostrap(t *testing.T) {
 	testCases := []struct {
 		name                            string
 		firstExclusiveHighestBlockLimit uint64
+		mergeFiles                      map[uint64][]*OneBlockFile
 		expectedMergeFilesRead          []int
 		expectedFirstBlockNum           uint64
-		expectedErr                     bool
+		expectedErr                     string
+		expectedLongestChainErr         bool
 	}{
 		{
 			name:                            "Sunny path",
 			firstExclusiveHighestBlockLimit: 115,
+			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{110},
 			expectedFirstBlockNum:           113,
 		},
 		{
+			name:                            "First bundle with no merge file existing",
+			firstExclusiveHighestBlockLimit: 5,
+			mergeFiles:                      mergeFiles,
+			expectedMergeFilesRead:          nil,
+			expectedFirstBlockNum:           0,
+			expectedErr:                     "loading one block files: failed to fetch merged file for low block num: 0: merge file not found",
+		},
+		{
+			name:                            "First bundle with merge file",
+			firstExclusiveHighestBlockLimit: 5,
+			mergeFiles: map[uint64][]*OneBlockFile{
+				0: {
+					MustNewOneBlockFile("0000000001-20210728T105016.07-00000001a-00000000a-00-suffix"),
+					MustNewOneBlockFile("0000000002-20210728T105016.07-00000002a-00000001a-00-suffix"),
+					MustNewOneBlockFile("0000000003-20210728T105016.07-00000003a-00000002a-00-suffix"),
+					MustNewOneBlockFile("0000000004-20210728T105016.07-00000004a-00000003a-01-suffix"),
+				}},
+			expectedMergeFilesRead: []int{0},
+			expectedFirstBlockNum:  1,
+		},
+		{
+			name:                            "First bundle with no merge file existing",
+			firstExclusiveHighestBlockLimit: 5,
+			mergeFiles:                      mergeFiles,
+			expectedMergeFilesRead:          nil,
+			expectedFirstBlockNum:           0,
+			expectedErr:                     "loading one block files: failed to fetch merged file for low block num: 0: merge file not found",
+		},
+		{
 			name:                            "First and last from single file",
 			firstExclusiveHighestBlockLimit: 110,
+			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{105},
 			expectedFirstBlockNum:           106,
 		},
 		{
 			name:                            "Find lib over 2 files",
 			firstExclusiveHighestBlockLimit: 105,
+			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{100, 95},
 			expectedFirstBlockNum:           98,
 		},
@@ -624,21 +658,27 @@ func TestBundler_Boostrap(t *testing.T) {
 			err := bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
 				mergeFileReads = append(mergeFileReads, int(lowBlockNum))
 
-				if oneBlockFiles, found := mergeFiles[lowBlockNum]; found {
+				if oneBlockFiles, found := c.mergeFiles[lowBlockNum]; found {
 					return oneBlockFiles, nil
 				}
 				return nil, errors.New("merge file not found")
 			})
 
-			if c.expectedErr {
-				require.Error(t, err)
+			if c.expectedErr != "" {
+				require.Error(t, err, c.expectedErr)
+				return
 			} else {
 				require.NoError(t, err)
 			}
 
 			require.Equal(t, c.expectedMergeFilesRead, mergeFileReads)
 			firstBlockNum, err := bundler.LongestChainFirstBlockNum()
-			require.NoError(t, err)
+			if c.expectedLongestChainErr {
+				require.Errorf(t, err, "no longest chain available")
+			} else {
+				require.NoError(t, err)
+			}
+
 			require.Equal(t, int(c.expectedFirstBlockNum), int(firstBlockNum))
 		})
 	}

@@ -81,10 +81,11 @@ func (a *App) Run() error {
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	state, err := merger.LoadState(a.config.StateFile)
-
+	foundAny := false
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
-		nextExclusiveHighestBlockLimit, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, 100)
+		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, 100)
+		foundAny = found
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}
@@ -94,13 +95,15 @@ func (a *App) Run() error {
 	}
 
 	bundler := bundle.NewBundler(100, state.ExclusiveHighestBlockLimit)
-	err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
-		if fetchErr != nil {
-			return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)
-		}
-		return oneBlockFiles, err
-	})
+	if foundAny {
+		err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
+			if fetchErr != nil {
+				return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)
+			}
+			return oneBlockFiles, err
+		})
+	}
 
 	if err != nil {
 		return fmt.Errorf("bundle bootstrap: %w", err)

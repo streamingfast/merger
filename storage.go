@@ -27,17 +27,17 @@ import (
 )
 
 // FindNextBaseMergedBlock will return an error if there is a gap found ...
-func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (uint64, error) {
+func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (uint64, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 	defer cancel()
+	foundAny := false
 	minimalBlockNum := bstream.GetProtocolFirstStreamableBlock
 	prefix, err := highestFilePrefix(ctx, mergedBlocksStore, minimalBlockNum, chunkSize)
 	if err != nil {
-		return 0, err
+		return 0, foundAny, err
 	}
 	zlog.Debug("find next base merged block, looking with prefix", zap.String("prefix", prefix))
 	var lastNumber uint64
-	foundAny := false
 	err = mergedBlocksStore.Walk(ctx, prefix, ".tmp", func(filename string) error {
 		fileNumberVal, err := strconv.ParseUint(filename, 10, 32)
 		if err != nil {
@@ -64,10 +64,10 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 		err = nil
 	}
 	if !foundAny {
-		return ((minimalBlockNum / chunkSize) * chunkSize) + chunkSize, err
+		return 0, foundAny, err
 	}
 
-	return lastNumber + chunkSize, err
+	return lastNumber + chunkSize, foundAny, err
 }
 
 func getLeadingZeroes(blockNum uint64) (leadingZeros int) {

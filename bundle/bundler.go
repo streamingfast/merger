@@ -48,6 +48,7 @@ func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uin
 	defer b.mutex.Unlock()
 
 	initialLowBlockNum := b.BundleInclusiveLowerBlock()
+
 	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
 	if err != nil {
 		return fmt.Errorf("loading one block files: %w", err)
@@ -214,7 +215,7 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 
 	longestChain := b.longestChain()
 	if len(longestChain) == 0 {
-		return 0, fmt.Errorf("no longuest chain available")
+		return 0, fmt.Errorf("no longest chain available")
 	}
 	block := b.db.BlockForID(longestChain[0])
 	return block.BlockNum, nil
