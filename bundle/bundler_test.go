@@ -432,7 +432,7 @@ func TestBundler_Purge(t *testing.T) {
 		name                      string
 		files                     []*OneBlockFile
 		lastMergerBlock           *OneBlockFile
-		expectedPurgedFileCount   int
+		expectedFileToDeleteCount int
 		expectedLongestFirstBlock string
 		expectedLibID             string
 	}{
@@ -444,11 +444,11 @@ func TestBundler_Purge(t *testing.T) {
 				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
 				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
 				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101-suffix"),
-				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101-suffix"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-000	00106a-00000104a-101-suffix"),
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101-suffix"),
 			expectedLongestFirstBlock: "00000101a",
-			expectedPurgedFileCount:   1,
+			expectedFileToDeleteCount: 5,
 			expectedLibID:             "00000101a",
 		},
 		{
@@ -465,7 +465,7 @@ func TestBundler_Purge(t *testing.T) {
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101-suffix"),
 			expectedLongestFirstBlock: "00000101a",
-			expectedPurgedFileCount:   1,
+			expectedFileToDeleteCount: 7,
 			expectedLibID:             "00000101a",
 		},
 		{
@@ -482,7 +482,7 @@ func TestBundler_Purge(t *testing.T) {
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103-suffix"),
 			expectedLongestFirstBlock: "00000103a",
-			expectedPurgedFileCount:   4,
+			expectedFileToDeleteCount: 7,
 			expectedLibID:             "00000103a",
 		},
 		{
@@ -493,7 +493,7 @@ func TestBundler_Purge(t *testing.T) {
 			},
 			lastMergerBlock:           nil,
 			expectedLongestFirstBlock: "00000100a",
-			expectedPurgedFileCount:   0,
+			expectedFileToDeleteCount: 0,
 			expectedLibID:             "",
 		},
 		{
@@ -504,7 +504,7 @@ func TestBundler_Purge(t *testing.T) {
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
 			expectedLongestFirstBlock: "00000100a",
-			expectedPurgedFileCount:   0,
+			expectedFileToDeleteCount: 0,
 			expectedLibID:             "",
 		},
 		{
@@ -523,7 +523,7 @@ func TestBundler_Purge(t *testing.T) {
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-103-suffix"),
 			expectedLongestFirstBlock: "00000103a",
-			expectedPurgedFileCount:   6,
+			expectedFileToDeleteCount: 8,
 			expectedLibID:             "00000103a",
 		},
 	}
@@ -535,10 +535,13 @@ func TestBundler_Purge(t *testing.T) {
 				bundler.AddOneBlockFile(f)
 			}
 
-			bundler.lastMergeOneBlockFile = c.lastMergerBlock
+			completed, highestBlockLimit := bundler.IsComplete()
+			if completed {
+				bundler.Commit(highestBlockLimit)
+			}
 
 			bundler.Purge(func(purgedOneBlockFiles []*OneBlockFile) {
-				require.Equal(t, c.expectedPurgedFileCount, len(purgedOneBlockFiles))
+				require.Equal(t, c.expectedFileToDeleteCount, len(purgedOneBlockFiles))
 			})
 
 			require.Equal(t, c.expectedLibID, bundler.db.LIBID())

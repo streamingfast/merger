@@ -297,7 +297,10 @@ func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 	if libRef != bstream.BlockRefEmpty {
 		purgedBlocks := b.db.MoveLIB(libRef)
 		for _, block := range purgedBlocks {
-			collected[block.BlockID] = block.Object.(*OneBlockFile)
+			oneBlockFile := block.Object.(*OneBlockFile)
+			if oneBlockFile.Merged && !oneBlockFile.Deleted {
+				collected[block.BlockID] = block.Object.(*OneBlockFile)
+			}
 		}
 	}
 
