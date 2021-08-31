@@ -40,7 +40,7 @@ type Config struct {
 	StateFile                      string
 	OneBlockDeletionThreads        int
 	MaxOneBlockOperationsBatchSize int
-	nextExclusiveHighestBlockLimit uint64
+	NextExclusiveHighestBlockLimit uint64
 }
 
 type App struct {
@@ -92,8 +92,8 @@ func (a *App) Run() error {
 		foundAny = found
 		if !foundAny {
 			nextExclusiveHighestBlockLimit = 100
-			if a.config.nextExclusiveHighestBlockLimit > 0 {
-				nextExclusiveHighestBlockLimit = a.config.nextExclusiveHighestBlockLimit
+			if a.config.NextExclusiveHighestBlockLimit > 0 {
+				nextExclusiveHighestBlockLimit = a.config.NextExclusiveHighestBlockLimit
 			}
 		}
 		state = &merger.State{
