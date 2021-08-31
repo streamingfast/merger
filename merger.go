@@ -103,7 +103,13 @@ func (m *Merger) launch() (err error) {
 				m.deleteFilesFunc(tooOldFiles)
 			}
 
-			if lastOneBlockFileAdded == nil {
+			if lastOneBlockFileAdded != nil {
+				zlog.Info("one block retrieved", zap.Uint64("last_block_file", lastOneBlockFileAdded.Num))
+			}
+
+			isBundleComplete, highestBundleBlockNum = m.bundler.IsComplete()
+			if lastOneBlockFileAdded == nil || !isBundleComplete {
+				zlog.Info("bundle not completed after retrieving one block file", zap.Stringer("bundle", m.bundler))
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
 					continue
