@@ -50,7 +50,7 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 	}
 
 	lowestBlock := longestChain[0]
-	highestBlock := longestChain[len(longestChain)]
+	highestBlock := longestChain[len(longestChain)-1]
 
 	if req.LowBlockNum < lowestBlock.Num || req.LowBlockNum >= highestBlock.Num {
 		err := fmt.Errorf("cannot find requested blocks")

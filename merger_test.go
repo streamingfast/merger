@@ -76,8 +76,8 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 	err := merger.launch()
 	require.NoError(t, err)
 
-	assert.Len(t, deletedFiles, 1)
-	assert.Equal(t, srcOneBlockFiles[0:1], deletedFiles)
+	assert.Len(t, deletedFiles, 4)
+	assert.Equal(t, bundle.ToSortedIDs(srcOneBlockFiles[0:4]), bundle.ToSortedIDs(deletedFiles))
 	assert.Len(t, mergedFiles, 4)
 	assert.Equal(t, srcOneBlockFiles[0:4], mergedFiles)
 
@@ -127,7 +127,7 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 	err := merger.launch()
 	require.NoError(t, err)
 
-	expectedDeleted := append(clone(srcOneBlockFiles[0:2]), srcOneBlockFiles[5])
+	expectedDeleted := append(clone(srcOneBlockFiles[0:4]), srcOneBlockFiles[5])
 	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
 
 	expectedMerged := append(clone(srcOneBlockFiles[0:4]), srcOneBlockFiles[5])
@@ -187,7 +187,7 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 
 	require.Equal(t, 2, fetchOneBlockFilesCallCount)
 
-	expectedDeleted := append(clone(srcOneBlockFiles[0][0:2]), srcOneBlockFiles[1][0]) //normal purge and too old file
+	expectedDeleted := append(clone(srcOneBlockFiles[0][0:4]), srcOneBlockFiles[1][0]) //normal purge and too old file
 	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
 
 	expectedMerged := clone(srcOneBlockFiles[0][0:4])
@@ -252,9 +252,7 @@ func TestNewMerger_Wait_For_Files(t *testing.T) {
 	err := merger.launch()
 	require.NoError(t, err)
 
-	assert.Len(t, deletedFiles, 1)
-	assert.Equal(t, srcOneBlockFiles[1][0:1], deletedFiles)
-	assert.Len(t, mergedFiles, 4)
+	assert.Equal(t, bundle.ToSortedIDs(mergedFiles), bundle.ToSortedIDs(deletedFiles))
 	assert.Equal(t, srcOneBlockFiles[1], mergedFiles)
 }
 
@@ -285,8 +283,9 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 		return srcOneBlockFiles, nil
 	}
 
+	var deletedFiles []*bundle.OneBlockFile
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
-		t.Fatalf("should not be call")
+		deletedFiles = append(deletedFiles, oneBlockFiles...)
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
@@ -312,6 +311,10 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 
 	err := merger.launch()
 	require.NoError(t, err)
+
+	expectedDeleted := mergedFiles
+	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
+
 	require.Equal(t, 2, mergeUploadFuncCallCount)
 	require.Equal(t, bundle.ToIDs(srcOneBlockFiles[0:8]), bundle.ToIDs(mergedFiles))
 }
@@ -444,8 +447,9 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 
 	}
 
+	var deletedFiles []*bundle.OneBlockFile
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
-		t.Fatalf("should not be called")
+		deletedFiles = append(deletedFiles, oneBlockFiles...)
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
@@ -466,6 +470,9 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 
 	err = merger.launch()
 	require.NoError(t, err)
+
+	expectedDeleted := mergedFiles //normal purge and too old file
+	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
 
 	require.Len(t, mergedFiles, 4)
 	require.Equal(t, mergedFiles, srcOneBlockFiles[0:4])

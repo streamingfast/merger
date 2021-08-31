@@ -145,9 +145,9 @@ func (m *Merger) launch() (err error) {
 			zlog.Warn("failed to save state", zap.Error(err))
 		}
 
-		m.bundler.Purge(func(purgedOneBlockFiles []*bundle.OneBlockFile) {
-			if len(purgedOneBlockFiles) > 0 {
-				m.deleteFilesFunc(purgedOneBlockFiles)
+		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
+			if len(oneBlockFilesToDelete) > 0 {
+				m.deleteFilesFunc(oneBlockFilesToDelete)
 			}
 		})
 

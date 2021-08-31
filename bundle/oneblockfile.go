@@ -34,6 +34,7 @@ type OneBlockFile struct {
 	PreviousID    string
 	MemoizeData   []byte
 	Merged        bool
+	Deleted       bool
 }
 
 func MustNewOneBlockFile(fileName string) *OneBlockFile {

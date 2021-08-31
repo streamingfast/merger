@@ -285,7 +285,7 @@ func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 	return
 }
 
-func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
+func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -293,13 +293,28 @@ func (b *Bundler) Purge(callback func(purgedOneBlockFiles []*OneBlockFile)) {
 		return
 	}
 	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), b.lastMergeOneBlockFile.LibNum())
-	var purgedOneBlockFiles []*OneBlockFile
+	collected := map[string]*OneBlockFile{}
 	if libRef != bstream.BlockRefEmpty {
 		purgedBlocks := b.db.MoveLIB(libRef)
 		for _, block := range purgedBlocks {
-			purgedOneBlockFiles = append(purgedOneBlockFiles, block.Object.(*OneBlockFile))
+			collected[block.BlockID] = block.Object.(*OneBlockFile)
 		}
 	}
-	callback(purgedOneBlockFiles)
+
+	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
+		oneBlockFile := object.(*OneBlockFile)
+		if oneBlockFile.Merged && !oneBlockFile.Deleted {
+			collected[oneBlockFile.ID] = oneBlockFile
+		}
+		return true
+	})
+
+	var toDelete []*OneBlockFile
+	for _, oneBlockFile := range collected {
+		oneBlockFile.Deleted = true
+		toDelete = append(toDelete, oneBlockFile)
+	}
+	callback(toDelete)
+
 	return
 }
