@@ -19,6 +19,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/merger/bundle"
 
 	"github.com/streamingfast/dgrpc"
@@ -81,17 +83,18 @@ func (a *App) Run() error {
 	io := merger.NewMergerIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize)
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
+	bundleSize := uint64(100)
 	foundAny := false
 	state, err := merger.LoadState(a.config.StateFile)
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
-		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, 100)
+		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, bundleSize)
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}
 		foundAny = found
 		if !foundAny {
-			nextExclusiveHighestBlockLimit = 100
+			nextExclusiveHighestBlockLimit = ((bstream.GetProtocolFirstStreamableBlock / bundleSize) * bundleSize) + bundleSize
 			if a.config.NextExclusiveHighestBlockLimit > 0 {
 				nextExclusiveHighestBlockLimit = a.config.NextExclusiveHighestBlockLimit
 			}
@@ -101,7 +104,7 @@ func (a *App) Run() error {
 		}
 	}
 
-	bundler := bundle.NewBundler(100, state.ExclusiveHighestBlockLimit)
+	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
 	if foundAny {
 		err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
