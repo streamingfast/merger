@@ -153,9 +153,7 @@ func (m *Merger) launch() (err error) {
 				m.deleteFilesFunc(oneBlockFilesToDelete)
 			}
 		})
-
 	}
-
 }
 
 func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, lastOneBlockFileAdded *bundle.OneBlockFile, err error) {

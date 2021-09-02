@@ -105,52 +105,12 @@ func TestFindNextBaseBlock(t *testing.T) {
 			expectedFoundAny:      true,
 		},
 		{
-			name:                  "round_minimal_num",
-			writtenFiles:          []string{"0000000100", "0000003400", "0000010000", "0000010100", "0000010200"},
+			name:                  "hum",
+			writtenFiles:          []string{"0000009900", "0000010000", "0000010100"},
 			chunkSize:             100,
-			minimalBlockNum:       10000,
-			expectedNextBaseBlock: 10300,
+			minimalBlockNum:       3,
+			expectedNextBaseBlock: 10200,
 			expectedFoundAny:      true,
-		},
-		{
-			name:                  "specific_minimal_num",
-			writtenFiles:          []string{"0000000100", "0000003400", "0000010000", "0000010200", "0000010300"},
-			chunkSize:             100,
-			minimalBlockNum:       10200,
-			expectedNextBaseBlock: 10400,
-			expectedFoundAny:      true,
-		},
-		{
-			name:                  "complex_minimal_num",
-			writtenFiles:          []string{"0000000100", "0000003400", "0000010000", "0008976500", "0008976600"},
-			chunkSize:             100,
-			minimalBlockNum:       8976500,
-			expectedNextBaseBlock: 8976700,
-			expectedFoundAny:      true,
-		},
-		{
-			name:                  "complex_minimal_num with chunck size 50",
-			writtenFiles:          []string{"0000000100", "0000000150", "0000015000", "0008976500", "0008976550", "0008976600", "0008976650"},
-			chunkSize:             50,
-			minimalBlockNum:       8976500,
-			expectedNextBaseBlock: 8976700,
-			expectedFoundAny:      true,
-		},
-		{
-			name:                  "complex_minimal_num with chunck size 3",
-			writtenFiles:          []string{"0000000100", "0000000103", "0000000106", "0000000507", "0000000510", "0000000513"},
-			chunkSize:             3,
-			minimalBlockNum:       507,
-			expectedNextBaseBlock: 516,
-			expectedFoundAny:      true,
-		},
-		{
-			name:                  "absent_minimal_num",
-			writtenFiles:          []string{"0000000100", "0000003400", "0000010000"},
-			chunkSize:             100,
-			minimalBlockNum:       8976500,
-			expectedNextBaseBlock: 0,
-			expectedFoundAny:      false,
 		},
 	}
 
@@ -170,7 +130,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 			bstream.GetProtocolFirstStreamableBlock = test.minimalBlockNum
 			nextBaseMergedBlock, foundAny, err := FindNextBaseMergedBlock(s, test.chunkSize)
 			require.NoError(t, err)
-			require.Equal(t, test.expectedFoundAny, foundAny)
+			assert.Equal(t, test.expectedFoundAny, foundAny)
 
 			assert.Equal(t, int(test.expectedNextBaseBlock), int(nextBaseMergedBlock))
 		})

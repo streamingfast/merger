@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
@@ -31,8 +30,7 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 	defer cancel()
 	foundAny := false
-	minimalBlockNum := bstream.GetProtocolFirstStreamableBlock
-	prefix, err := highestFilePrefix(ctx, mergedBlocksStore, minimalBlockNum, chunkSize)
+	prefix, err := highestFilePrefix(ctx, mergedBlocksStore, uint64(0), chunkSize)
 	if err != nil {
 		return 0, foundAny, err
 	}
@@ -45,9 +43,6 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 			return nil
 		}
 		fileNumber := fileNumberVal
-		if fileNumber < minimalBlockNum {
-			return nil
-		}
 		foundAny = true
 
 		if lastNumber == 0 {
@@ -113,15 +108,15 @@ func highestFilePrefix(ctx context.Context, mergedBlocksStore dstore.Store, mini
 	blockNumStr := strconv.Itoa(int(minimalBlockNum))
 	filePrefix = leadingZeroes + blockNumStr
 
-	var exists bool
-	exists, err = fileExistWithPrefix(ctx, filePrefix, mergedBlocksStore)
-	if err != nil {
-		return
-	}
-	if !exists {
-		zlog.Info("prefix of minimal block num not found in merged blocks, we consider it has the highest file prefix", zap.String("file_prefix", filePrefix))
-		return
-	}
+	//var exists bool
+	//exists, err = fileExistWithPrefix(ctx, filePrefix, mergedBlocksStore)
+	//if err != nil {
+	//	return
+	//}
+	//if !exists {
+	//	zlog.Info("prefix of minimal block num not found in merged blocks, we consider it has the highest file prefix", zap.String("file_prefix", filePrefix))
+	//	return
+	//}
 
 	filePrefix, err = scanForHighestPrefix(ctx, mergedBlocksStore, chuckSize, minimalBlockNum, filePrefix, 4)
 	return
