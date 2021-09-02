@@ -20,13 +20,11 @@ import (
 	"time"
 
 	"github.com/streamingfast/bstream"
-
-	"github.com/streamingfast/merger/bundle"
-
 	"github.com/streamingfast/dgrpc"
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger"
+	"github.com/streamingfast/merger/bundle"
 	"github.com/streamingfast/merger/metrics"
 	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"

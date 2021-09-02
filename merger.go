@@ -145,14 +145,15 @@ func (m *Merger) launch() (err error) {
 			zlog.Warn("failed to save state", zap.Error(err))
 		}
 
+		metrics.HeadBlockTimeDrift.SetBlockTime(m.bundler.LastMergeOneBlockFile().BlockTime)
+		metrics.HeadBlockNumber.SetUint64(m.bundler.LastMergeOneBlockFile().Num)
+
 		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
 			if len(oneBlockFilesToDelete) > 0 {
 				m.deleteFilesFunc(oneBlockFilesToDelete)
 			}
 		})
 
-		metrics.HeadBlockTimeDrift.SetBlockTime(m.bundler.LastMergeOneBlockFile().BlockTime)
-		metrics.HeadBlockNumber.SetUint64(m.bundler.LastMergeOneBlockFile().Num)
 	}
 
 }
