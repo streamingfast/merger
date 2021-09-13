@@ -53,23 +53,6 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 	return
 }
 
-func blockFileName(block *bstream.Block) string {
-	blockTime := block.Time()
-	blockTimeString := fmt.Sprintf("%s.%01d", blockTime.Format("20060102T150405"), blockTime.Nanosecond()/100000000)
-
-	blockID := block.ID()
-	if len(blockID) > 8 {
-		blockID = blockID[len(blockID)-8:]
-	}
-
-	previousID := block.PreviousID()
-	if len(previousID) > 8 {
-		previousID = previousID[len(previousID)-8:]
-	}
-
-	return fmt.Sprintf("%010d-%s-%s-%s-%d", block.Num(), blockTimeString, blockID, previousID, block.LibNum)
-}
-
 func (m *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
 	defer cancel()
@@ -251,7 +234,9 @@ func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneB
 			}
 			return nil, err
 		}
-		fileName := blockFileName(block)
+		// we do this little dance to ensure that the 'canonical filename' will match any other oneblockfiles
+		// the oneblock encoding/decoding stay together inside 'bundle' package
+		fileName := bundle.BlockFileName(block)
 		oneBlockFile := bundle.MustNewOneBlockFile(fileName)
 		oneBlockFile.Merged = true
 		oneBlockFiles = append(oneBlockFiles, oneBlockFile)

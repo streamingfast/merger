@@ -20,6 +20,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/streamingfast/bstream"
 )
 
 var Empty struct{}
@@ -120,4 +122,21 @@ func parseFilename(filename string) (blockNum uint64, blockTime time.Time, block
 	}
 
 	return
+}
+
+func BlockFileName(block *bstream.Block) string {
+	blockTime := block.Time()
+	blockTimeString := fmt.Sprintf("%s.%01d", blockTime.Format("20060102T150405"), blockTime.Nanosecond()/100000000)
+
+	blockID := block.ID()
+	if len(blockID) > 8 {
+		blockID = blockID[len(blockID)-8:]
+	}
+
+	previousID := block.PreviousID()
+	if len(previousID) > 8 {
+		previousID = previousID[len(previousID)-8:]
+	}
+
+	return fmt.Sprintf("%010d-%s-%s-%s-%d-generated", block.Num(), blockTimeString, blockID, previousID, block.LibNum)
 }
