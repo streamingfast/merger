@@ -45,14 +45,10 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 		fileNumber := fileNumberVal
 		foundAny = true
 
-		if lastNumber == 0 {
-			lastNumber = fileNumber
-		} else {
-			if fileNumber != lastNumber+chunkSize {
-				return fmt.Errorf("hole was found between %d and %d", lastNumber, fileNumber)
-			}
-			lastNumber = fileNumber
+		if fileNumber != lastNumber+chunkSize && lastNumber != 0 {
+			zlog.Warn("hole was found while walking", zap.Uint64("last_number", lastNumber), zap.Uint64("file_number", fileNumber))
 		}
+		lastNumber = fileNumber
 		return nil
 	})
 	if err == context.DeadlineExceeded {
