@@ -79,7 +79,7 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 
 			blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
 			if err != nil {
-				return fmt.Errorf("unable to read one block: %w", err)
+				return fmt.Errorf("unable to read one block: %s:%w", filename, err)
 			}
 
 			block, err := blockReader.Read()

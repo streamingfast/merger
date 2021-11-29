@@ -3,6 +3,7 @@ module github.com/streamingfast/merger
 go 1.15
 
 require (
+	github.com/golang/protobuf v1.5.2
 	github.com/streamingfast/bstream v0.0.2-0.20210825183030-76aac82b2da2
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dgrpc v0.0.0-20210811180351-8646818518b2
