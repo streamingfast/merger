@@ -19,12 +19,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/streamingfast/dmetrics"
-	"github.com/streamingfast/merger/metrics"
-
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dgrpc"
+	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger"
+	"github.com/streamingfast/merger/bundle"
+	"github.com/streamingfast/merger/metrics"
 	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -34,16 +35,12 @@ type Config struct {
 	StorageOneBlockFilesPath       string
 	StorageMergedBlocksFilesPath   string
 	GRPCListenAddr                 string
-	BatchMode                      bool
-	StartBlockNum                  uint64
-	StopBlockNum                   uint64
-	MinimalBlockNum                uint64
 	WritersLeewayDuration          time.Duration
 	TimeBetweenStoreLookups        time.Duration
 	StateFile                      string
-	MaxFixableFork                 uint64
 	OneBlockDeletionThreads        int
 	MaxOneBlockOperationsBatchSize int
+	NextExclusiveHighestBlockLimit uint64
 }
 
 type App struct {
@@ -71,7 +68,7 @@ func (a *App) Run() error {
 
 	dmetrics.Register(metrics.MetricSet)
 
-	sourceArchiveStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
+	oneBlockStoreStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
 	if err != nil {
 		return fmt.Errorf("failed to init source archive store: %w", err)
 	}
@@ -81,44 +78,54 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	var startBlockNum uint64
-	var stopBlockNum uint64
-	var seenBlocks *merger.SeenBlockCache
+	io := merger.NewMergerIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize)
+	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
-	if a.config.BatchMode {
-		startBlockNum = a.config.StartBlockNum
-		stopBlockNum = a.config.StopBlockNum
-		seenBlocks = merger.NewSeenBlockCacheInMemory(startBlockNum, a.config.MaxFixableFork)
-	} else {
-		if a.config.StartBlockNum != 0 {
-			seenBlocks = merger.NewSeenBlockCacheFromNewFile(a.config.StateFile, a.config.MaxFixableFork)
-			startBlockNum = a.config.StartBlockNum
-		} else {
-			seenBlocks = merger.NewSeenBlockCacheFromFile(a.config.StateFile, a.config.MaxFixableFork)
-			if seenBlocks.HighestBlockNum != 0 {
-				startBlockNum = seenBlocks.HighestBlockNum + 1
-			} else {
-				startBlockNum, err = merger.FindNextBaseMergedBlock(mergedBlocksStore, a.config.MinimalBlockNum, 100)
-				if err != nil {
-					return fmt.Errorf("finding where to start: %w", err)
-				}
+	bundleSize := uint64(100)
+	foundAny := false
+	state, err := merger.LoadState(a.config.StateFile)
+	if err != nil || state == nil {
+		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
+		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, bundleSize)
+		if err != nil {
+			return fmt.Errorf("finding where to start: %w", err)
+		}
+		foundAny = found
+		if !foundAny {
+			nextExclusiveHighestBlockLimit = ((bstream.GetProtocolFirstStreamableBlock / bundleSize) * bundleSize) + bundleSize
+			if a.config.NextExclusiveHighestBlockLimit > 0 {
+				nextExclusiveHighestBlockLimit = a.config.NextExclusiveHighestBlockLimit
 			}
+		}
+		state = &merger.State{
+			ExclusiveHighestBlockLimit: nextExclusiveHighestBlockLimit,
+		}
+	}
+
+	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
+	if foundAny {
+		err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
+			if fetchErr != nil {
+				return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)
+			}
+			return oneBlockFiles, err
+		})
+		if err != nil {
+			return fmt.Errorf("bundle bootstrap: %w", err)
 		}
 	}
 
 	m := merger.NewMerger(
-		sourceArchiveStore,
-		mergedBlocksStore,
-		a.config.WritersLeewayDuration,
-		100,
-		seenBlocks,
-		startBlockNum,
-		stopBlockNum,
+		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.GRPCListenAddr,
-		a.config.OneBlockDeletionThreads,
-		a.config.MaxOneBlockOperationsBatchSize,
-		a.config.BatchMode,
+		io.FetchMergeFile,
+		io.FetchOneBlockFiles,
+		filesDeleter.Delete,
+		io.MergeUpload,
+		io.DownloadFile,
+		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")
 
@@ -131,6 +138,7 @@ func (a *App) Run() error {
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
 
+	filesDeleter.Start(a.config.OneBlockDeletionThreads, 100000)
 	go m.Launch()
 
 	zlog.Info("merger running")

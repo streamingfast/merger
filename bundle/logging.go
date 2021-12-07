@@ -12,31 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package merger
+package bundle
 
 import (
-	"fmt"
-	"log"
-	"time"
-
-	"gopkg.in/olivere/elastic.v3/backoff"
+	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
 )
 
-func Retry(attempts int, sleep time.Duration, callback func() error) (err error) {
-	b := backoff.NewExponentialBackoff(sleep, 5*time.Second)
-	for i := 0; ; i++ {
-		err = callback()
-		if err == nil {
-			return
-		}
+var zlog *zap.Logger
 
-		if i >= (attempts - 1) {
-			break
-		}
-
-		time.Sleep(b.Next())
-
-		log.Println("retrying after error:", err)
-	}
-	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
+func init() {
+	logging.Register("github.com/streamingfast/merger/bundle", &zlog)
 }

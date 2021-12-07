@@ -26,17 +26,16 @@ import (
 )
 
 // FindNextBaseMergedBlock will return an error if there is a gap found ...
-func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, minimalBlockNum uint64, chunkSize uint64) (uint64, error) {
+func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (uint64, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 	defer cancel()
-
-	prefix, err := highestFilePrefix(ctx, mergedBlocksStore, minimalBlockNum, chunkSize)
+	foundAny := false
+	prefix, err := highestFilePrefix(ctx, mergedBlocksStore, uint64(0), chunkSize)
 	if err != nil {
-		return 0, err
+		return 0, foundAny, err
 	}
 	zlog.Debug("find next base merged block, looking with prefix", zap.String("prefix", prefix))
 	var lastNumber uint64
-	foundAny := false
 	err = mergedBlocksStore.Walk(ctx, prefix, ".tmp", func(filename string) error {
 		fileNumberVal, err := strconv.ParseUint(filename, 10, 32)
 		if err != nil {
@@ -44,29 +43,22 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, minimalBlockNum uin
 			return nil
 		}
 		fileNumber := fileNumberVal
-		if fileNumber < minimalBlockNum {
-			return nil
-		}
 		foundAny = true
 
-		if lastNumber == 0 {
-			lastNumber = fileNumber
-		} else {
-			if fileNumber != lastNumber+chunkSize {
-				return fmt.Errorf("hole was found between %d and %d", lastNumber, fileNumber)
-			}
-			lastNumber = fileNumber
+		if fileNumber != lastNumber+chunkSize && lastNumber != 0 {
+			zlog.Warn("hole was found while walking", zap.Uint64("last_number", lastNumber), zap.Uint64("file_number", fileNumber))
 		}
+		lastNumber = fileNumber
 		return nil
 	})
 	if err == context.DeadlineExceeded {
 		err = nil
 	}
 	if !foundAny {
-		return minimalBlockNum, err
+		return 0, foundAny, err
 	}
 
-	return lastNumber + chunkSize, err
+	return lastNumber + chunkSize, foundAny, err
 }
 
 func getLeadingZeroes(blockNum uint64) (leadingZeros int) {
@@ -112,15 +104,15 @@ func highestFilePrefix(ctx context.Context, mergedBlocksStore dstore.Store, mini
 	blockNumStr := strconv.Itoa(int(minimalBlockNum))
 	filePrefix = leadingZeroes + blockNumStr
 
-	var exists bool
-	exists, err = fileExistWithPrefix(ctx, filePrefix, mergedBlocksStore)
-	if err != nil {
-		return
-	}
-	if !exists {
-		zlog.Info("prefix of minimal block num not found in merged blocks, we consider it has the highest file prefix", zap.String("file_prefix", filePrefix))
-		return
-	}
+	//var exists bool
+	//exists, err = fileExistWithPrefix(ctx, filePrefix, mergedBlocksStore)
+	//if err != nil {
+	//	return
+	//}
+	//if !exists {
+	//	zlog.Info("prefix of minimal block num not found in merged blocks, we consider it has the highest file prefix", zap.String("file_prefix", filePrefix))
+	//	return
+	//}
 
 	filePrefix, err = scanForHighestPrefix(ctx, mergedBlocksStore, chuckSize, minimalBlockNum, filePrefix, 4)
 	return

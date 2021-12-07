@@ -1,4 +1,4 @@
-package merger
+package bundle
 
 import (
 	"context"
@@ -6,24 +6,23 @@ import (
 	"io"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dstore"
 	"go.uber.org/zap"
 )
 
 type BundleReader struct {
-	ctx               context.Context
-	readBuffer        []byte
-	readBufferOffset  int
-	oneBlockFiles     []*OneBlockFile
-	oneBlockFileStore dstore.Store
-	headerPassed      bool
+	ctx                  context.Context
+	readBuffer           []byte
+	readBufferOffset     int
+	oneBlockFiles        []*OneBlockFile
+	downloadOneBlockFile func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)
+	headerPassed         bool
 }
 
-func NewBundleReader(ctx context.Context, b *Bundle, oneBlockFileStore dstore.Store) *BundleReader {
+func NewBundleReader(ctx context.Context, oneBlockFiles []*OneBlockFile, downloadOneBlockFile func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)) *BundleReader {
 	return &BundleReader{
-		ctx:               ctx,
-		oneBlockFileStore: oneBlockFileStore,
-		oneBlockFiles:     b.timeSortedFiles(),
+		ctx:                  ctx,
+		downloadOneBlockFile: downloadOneBlockFile,
+		oneBlockFiles:        oneBlockFiles,
 	}
 }
 
@@ -39,8 +38,8 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 
 		obf := r.oneBlockFiles[0]
 		r.oneBlockFiles = r.oneBlockFiles[1:]
-		zlog.Debug("downloading one block file", zap.String("canonical_name", obf.canonicalName))
-		data, err := obf.Data(r.ctx, r.oneBlockFileStore)
+		zlog.Debug("downloading one block file", zap.String("canonical_name", obf.CanonicalName))
+		data, err := obf.Data(r.ctx, r.downloadOneBlockFile)
 		if err != nil {
 			return 0, err
 		}

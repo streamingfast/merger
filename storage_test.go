@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/streamingfast/bstream"
+
 	"github.com/streamingfast/dstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,67 +81,36 @@ func TestWalkFS(t *testing.T) {
 func TestFindNextBaseBlock(t *testing.T) {
 
 	tests := []struct {
-		name              string
-		writtenFiles      []string
-		minimalBlockNum   uint64
-		chunkSize         uint64
-		expectedBaseBlock uint64
+		name                  string
+		writtenFiles          []string
+		minimalBlockNum       uint64
+		chunkSize             uint64
+		expectedFoundAny      bool
+		expectedNextBaseBlock uint64
 	}{
 		{
-			name:              "zero",
-			writtenFiles:      []string{},
-			chunkSize:         100,
-			minimalBlockNum:   0,
-			expectedBaseBlock: 0,
+			name:                  "zero",
+			writtenFiles:          []string{},
+			chunkSize:             100,
+			minimalBlockNum:       0,
+			expectedFoundAny:      false,
+			expectedNextBaseBlock: 0,
 		},
 		{
-			name:              "simple",
-			writtenFiles:      []string{"0000000000", "0000000100", "0000000200"},
-			chunkSize:         100,
-			minimalBlockNum:   0,
-			expectedBaseBlock: 300,
+			name:                  "simple",
+			writtenFiles:          []string{"0000000000", "0000000100", "0000000200"},
+			chunkSize:             100,
+			minimalBlockNum:       0,
+			expectedNextBaseBlock: 300,
+			expectedFoundAny:      true,
 		},
 		{
-			name:              "round_minimal_num",
-			writtenFiles:      []string{"0000000100", "0000003400", "0000010000", "0000010100", "0000010200"},
-			chunkSize:         100,
-			minimalBlockNum:   10000,
-			expectedBaseBlock: 10300,
-		},
-		{
-			name:              "specific_minimal_num",
-			writtenFiles:      []string{"0000000100", "0000003400", "0000010000", "0000010200", "0000010300"},
-			chunkSize:         100,
-			minimalBlockNum:   10200,
-			expectedBaseBlock: 10400,
-		},
-		{
-			name:              "complex_minimal_num",
-			writtenFiles:      []string{"0000000100", "0000003400", "0000010000", "0008976500", "0008976600"},
-			chunkSize:         100,
-			minimalBlockNum:   8976500,
-			expectedBaseBlock: 8976700,
-		},
-		{
-			name:              "complex_minimal_num with chunck size 50",
-			writtenFiles:      []string{"0000000100", "0000000150", "0000015000", "0008976500", "0008976550", "0008976600", "0008976650"},
-			chunkSize:         50,
-			minimalBlockNum:   8976500,
-			expectedBaseBlock: 8976700,
-		},
-		{
-			name:              "complex_minimal_num with chunck size 3",
-			writtenFiles:      []string{"0000000100", "0000000103", "0000000106", "0000000507", "0000000510", "0000000513"},
-			chunkSize:         3,
-			minimalBlockNum:   507,
-			expectedBaseBlock: 516,
-		},
-		{
-			name:              "absent_minimal_num",
-			writtenFiles:      []string{"0000000100", "0000003400", "0000010000"},
-			chunkSize:         100,
-			minimalBlockNum:   8976500,
-			expectedBaseBlock: 8976500,
+			name:                  "hum",
+			writtenFiles:          []string{"0000009900", "0000010000", "0000010100"},
+			chunkSize:             100,
+			minimalBlockNum:       3,
+			expectedNextBaseBlock: 10200,
+			expectedFoundAny:      true,
 		},
 	}
 
@@ -156,12 +127,12 @@ func TestFindNextBaseBlock(t *testing.T) {
 				err := s.WriteObject(context.Background(), filename, strings.NewReader(""))
 				require.NoError(t, err)
 			}
-
-			i, err := FindNextBaseMergedBlock(s, test.minimalBlockNum, test.chunkSize)
+			bstream.GetProtocolFirstStreamableBlock = test.minimalBlockNum
+			nextBaseMergedBlock, foundAny, err := FindNextBaseMergedBlock(s, test.chunkSize)
 			require.NoError(t, err)
+			assert.Equal(t, test.expectedFoundAny, foundAny)
 
-			assert.Equal(t, int(test.expectedBaseBlock), int(i))
-
+			assert.Equal(t, int(test.expectedNextBaseBlock), int(nextBaseMergedBlock))
 		})
 	}
 }

@@ -1,12 +1,17 @@
 package merger
 
 import (
+	"bytes"
 	"fmt"
 	"net"
+	"strings"
 
+	"github.com/streamingfast/bstream"
+	"google.golang.org/grpc/metadata"
+
+	"github.com/streamingfast/dgrpc"
 	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
-	"github.com/streamingfast/dgrpc"
 	"go.uber.org/zap"
 )
 
@@ -32,4 +37,85 @@ func (m *Merger) startServer() {
 			return
 		}
 	}()
+}
+
+func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_PreMergedBlocksServer) error {
+
+	longestChain := m.bundler.LongestOneBlockFileChain()
+
+	if len(longestChain) == 0 {
+		err := fmt.Errorf("cannot find requested blocks")
+		_ = server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
+	}
+
+	lowestBlock := longestChain[0]
+	highestBlock := longestChain[len(longestChain)-1]
+
+	if req.LowBlockNum < lowestBlock.Num || req.LowBlockNum >= highestBlock.Num {
+		err := fmt.Errorf("cannot find requested blocks")
+		_ = server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
+	}
+
+	var foundHighBlockID bool
+	var foundLowBlockNum bool
+	for _, oneBlock := range longestChain {
+		if oneBlock.Num == req.LowBlockNum {
+			foundLowBlockNum = true
+		}
+		if strings.HasSuffix(req.HighBlockID, oneBlock.ID) {
+			foundHighBlockID = true
+			break
+		}
+	}
+	if !foundLowBlockNum {
+		err := fmt.Errorf("cannot find requested lowBlockNum")
+		server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
+	}
+	if !foundHighBlockID {
+		err := fmt.Errorf("cannot find requested highBlockID")
+		server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
+		return err
+	}
+
+	oneBlockFiles := m.bundler.ToBundle(highestBlock.Num)
+	for _, oneBlock := range oneBlockFiles {
+		if oneBlock.Num < req.LowBlockNum {
+			continue
+		}
+
+		data, err := oneBlock.Data(server.Context(), m.downloadOneBlockFunc)
+		if err != nil {
+			return fmt.Errorf("unable to get one block data: %w", err)
+		}
+
+		blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
+		if err != nil {
+			return fmt.Errorf("unable to read one block: %w", err)
+		}
+
+		block, err := blockReader.Read()
+		if block == nil {
+			return err
+		}
+
+		protoBlock, err := block.ToProto()
+		if protoBlock == nil || err != nil {
+			return err
+		}
+
+		err = server.Send(
+			&pbmerge.Response{
+				Found: true,
+				Block: protoBlock,
+			})
+
+		if err != nil {
+			return fmt.Errorf("unable send response to client: %w", err)
+		}
+	}
+
+	return nil
 }
