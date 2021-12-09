@@ -3,6 +3,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"github.com/golang/protobuf/ptypes"
 	"io"
 	"path"
 	"runtime"
@@ -12,7 +13,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
-	pbbstream "github.com/streamingfast/pbgo/dfuse/bstream/v1"
+	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,7 +77,7 @@ func (l *BlockReader) Read() (*bstream.Block, error) {
 			return nil, fmt.Errorf("unable to read block proto: %s", err)
 		}
 
-		blk, err := bstream.BlockFromProto(pbBlock)
+		blk, err := blockFromProto(pbBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -90,4 +91,21 @@ func (l *BlockReader) Read() (*bstream.Block, error) {
 
 	// In all other cases, we are in an error path
 	return nil, fmt.Errorf("failed reading next dbin message: %s", err)
+}
+
+func blockFromProto(b *pbbstream.Block) (*bstream.Block, error) {
+	blockTime, err := ptypes.Timestamp(b.Timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("unable to turn google proto Timestamp %q into time.Time: %w", b.Timestamp.String(), err)
+	}
+
+	return bstream.MemoryBlockPayloadSetter(&bstream.Block{
+		Id:             b.Id,
+		Number:         b.Number,
+		PreviousId:     b.PreviousId,
+		Timestamp:      blockTime,
+		LibNum:         b.LibNum,
+		PayloadKind:    b.PayloadKind,
+		PayloadVersion: b.PayloadVersion,
+	}, b.PayloadBuffer)
 }

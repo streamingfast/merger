@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/streamingfast/dgrpc"
-	pbmerge "github.com/streamingfast/pbgo/dfuse/merger/v1"
 	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
+	pbmerge "github.com/streamingfast/pbgo/sf/merger/v1"
 	"go.uber.org/zap"
 )
 
