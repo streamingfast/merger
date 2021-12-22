@@ -360,21 +360,28 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 
 	cycle := 0
 	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		// not actually fetching oneBlockFiles, but it is a good place to add assertions in this loop
 		switch cycle {
 		case 0:
 			num, err := merger.bundler.LongestChainFirstBlockNum()
 			require.NoError(t, err)
+			require.Equal(t, merger.bundler.BundleInclusiveLowerBlock(), uint64(105))
+			require.Equal(t, merger.bundler.ExclusiveHighestBlockLimit(), uint64(110))
 			require.Equal(t, num, uint64(100))
 		case 1:
 			num, err := merger.bundler.LongestChainFirstBlockNum()
 			require.NoError(t, err)
+			require.Equal(t, merger.bundler.BundleInclusiveLowerBlock(), uint64(110))
+			require.Equal(t, merger.bundler.ExclusiveHighestBlockLimit(), uint64(115))
 			require.Equal(t, num, uint64(104))
 		case 2:
 			num, err := merger.bundler.LongestChainFirstBlockNum()
 			require.NoError(t, err)
+			require.Equal(t, merger.bundler.BundleInclusiveLowerBlock(), uint64(115))
+			require.Equal(t, merger.bundler.ExclusiveHighestBlockLimit(), uint64(120))
 			require.Equal(t, num, uint64(109))
 		default:
-			zlog.Fatal("Should not append")
+			t.Fatalf("Should not happen")
 		}
 		cycle += 1
 
@@ -382,17 +389,17 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 	}
 
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
-		zlog.Fatal("Should not append. Only forkdb should be truncated")
+		t.Fatalf("Should not happen. Only forkdb should be truncated")
 	}
 
 	merger.mergeUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
-		t.Fatalf("should not have been call")
+		t.Fatalf("should not have been called")
 		return nil
 	}
 
 	go func() {
 		select {
-		case <-time.After(100000 * time.Second):
+		case <-time.After(time.Second):
 			panic("too long")
 		case <-merger.Terminated():
 		}
