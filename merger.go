@@ -91,11 +91,7 @@ func (m *Merger) launch() (err error) {
 			m.bundler.AddPreMergedOneBlockFiles(oneBlockFiles)
 		}
 
-		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
-			if len(oneBlockFilesToDelete) > 0 {
-				m.deleteFilesFunc(oneBlockFilesToDelete)
-			}
-		})
+		m.bundler.Purge(func([]*bundle.OneBlockFile) {}) // no file deletion, just move LIB on forkdb
 
 		isBundleComplete, highestBundleBlockNum := m.bundler.IsComplete()
 		if !isBundleComplete {
