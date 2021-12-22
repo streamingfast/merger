@@ -246,6 +246,10 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 
 	var out []*OneBlockFile
+	//1100
+	//995a - 996a - 997a - 998a - 999a - 1000a - 1001a - 1002a - 1003a - 1004a - 1005a - 1006a -- 1101
+	//									 - 1001b - 1002b - 1003b - 1004b
+
 	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
 		blkNum := oneBlockFile.Num
@@ -265,6 +269,10 @@ func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 
 	return out
 }
+
+//1100
+//995a - 996a - 997a - 998a - 999a - 1000a - 1001a - 1002a - 1003a - 1004a - 1005a - 1006a -- 1101
+//									 - 1001b - 1002b - 1003b - 1004b
 
 func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 	b.mutex.Lock()

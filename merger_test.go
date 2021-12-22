@@ -50,7 +50,6 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 
 	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 		return srcOneBlockFiles, nil
-
 	}
 
 	var deletedFiles []*bundle.OneBlockFile

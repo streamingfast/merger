@@ -108,7 +108,7 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 func (m *MergerIO) DownloadFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
-		out, err := m.oneBlocksStore.OpenObject(ctx, filename)
+		out, err = m.oneBlocksStore.OpenObject(ctx, filename)
 		if err != nil {
 			continue
 		}
