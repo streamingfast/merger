@@ -300,7 +300,8 @@ func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 	if b.lastMergeOneBlockFile == nil {
 		return
 	}
-	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), b.lastMergeOneBlockFile.LibNum())
+	lastMergeOneBlockFileLibNum := b.lastMergeOneBlockFile.LibNum()
+	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), lastMergeOneBlockFileLibNum)
 	collected := map[string]*OneBlockFile{}
 	if libRef != bstream.BlockRefEmpty {
 		purgedBlocks := b.db.MoveLIB(libRef)

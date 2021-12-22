@@ -87,8 +87,15 @@ func (m *Merger) launch() (err error) {
 
 		zlog.Debug("verifying if bundle file already exist in store")
 		if oneBlockFiles, err := m.fetchMergedFileFunc(m.bundler.BundleInclusiveLowerBlock()); err == nil {
+			zlog.Info("adding files from already merge bundle", zap.Int("file_count", len(oneBlockFiles)))
 			m.bundler.AddPreMergedOneBlockFiles(oneBlockFiles)
 		}
+
+		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
+			if len(oneBlockFilesToDelete) > 0 {
+				m.deleteFilesFunc(oneBlockFilesToDelete)
+			}
+		})
 
 		isBundleComplete, highestBundleBlockNum := m.bundler.IsComplete()
 		if !isBundleComplete {

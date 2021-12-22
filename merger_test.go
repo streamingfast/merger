@@ -319,36 +319,70 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 }
 
 func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(5, 105)
 
 	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, nil, "")
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
-		0: {
-			bundle.MustNewMergedOneBlockFile("0000000001-20210728T105016.01-00000001a-00000000a-0-suffix"),
-			bundle.MustNewMergedOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-0-suffix"),
-			bundle.MustNewMergedOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
-			bundle.MustNewMergedOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-2-suffix"),
+		100: {
+			bundle.MustNewOneBlockFile("0000000100-20210728T105016.08-00000100a-00000099a-99-suffix"),
+			bundle.MustNewOneBlockFile("0000000101-20210728T105016.09-00000101a-00000100a-99-suffix"),
+			bundle.MustNewOneBlockFile("0000000102-20210728T105016.10-00000102a-00000101a-99-suffix"),
+			bundle.MustNewOneBlockFile("0000000103-20210728T105016.11-00000103a-00000102a-99-suffix"),
+			bundle.MustNewOneBlockFile("0000000104-20210728T105016.12-00000104a-00000103a-99-suffix"),
+		},
+		105: {
+			bundle.MustNewOneBlockFile("0000000105-20210728T105016.13-00000105a-00000104a-100-suffix"),
+			bundle.MustNewOneBlockFile("0000000106-20210728T105016.14-00000106a-00000105a-101-suffix"),
+			bundle.MustNewOneBlockFile("0000000107-20210728T105016.15-00000107a-00000106a-102-suffix"),
+			bundle.MustNewOneBlockFile("0000000108-20210728T105016.16-00000108a-00000107a-103-suffix"),
+			bundle.MustNewOneBlockFile("0000000109-20210728T105016.17-00000109a-00000108a-104-suffix"),
+		},
+		110: {
+			bundle.MustNewOneBlockFile("0000000110-20210728T105016.18-00000110a-00000109a-105-suffix"),
+			bundle.MustNewOneBlockFile("0000000111-20210728T105016.19-00000111a-00000110a-106-suffix"),
+			bundle.MustNewOneBlockFile("0000000112-20210728T105016.20-00000112a-00000111a-107-suffix"),
+			bundle.MustNewOneBlockFile("0000000113-20210728T105016.21-00000113a-00000112a-108-suffix"),
+			bundle.MustNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-109-suffix"),
 		},
 	}
 
-	var mergeFilesFetched []uint64
 	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
-		mergeFilesFetched = append(mergeFilesFetched, lowBlockNum)
 		oneBlockFile, found := mergeFiles[lowBlockNum]
 		if !found {
 			return nil, fmt.Errorf("nada")
 		}
+		if lowBlockNum == 110 {
+			defer merger.Shutdown(nil)
+		}
 		return oneBlockFile, nil
 	}
 
+	cycle := 0
 	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		defer merger.Shutdown(nil)
+		switch cycle {
+		case 0:
+			num, err := merger.bundler.LongestChainFirstBlockNum()
+			require.NoError(t, err)
+			require.Equal(t, num, uint64(100))
+		case 1:
+			num, err := merger.bundler.LongestChainFirstBlockNum()
+			require.NoError(t, err)
+			require.Equal(t, num, uint64(104))
+		case 2:
+			num, err := merger.bundler.LongestChainFirstBlockNum()
+			require.NoError(t, err)
+			require.Equal(t, num, uint64(109))
+		default:
+			zlog.Fatal("Should not append")
+		}
+		cycle += 1
+
 		return nil, nil
 	}
 
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
-		t.Fatalf("should not have been call")
+		zlog.Fatal("Should not append. Only forkdb should be truncated")
 	}
 
 	merger.mergeUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
@@ -358,7 +392,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 
 	go func() {
 		select {
-		case <-time.After(time.Second):
+		case <-time.After(100000 * time.Second):
 			panic("too long")
 		case <-merger.Terminated():
 		}
@@ -366,8 +400,6 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 
 	err := merger.launch()
 	require.NoError(t, err)
-
-	require.Equal(t, mergeFilesFetched, []uint64{0})
 }
 
 func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
