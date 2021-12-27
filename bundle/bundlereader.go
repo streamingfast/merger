@@ -40,8 +40,14 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 		r.oneBlockFiles = r.oneBlockFiles[1:]
 		zlog.Debug("downloading one block file", zap.String("canonical_name", obf.CanonicalName))
 		data, err := obf.Data(r.ctx, r.downloadOneBlockFile)
+
 		if err != nil {
 			return 0, err
+		}
+
+		if len(data) == 0 {
+			r.readBuffer = nil
+			continue
 		}
 
 		if r.headerPassed {
@@ -51,11 +57,6 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 			data = data[bstream.GetBlockWriterHeaderLen:]
 		} else {
 			r.headerPassed = true
-		}
-
-		if len(data) == 0 {
-			r.readBuffer = nil
-			continue
 		}
 
 		r.readBuffer = data

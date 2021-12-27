@@ -198,15 +198,16 @@ func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
 	bundle := NewDownloadBundle()
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
-		return nil, fmt.Errorf("some error")
+		return []byte{}, nil
 	}
 
 	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
 	r1 := make([]byte, 4)
+	r.headerPassed = true
 
 	read, err := r.Read(r1)
 	require.Equal(t, read, 0)
-	require.Errorf(t, err, "some error")
+	require.Errorf(t, err, "EOF")
 }
 
 func TestBundleReader_Read_ReadBufferNotNil(t *testing.T) {
