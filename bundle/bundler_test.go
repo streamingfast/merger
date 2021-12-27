@@ -3,6 +3,7 @@ package bundle
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -129,6 +130,49 @@ func TestBundler_AddOneBlockFileUglyPatch(t *testing.T) {
 		exists = bundler.AddOneBlockFile(MustNewOneBlockFile(f))
 		require.True(t, exists)
 	}
+}
+
+func TestBundler_AddPreMergedOneBlockFiles(t *testing.T) {
+	c := struct {
+		name                       string
+		files                      []string
+		lastMergeBlockID           string
+		blockLimit                 uint64
+		expectedCompleted          bool
+		expectedLowerBlockNumLimit uint64
+		expectedHighestBlockLimit  uint64
+	}{
+		name: "file 0",
+		files: []string{
+			"0000000100-20210728T105016.0-00000100a-00000099a-90-suffix",
+		},
+		lastMergeBlockID:          "00000099a",
+		blockLimit:                105,
+		expectedCompleted:         true,
+		expectedHighestBlockLimit: 104,
+	}
+
+	bundler := NewBundler(2, c.blockLimit)
+	bundler.lastMergeOneBlockFile = &OneBlockFile{
+		ID: c.lastMergeBlockID,
+	}
+
+	bundler.AddPreMergedOneBlockFiles([]*OneBlockFile{})
+	last := bundler.LastMergeOneBlockFile()
+	limit := bundler.ExclusiveHighestBlockLimit()
+	require.IsType(t, OneBlockFile{}, *last)
+	require.Equal(t, last.CanonicalName, "")
+	require.Equal(t, limit, c.blockLimit)
+
+	for _, f := range c.files {
+		bundler.AddPreMergedOneBlockFiles([]*OneBlockFile{MustNewOneBlockFile(f)})
+	}
+
+	last = bundler.LastMergeOneBlockFile()
+	limit = bundler.ExclusiveHighestBlockLimit()
+	require.IsType(t, OneBlockFile{}, *last)
+	require.Equal(t, last.CanonicalName, strings.Split(c.files[0], "-suffix")[0])
+	require.Equal(t, limit, bundler.bundleSize+c.blockLimit)
 }
 
 func TestBundler_IsComplete(t *testing.T) {
