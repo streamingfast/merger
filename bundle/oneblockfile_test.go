@@ -107,6 +107,12 @@ func TestOneBlockFile_ParseFilename_InvalidBlockTime(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestOneBlockFile_ParseFilename_InvalidLibNum(t *testing.T) {
+	name := "0000000100-20170701T122141.0-24a07267-e5914b39-FFFF-suffix"
+	_, _, _, _, _, _, err := parseFilename(name)
+	require.Error(t, err)
+}
+
 func mustParseTime(in string) time.Time {
 	t, err := time.Parse("20060102T150405.999999", in)
 	if err != nil {
