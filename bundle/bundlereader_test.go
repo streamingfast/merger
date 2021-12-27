@@ -103,8 +103,6 @@ func NewTestBundle() []*OneBlockFile {
 }
 
 func NewDownloadBundle() []*OneBlockFile {
-	bstream.GetBlockWriterHeaderLen = 0
-
 	bt := time.Time{}
 	o1 := &OneBlockFile{
 		CanonicalName: "o1",
@@ -178,6 +176,25 @@ func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
 }
 
 func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
+	//important
+	bstream.GetBlockWriterHeaderLen = 10
+
+	bundle := NewDownloadBundle()
+
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+		return []byte{0xAB, 0xCD, 0xEF}, nil
+	}
+
+	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r1 := make([]byte, 4)
+	r.headerPassed = true
+
+	read, err := r.Read(r1)
+	require.Equal(t, read, 0)
+	require.Error(t, err)
+}
+
+func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
 	bundle := NewDownloadBundle()
 
 	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
