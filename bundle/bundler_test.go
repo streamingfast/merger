@@ -950,9 +950,17 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			bundler := NewBundler(5, 105)
+
+			if c.name == "in the middle" {
+				// no root yet, can't be too old
+				tooOld := bundler.IsBlockTooOld(c.blockNum)
+				require.False(t, tooOld)
+			}
+
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}
+
 			tooOld := bundler.IsBlockTooOld(c.blockNum)
 			require.Equal(t, c.expectedResult, tooOld)
 		})
