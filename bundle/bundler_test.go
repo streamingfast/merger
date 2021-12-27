@@ -1004,3 +1004,39 @@ func TestBundler_LongestChain_MultipleSameLength(t *testing.T) {
 	longestChain := bundler.LongestChain()
 	require.Nil(t, longestChain)
 }
+
+func TestBundler_LongestOneBlockFileChain_SameBlockTime(t *testing.T) {
+	c := struct {
+		name                      string
+		files                     []*OneBlockFile
+		lastMergerBlock           *OneBlockFile
+		expectedFileToDeleteCount int
+		expectedLongestFirstBlock string
+		expectedLibID             string
+	}{
+		name: "Sunny path with fork",
+		files: []*OneBlockFile{
+			MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
+			MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+
+			MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
+			MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
+			MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-100-suffix"),
+			MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-100-suffix"),
+
+			MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101a-100-suffix"),
+			MustNewOneBlockFile("0000000103-20210728T105016.06-00000103b-00000102b-100-suffix"),
+		},
+	}
+
+	bundler := NewBundler(5, 107)
+	blockTime := c.files[0].BlockTime
+
+	for _, f := range c.files {
+		f.BlockTime = blockTime
+		bundler.AddOneBlockFile(f)
+	}
+
+	longest := bundler.LongestOneBlockFileChain()
+	require.Equal(t, len(longest), 6)
+}
