@@ -2,6 +2,7 @@ package bundle
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -70,7 +71,32 @@ func TestBundler_LastMergeOneBlockFile(t *testing.T) {
 	require.Equal(t, last.ID, c.lastMergeBlockID)
 
 }
+
+func TestBundler_ExclusiveHighestBlockLimit(t *testing.T) {
+	c := struct {
+		name                       string
+		files                      []string
+		lastMergeBlockID           string
+		blockLimit                 uint64
+		expectedCompleted          bool
+		expectedLowerBlockNumLimit uint64
+		expectedHighestBlockLimit  uint64
+	}{
+		name:                      "file 0",
+		files:                     []string{},
+		lastMergeBlockID:          "00000099a",
+		blockLimit:                105,
+		expectedCompleted:         true,
+		expectedHighestBlockLimit: 104,
 	}
+
+	bundler := NewBundler(5, c.blockLimit)
+	bundler.lastMergeOneBlockFile = &OneBlockFile{
+		ID: c.lastMergeBlockID,
+	}
+	limit := bundler.ExclusiveHighestBlockLimit()
+	require.Equal(t, "uint64", reflect.TypeOf(limit).Name())
+	require.Equal(t, c.blockLimit, limit)
 }
 
 func TestBundler_IsComplete(t *testing.T) {
