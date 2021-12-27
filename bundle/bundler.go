@@ -214,7 +214,7 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 	defer b.mutex.Unlock()
 
 	longestChain := b.longestChain()
-	if len(longestChain) == 0 {
+	if longestChain == nil || len(longestChain) == 0 {
 		return 0, fmt.Errorf("no longest chain available")
 	}
 	block := b.db.BlockForID(longestChain[0])

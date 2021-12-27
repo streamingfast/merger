@@ -771,7 +771,6 @@ func TestBundler_Boostrap(t *testing.T) {
 		expectedMergeFilesRead          []int
 		expectedFirstBlockNum           uint64
 		expectedErr                     string
-		expectedLongestChainErr         bool
 	}{
 		{
 			name:                            "Sunny path",
@@ -828,8 +827,16 @@ func TestBundler_Boostrap(t *testing.T) {
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
 			bundler := NewBundler(5, c.firstExclusiveHighestBlockLimit)
+
+			// No links in ForksDB yet
+			longestChain := bundler.LongestChain()
+			require.Nil(t, longestChain)
+			firstBlockNum, err := bundler.LongestChainFirstBlockNum()
+			require.Equal(t, firstBlockNum, uint64(0))
+			require.Errorf(t, err, "no longest chain available")
+
 			var mergeFileReads []int
-			err := bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
+			err = bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
 				mergeFileReads = append(mergeFileReads, int(lowBlockNum))
 
 				if oneBlockFiles, found := c.mergeFiles[lowBlockNum]; found {
@@ -846,13 +853,9 @@ func TestBundler_Boostrap(t *testing.T) {
 			}
 
 			require.Equal(t, c.expectedMergeFilesRead, mergeFileReads)
-			firstBlockNum, err := bundler.LongestChainFirstBlockNum()
-			if c.expectedLongestChainErr {
-				require.Errorf(t, err, "no longest chain available")
-			} else {
-				require.NoError(t, err)
-			}
 
+			firstBlockNum, err = bundler.LongestChainFirstBlockNum()
+			require.NoError(t, err)
 			require.Equal(t, int(c.expectedFirstBlockNum), int(firstBlockNum))
 		})
 	}
