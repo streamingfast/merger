@@ -969,3 +969,38 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 		})
 	}
 }
+
+func TestBundler_LongestChain_MultipleSameLength(t *testing.T) {
+	c := struct {
+		name                      string
+		files                     []*OneBlockFile
+		lastMergerBlock           *OneBlockFile
+		expectedFileToDeleteCount int
+		expectedLongestFirstBlock string
+		expectedLibID             string
+	}{
+		name: "Sunny path with fork",
+		files: []*OneBlockFile{
+			MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
+			MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+
+			MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
+			MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
+			MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-100-suffix"),
+			MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-100-suffix"),
+
+			MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101a-100-suffix"),
+			MustNewOneBlockFile("0000000103-20210728T105016.06-00000103b-00000102b-100-suffix"),
+			MustNewOneBlockFile("0000000104-20210728T105016.07-00000104b-00000103b-100-suffix"),
+			MustNewOneBlockFile("0000000106-20210728T105016.08-00000106b-00000104b-100-suffix"),
+		},
+	}
+
+	bundler := NewBundler(5, 107)
+	for _, f := range c.files {
+		bundler.AddOneBlockFile(f)
+	}
+
+	longestChain := bundler.LongestChain()
+	require.Nil(t, longestChain)
+}

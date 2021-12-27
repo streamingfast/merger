@@ -168,23 +168,20 @@ func (b *Bundler) longestChain() []string {
 		return nil //this is happening when there is no links in db
 	}
 
-	count := 0
 	var longestChain []string
+
 	for _, root := range roots {
 		tree := b.db.BuildTreeWithID(root)
 		lc := tree.Chains().LongestChain()
 
-		if len(longestChain) == len(lc) {
-			count++
+		if lc == nil {
+			// found multiple chain with same length
+			return nil
 		}
 
 		if len(longestChain) < len(lc) {
-			count = 1
 			longestChain = lc
 		}
-	}
-	if count > 1 { // found multiple chain with same length
-		return nil
 	}
 
 	return longestChain
