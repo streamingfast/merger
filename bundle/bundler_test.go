@@ -42,6 +42,34 @@ func TestBundler_String(t *testing.T) {
 	require.Contains(t, str, "exclusive_highest_block_limit")
 
 }
+
+func TestBundler_LastMergeOneBlockFile(t *testing.T) {
+	c := struct {
+		name                       string
+		files                      []string
+		lastMergeBlockID           string
+		blockLimit                 uint64
+		expectedCompleted          bool
+		expectedLowerBlockNumLimit uint64
+		expectedHighestBlockLimit  uint64
+	}{
+		name:                      "file 0",
+		files:                     []string{},
+		lastMergeBlockID:          "00000099a",
+		blockLimit:                105,
+		expectedCompleted:         true,
+		expectedHighestBlockLimit: 104,
+	}
+
+	bundler := NewBundler(5, c.blockLimit)
+	bundler.lastMergeOneBlockFile = &OneBlockFile{
+		ID: c.lastMergeBlockID,
+	}
+	last := bundler.LastMergeOneBlockFile()
+	require.IsType(t, OneBlockFile{}, *last)
+	require.Equal(t, last.ID, c.lastMergeBlockID)
+
+}
 	}
 }
 
