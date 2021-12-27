@@ -102,6 +102,28 @@ func NewTestBundle() []*OneBlockFile {
 	return []*OneBlockFile{o1, o2, o3}
 }
 
+func NewDownloadBundle() []*OneBlockFile {
+	bstream.GetBlockWriterHeaderLen = 0
+
+	bt := time.Time{}
+	o1 := &OneBlockFile{
+		CanonicalName: "o1",
+		BlockTime:     bt,
+		MemoizeData:   []byte{},
+	}
+	o2 := &OneBlockFile{
+		CanonicalName: "o2",
+		BlockTime:     bt.Local().Add(1 * time.Second),
+		MemoizeData:   []byte{},
+	}
+	o3 := &OneBlockFile{
+		CanonicalName: "o3",
+		BlockTime:     bt.Local().Add(2 * time.Second),
+		MemoizeData:   []byte{},
+	}
+	return []*OneBlockFile{o1, o2, o3}
+}
+
 func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 	//important
 	bstream.GetBlockWriterHeaderLen = 10
@@ -138,4 +160,19 @@ func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 	b3, err := dbinReader.ReadMessage()
 	require.NoError(t, err)
 	require.Equal(t, b3, bundle[2].MemoizeData[14:])
+}
+
+func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
+	bundle := NewDownloadBundle()
+
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+		return nil, fmt.Errorf("some error")
+	}
+
+	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r1 := make([]byte, 4)
+
+	read, err := r.Read(r1)
+	require.Equal(t, read, 0)
+	require.Errorf(t, err, "some error")
 }
