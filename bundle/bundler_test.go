@@ -12,6 +12,39 @@ import (
 //            \- 102b - 103b                     \- 108b - 109b - 110b
 //                                                             \- 110c - 111c
 
+func TestBundler_String(t *testing.T) {
+	c := struct {
+		name                       string
+		files                      []string
+		lastMergeBlockID           string
+		blockLimit                 uint64
+		expectedCompleted          bool
+		expectedLowerBlockNumLimit uint64
+		expectedHighestBlockLimit  uint64
+	}{
+		name:                      "file 0",
+		files:                     []string{},
+		lastMergeBlockID:          "00000099a",
+		blockLimit:                105,
+		expectedCompleted:         true,
+		expectedHighestBlockLimit: 104,
+	}
+
+	bundler := NewBundler(5, c.blockLimit)
+	bundler.lastMergeOneBlockFile = &OneBlockFile{
+		ID: c.lastMergeBlockID,
+	}
+
+	str := bundler.String()
+	require.Contains(t, str, "bundle_size")
+	require.Contains(t, str, "last_merge_block_num")
+	require.Contains(t, str, "inclusive_lower_block_num")
+	require.Contains(t, str, "exclusive_highest_block_limit")
+
+}
+	}
+}
+
 func TestBundler_IsComplete(t *testing.T) {
 
 	cases := []struct {
@@ -784,7 +817,6 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 			}
 			tooOld := bundler.IsBlockTooOld(c.blockNum)
 			require.Equal(t, c.expectedResult, tooOld)
-
 		})
 	}
 }
