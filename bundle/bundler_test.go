@@ -509,6 +509,14 @@ func TestBundler_Complicated(t *testing.T) {
 
 	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000115a", "00000116a", "00000117a", "00000118a"}, ids)
+
+	longestOneBlockChain := bundler.LongestOneBlockFileChain()
+	require.IsType(t, []*OneBlockFile{}, longestOneBlockChain)
+	require.Equal(t, len(longestOneBlockChain), 19)
+
+	longestChain := bundler.LongestChain()
+	require.IsType(t, []string{}, longestChain)
+	require.Equal(t, len(longestOneBlockChain), len(longestChain))
 }
 
 func TestBundler_BackToTheFuture(t *testing.T) {
