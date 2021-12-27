@@ -16,6 +16,7 @@ package bundle
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +30,13 @@ func TestOneBlockFile_MustNewOneBlockFile_Panics(t *testing.T) {
 	_ = MustNewOneBlockFile(name)
 }
 
-func TestParseFilenames(t *testing.T) {
+func TestOneBlockFile_MustNewMergedOneBlockFile(t *testing.T) {
+	name := "0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"
+	obf := MustNewMergedOneBlockFile(name)
+	require.IsType(t, OneBlockFile{}, *obf)
+	require.Equal(t, obf.CanonicalName, strings.Split(name, "-suffix")[0])
+}
+
 	lib := func(num uint64) *uint64 { lib := num; return &lib }
 	tests := []struct {
 		name                        string
