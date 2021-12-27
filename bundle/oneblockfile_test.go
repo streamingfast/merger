@@ -37,7 +37,7 @@ func TestOneBlockFile_MustNewMergedOneBlockFile(t *testing.T) {
 	require.Equal(t, obf.CanonicalName, strings.Split(name, "-suffix")[0])
 }
 
-func TestOneBlockFile_parseFilename(t *testing.T) {
+func TestOneBlockFile_ParseFilename(t *testing.T) {
 	lib := func(num uint64) *uint64 { lib := num; return &lib }
 	tests := []struct {
 		name                        string
