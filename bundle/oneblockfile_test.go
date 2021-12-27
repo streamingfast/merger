@@ -37,6 +37,7 @@ func TestOneBlockFile_MustNewMergedOneBlockFile(t *testing.T) {
 	require.Equal(t, obf.CanonicalName, strings.Split(name, "-suffix")[0])
 }
 
+func TestOneBlockFile_parseFilename(t *testing.T) {
 	lib := func(num uint64) *uint64 { lib := num; return &lib }
 	tests := []struct {
 		name                        string
@@ -100,4 +101,13 @@ func mustParseTime(in string) time.Time {
 		panic("invalid parsetime")
 	}
 	return t
+}
+
+func TestOneBlockFile_InnerLibNumPanic(t *testing.T) {
+	name := "0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"
+	obf := MustNewOneBlockFile(name)
+
+	defer func() { recover() }()
+	obf.InnerLibNum = nil
+	_ = obf.LibNum()
 }
