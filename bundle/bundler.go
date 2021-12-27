@@ -104,11 +104,11 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	b.addOneBlockFile(oneBlockFile)
-	return
+	exists := b.addOneBlockFile(oneBlockFile)
+	return exists
 }
 
-func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
+func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 	if block := b.db.BlockForID(oneBlockFile.ID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		for filename := range oneBlockFile.Filenames { //this is an ugly patch. ash stepd ;-)
@@ -118,8 +118,8 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 	}
 
 	blockRef := bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num)
-	exist = b.db.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
-	return
+	exists = b.db.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
+	return exists
 }
 
 func (b *Bundler) AddPreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {

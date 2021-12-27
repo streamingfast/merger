@@ -99,6 +99,38 @@ func TestBundler_ExclusiveHighestBlockLimit(t *testing.T) {
 	require.Equal(t, c.blockLimit, limit)
 }
 
+func TestBundler_AddOneBlockFileUglyPatch(t *testing.T) {
+	c := struct {
+		name                       string
+		files                      []string
+		lastMergeBlockID           string
+		blockLimit                 uint64
+		expectedCompleted          bool
+		expectedLowerBlockNumLimit uint64
+		expectedHighestBlockLimit  uint64
+	}{
+		name: "file 0",
+		files: []string{
+			"0000000100-20210728T105016.0-00000100a-00000099a-90-suffix",
+		},
+		lastMergeBlockID:          "00000099a",
+		blockLimit:                105,
+		expectedCompleted:         true,
+		expectedHighestBlockLimit: 104,
+	}
+
+	bundler := NewBundler(2, c.blockLimit)
+	bundler.lastMergeOneBlockFile = &OneBlockFile{
+		ID: c.lastMergeBlockID,
+	}
+	for _, f := range c.files {
+		exists := bundler.AddOneBlockFile(MustNewOneBlockFile(f))
+		require.False(t, exists)
+		exists = bundler.AddOneBlockFile(MustNewOneBlockFile(f))
+		require.True(t, exists)
+	}
+}
+
 func TestBundler_IsComplete(t *testing.T) {
 
 	cases := []struct {
