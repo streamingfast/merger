@@ -16,6 +16,7 @@ package bundle
 
 import (
 	"fmt"
+	"github.com/streamingfast/bstream"
 	"strings"
 	"testing"
 	"time"
@@ -128,4 +129,22 @@ func TestOneBlockFile_InnerLibNumPanic(t *testing.T) {
 	defer func() { recover() }()
 	obf.InnerLibNum = nil
 	_ = obf.LibNum()
+}
+
+func newBstreamBlock() *bstream.Block {
+	block := bstream.Block{
+		Id:         "longerthan8",
+		Number:     uint64(0),
+		PreviousId: "longerthan8too",
+		Timestamp:  mustParseTime("20170701T122141.0"),
+		LibNum:     uint64(0),
+	}
+
+	return &block
+}
+
+func TestOneBlockFile_BlockFileName(t *testing.T) {
+	block := newBstreamBlock()
+	bfn := BlockFileName(block)
+	require.Equal(t, bfn, "0000000000-20170701T122141.0-gerthan8-than8too-0-generated")
 }
