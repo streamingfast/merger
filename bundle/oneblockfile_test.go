@@ -23,6 +23,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOneBlockFile_MustNewOneBlockFile_Panics(t *testing.T) {
+	name := "invalid-filename"
+	defer func() { recover() }()
+	_ = MustNewOneBlockFile(name)
+}
+
 func TestParseFilenames(t *testing.T) {
 	lib := func(num uint64) *uint64 { lib := num; return &lib }
 	tests := []struct {
@@ -77,7 +83,6 @@ func TestParseFilenames(t *testing.T) {
 			assert.Equal(t, test.expectBlockIDSuffix, blkID)
 			assert.Equal(t, test.expectPreviousBlockIDSuffix, prevBlkID)
 			assert.Equal(t, test.expectCanonicalName, name)
-
 		})
 	}
 }
