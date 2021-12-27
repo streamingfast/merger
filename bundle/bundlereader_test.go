@@ -176,3 +176,18 @@ func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
 	require.Equal(t, read, 0)
 	require.Errorf(t, err, "some error")
 }
+
+func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
+	bundle := NewDownloadBundle()
+
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+		return nil, fmt.Errorf("some error")
+	}
+
+	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r1 := make([]byte, 4)
+
+	read, err := r.Read(r1)
+	require.Equal(t, read, 0)
+	require.Errorf(t, err, "some error")
+}
