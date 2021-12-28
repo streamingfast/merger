@@ -541,3 +541,13 @@ func TestBundler_Save_Load(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, state.ExclusiveHighestBlockLimit, reloaded.ExclusiveHighestBlockLimit)
 }
+
+func TestMerger_Launch(t *testing.T) {
+	bundler := bundle.NewBundler(5, 5)
+
+	fetchMergedFiles := func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) { return []*bundle.OneBlockFile{}, nil }
+	merger := NewMerger(bundler, 0, "", fetchMergedFiles, nil, nil, nil, nil, "")
+
+	go merger.Launch()
+	merger.Shutdown(fmt.Errorf(""))
+}
