@@ -112,7 +112,12 @@ func (m *Merger) launch() (err error) {
 
 			isBundleComplete, highestBundleBlockNum = m.bundler.IsComplete()
 			if lastOneBlockFileAdded == nil || !isBundleComplete {
+
 				zlog.Info("bundle not completed after retrieving one block file", zap.Stringer("bundle", m.bundler))
+				if last := m.bundler.LastMergeOneBlockFile(); last != nil {
+					metrics.HeadBlockTimeDrift.SetBlockTime(last.BlockTime)
+				}
+
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
 					continue
@@ -120,12 +125,6 @@ func (m *Merger) launch() (err error) {
 					return m.Err()
 				}
 			}
-
-			if m.bundler.LastMergeOneBlockFile() != nil && lastOneBlockFileAdded.Num < m.bundler.LastMergeOneBlockFile().Num { // will still drift if there is a hole and lastFile is advancing
-				metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.BlockTime)
-			}
-
-			continue //until not completed
 		}
 
 		zlog.Info("merging bundle",

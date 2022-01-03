@@ -542,12 +542,67 @@ func TestBundler_Save_Load(t *testing.T) {
 	require.Equal(t, state.ExclusiveHighestBlockLimit, reloaded.ExclusiveHighestBlockLimit)
 }
 
-func TestMerger_Launch(t *testing.T) {
+func TestMerger_Launch_FailFetchOneBlockFiles(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	fetchMergedFiles := func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) { return []*bundle.OneBlockFile{}, nil }
-	merger := NewMerger(bundler, 0, "", fetchMergedFiles, nil, nil, nil, nil, "")
+	fetchOneBlockFiles := func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		return nil, fmt.Errorf("couldn't fetch one block files")
+	}
+	merger := NewMerger(bundler, 0, "", fetchMergedFiles, fetchOneBlockFiles, nil, nil, nil, "")
 
+	merger.Launch()
+}
+
+func TestMerger_Launch_Drift(t *testing.T) {
+	c := struct {
+		name                      string
+		files                     []*bundle.OneBlockFile
+		blockLimit                uint64
+		expectedHighestBlockLimit uint64
+		expectedLastMergeBlockID  string
+	}{
+		name: "should call",
+		files: []*bundle.OneBlockFile{
+			bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000121-20210728T105416.0-00000121a-00000117b-90-suffix"),
+		},
+		blockLimit:                120,
+		expectedHighestBlockLimit: 117,
+		expectedLastMergeBlockID:  "00000117a",
+	}
+
+	bundler := bundle.NewBundler(10, c.blockLimit)
+
+	for _, f := range c.files {
+		bundler.AddOneBlockFile(f)
+	}
+
+	bundler.Commit(c.blockLimit)
+
+	var areWeDoneYet uint64
+	done := make(chan struct{})
+	fetchMergedFiles := func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+		if areWeDoneYet == 1 {
+			close(done)
+		}
+		areWeDoneYet += 1
+		return []*bundle.OneBlockFile{}, nil
+	}
+
+	fetchOneBlockFiles := func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		return c.files, nil
+	}
+
+	merger := NewMerger(bundler, 0, "", fetchMergedFiles, fetchOneBlockFiles, nil, nil, nil, "")
 	go merger.Launch()
-	merger.Shutdown(fmt.Errorf(""))
+	select {
+	case <-time.After(time.Second):
+		t.Fail()
+	case <-done:
+		merger.Shutdown(nil)
+	}
 }
