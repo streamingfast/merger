@@ -203,3 +203,17 @@ func TestMergerIO_FetchMergeFile(t *testing.T) {
 	require.Errorf(t, err, "EOF")
 	require.Nil(t, obf)
 }
+
+func TestMergerIO_FetchMergeFile_OpenObjectError(t *testing.T) {
+	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
+	require.NoError(t, err)
+	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
+	require.NoError(t, err)
+	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil)
+
+	obf, err := mio.FetchMergeFile(69)
+	// file not found
+	require.Error(t, err)
+	require.Errorf(t, err, "not found")
+	require.Nil(t, obf)
+}

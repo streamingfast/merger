@@ -226,6 +226,9 @@ func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneB
 	highestBlock := uint64(0)
 	for {
 		block, err := blkReader.Read()
+		if err != nil {
+			return nil, err
+		}
 
 		if block.Num() < lowerBlock {
 			lowerBlock = block.Num()
