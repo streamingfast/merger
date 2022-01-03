@@ -3,11 +3,12 @@ package merger
 import (
 	"context"
 	"fmt"
-	"github.com/golang/protobuf/ptypes"
 	"io"
 	"path"
 	"runtime"
 	"testing"
+
+	"github.com/golang/protobuf/ptypes"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
@@ -16,6 +17,22 @@ import (
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"github.com/stretchr/testify/require"
 )
+
+func TestNewMergerIO(t *testing.T) {
+	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
+	if err != nil {
+		panic(fmt.Errorf("failed to init source archive store: %w", err))
+	}
+
+	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
+	if err != nil {
+		panic(fmt.Errorf("failed to init destination archive store: %w", err))
+	}
+
+	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10)
+	require.NotNil(t, mio)
+	require.IsType(t, &MergerIO{}, mio)
+}
 
 func TestMergerIO_FetchOneBlockFiles(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
