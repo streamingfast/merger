@@ -58,8 +58,6 @@ func TestMergerIO_FetchOneBlockFiles_GetOneBlockFileDataError(t *testing.T) {
 	oneBlockStoreStore, err := dstore.NewStore("file://"+baseDir, "dbin", "", true)
 	require.NoError(t, err)
 
-	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(blockReaderFactory)
-
 	downloadFileFunc := func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
 		return nil, fmt.Errorf("yo")
 	}
@@ -73,6 +71,30 @@ func TestMergerIO_FetchOneBlockFiles_GetOneBlockFileDataError(t *testing.T) {
 	oneBlockFiles, err := mergerIO.FetchOneBlockFiles(context.Background())
 	require.Error(t, err)
 	require.Errorf(t, err, "getting one block file data: yo")
+	require.Nil(t, oneBlockFiles)
+}
+
+func TestMergerIO_FetchOneBlockFiles_GetBlockReaderFactoryError(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	baseDir := path.Dir(filename)
+	baseDir = path.Join(baseDir, "bundle/test_data")
+	oneBlockStoreStore, err := dstore.NewStore("file://"+baseDir, "dbin", "", true)
+	require.NoError(t, err)
+
+	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(blockReaderFactoryNil)
+
+	downloadFileFunc := func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
+		return []byte{}, nil
+	}
+
+	mergerIO := &MergerIO{
+		oneBlocksStore:                 oneBlockStoreStore,
+		maxOneBlockOperationsBatchSize: 3,
+		downloadFileFunc:               downloadFileFunc,
+	}
+
+	oneBlockFiles, err := mergerIO.FetchOneBlockFiles(context.Background())
+	require.Error(t, err)
 	require.Nil(t, oneBlockFiles)
 }
 
