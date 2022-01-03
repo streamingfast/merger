@@ -32,8 +32,9 @@ func NewMergerIO(oneBlocksStore dstore.Store, destStore dstore.Store, maxOneBloc
 
 func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
-		return
+		return nil // nothing to do
 	}
+
 	t0 := time.Now()
 
 	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
@@ -50,7 +51,7 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 
 	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
-	return
+	return nil
 }
 
 func (m *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {

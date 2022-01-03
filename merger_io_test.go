@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/streamingfast/merger/bundle"
+
 	"github.com/golang/protobuf/ptypes"
 
 	"github.com/golang/protobuf/proto"
@@ -20,14 +22,10 @@ import (
 
 func TestNewMergerIO(t *testing.T) {
 	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
-	if err != nil {
-		panic(fmt.Errorf("failed to init source archive store: %w", err))
-	}
+	require.NoError(t, err)
 
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
-	if err != nil {
-		panic(fmt.Errorf("failed to init destination archive store: %w", err))
-	}
+	require.NoError(t, err)
 
 	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10)
 	require.NotNil(t, mio)
@@ -125,4 +123,16 @@ func blockFromProto(b *pbbstream.Block) (*bstream.Block, error) {
 		PayloadKind:    b.PayloadKind,
 		PayloadVersion: b.PayloadVersion,
 	}, b.PayloadBuffer)
+}
+
+func TestMergerIO_MergeUpload_ZeroLengthOneBlockFiles(t *testing.T) {
+	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
+	require.NoError(t, err)
+
+	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
+	require.NoError(t, err)
+
+	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10)
+	err = mio.MergeUpload(0, []*bundle.OneBlockFile{})
+	require.Nil(t, err)
 }
