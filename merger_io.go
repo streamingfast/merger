@@ -21,14 +21,22 @@ type MergerIO struct {
 	destStore                      dstore.Store
 	maxOneBlockOperationsBatchSize int
 	writeObjectFunc                func() error
+	downloadFileFunc               func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
 }
 
-func NewMergerIO(oneBlocksStore dstore.Store, destStore dstore.Store, maxOneBlockOperationsBatchSize int, writeObjectFunc func() error) *MergerIO {
+func NewMergerIO(
+	oneBlocksStore dstore.Store,
+	destStore dstore.Store,
+	maxOneBlockOperationsBatchSize int,
+	writeObjectFunc func() error,
+	downloadFileFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error),
+) *MergerIO {
 	return &MergerIO{
 		oneBlocksStore:                 oneBlocksStore,
 		destStore:                      destStore,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 		writeObjectFunc:                writeObjectFunc,
+		downloadFileFunc:               downloadFileFunc,
 	}
 }
 
@@ -46,7 +54,10 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 		m.writeObjectFunc = func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 			defer cancel()
-			return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.DownloadFile))
+			if m.downloadFileFunc == nil {
+				m.downloadFileFunc = m.DownloadFile
+			}
+			return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.downloadFileFunc))
 		}
 	}
 
@@ -78,8 +89,12 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 		fileCount++
 		oneBlockFile := bundle.MustNewOneBlockFile(filename)
 
+		if m.downloadFileFunc == nil {
+			m.downloadFileFunc = m.DownloadFile
+		}
+
 		if oneBlockFile.InnerLibNum == nil {
-			data, err := oneBlockFile.Data(ctx, m.DownloadFile)
+			data, err := oneBlockFile.Data(ctx, m.downloadFileFunc)
 			if err != nil {
 				return fmt.Errorf("getting one block file data: %w", err)
 			}
