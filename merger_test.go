@@ -21,6 +21,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -708,4 +709,11 @@ func TestMerger_Launch_LoadStateError(t *testing.T) {
 	_, err = LoadState("/tmp/statefile")
 	require.Error(t, err)
 	require.Errorf(t, err, "EOF")
+}
+
+func TestState_String(t *testing.T) {
+	state := &State{}
+	str := state.String()
+	typ := reflect.TypeOf(str)
+	require.Equal(t, typ.Kind(), reflect.String)
 }
