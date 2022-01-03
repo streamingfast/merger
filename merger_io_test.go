@@ -136,3 +136,34 @@ func TestMergerIO_MergeUpload_ZeroLengthOneBlockFiles(t *testing.T) {
 	err = mio.MergeUpload(0, []*bundle.OneBlockFile{})
 	require.Nil(t, err)
 }
+
+func TestMergerIO_MergeUpload(t *testing.T) {
+	c := struct {
+		name                      string
+		files                     []*bundle.OneBlockFile
+		blockLimit                uint64
+		expectedHighestBlockLimit uint64
+		expectedLastMergeBlockID  string
+	}{
+		name: "sunny path",
+		files: []*bundle.OneBlockFile{
+			bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-90-suffix"),
+		},
+		blockLimit:                118,
+		expectedHighestBlockLimit: 118,
+		expectedLastMergeBlockID:  "00000119a",
+	}
+
+	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
+	require.NoError(t, err)
+	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
+	require.NoError(t, err)
+	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10)
+
+	err = mio.MergeUpload(114, c.files)
+	require.NoError(t, err)
+}
