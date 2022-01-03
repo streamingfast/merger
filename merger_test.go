@@ -697,3 +697,15 @@ func TestMerger_Launch_SaveStateError(t *testing.T) {
 	err := merger.launch()
 	require.Error(t, err)
 }
+
+func TestMerger_Launch_LoadStateError(t *testing.T) {
+	_, err := LoadState("/tmp/path/doesnt/exist/statefile")
+	require.Error(t, err)
+
+	_, err = os.Create("/tmp/statefile")
+	require.NoError(t, err)
+
+	_, err = LoadState("/tmp/statefile")
+	require.Error(t, err)
+	require.Errorf(t, err, "EOF")
+}
