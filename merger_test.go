@@ -562,7 +562,7 @@ func TestMerger_Launch_Drift(t *testing.T) {
 		expectedHighestBlockLimit uint64
 		expectedLastMergeBlockID  string
 	}{
-		name: "should call",
+		name: "should set metrics blocktime",
 		files: []*bundle.OneBlockFile{
 			bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
 			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
@@ -576,7 +576,6 @@ func TestMerger_Launch_Drift(t *testing.T) {
 	}
 
 	bundler := bundle.NewBundler(10, c.blockLimit)
-
 	for _, f := range c.files {
 		bundler.AddOneBlockFile(f)
 	}
@@ -605,4 +604,48 @@ func TestMerger_Launch_Drift(t *testing.T) {
 	case <-done:
 		merger.Shutdown(nil)
 	}
+}
+
+func TestMerger_Launch_MergeUploadError(t *testing.T) {
+	c := struct {
+		name                      string
+		files                     []*bundle.OneBlockFile
+		blockLimit                uint64
+		expectedHighestBlockLimit uint64
+		expectedLastMergeBlockID  string
+	}{
+		name: "sunny path",
+		files: []*bundle.OneBlockFile{
+			bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-90-suffix"),
+		},
+		blockLimit:                118,
+		expectedHighestBlockLimit: 118,
+		expectedLastMergeBlockID:  "00000119a",
+	}
+
+	bundler := bundle.NewBundler(5, c.blockLimit)
+	for _, f := range c.files {
+		bundler.AddOneBlockFile(f)
+	}
+
+	fetchMergedFile := func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+		return []*bundle.OneBlockFile{}, nil
+	}
+
+	fetchOneBlockFiles := func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		return c.files, nil
+	}
+
+	mergeUpload := func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+		return fmt.Errorf("yo")
+	}
+
+	merger := NewMerger(bundler, 0, "", fetchMergedFile, fetchOneBlockFiles, nil, mergeUpload, nil, "")
+	err := merger.launch()
+	require.Error(t, err)
+	require.Errorf(t, err, "yo")
 }
