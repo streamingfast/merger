@@ -174,8 +174,8 @@ func (b *Bundler) longestChain() []string {
 		tree := b.db.BuildTreeWithID(root)
 		lc := tree.Chains().LongestChain()
 
-		if lc == nil {
-			// found multiple chain with same length
+		if lc == nil || len(longestChain) == len(lc) {
+			// found multiple chains with same length
 			return nil
 		}
 
