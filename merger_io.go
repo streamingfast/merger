@@ -22,6 +22,8 @@ type MergerIO struct {
 	maxOneBlockOperationsBatchSize int
 	writeObjectFunc                func() error
 	downloadFileFunc               func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
+	retryAttempts                  int
+	retryCooldown                  time.Duration
 }
 
 func NewMergerIO(
@@ -30,6 +32,8 @@ func NewMergerIO(
 	maxOneBlockOperationsBatchSize int,
 	writeObjectFunc func() error,
 	downloadFileFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error),
+	retryAttempts int,
+	retryCooldown time.Duration,
 ) *MergerIO {
 	return &MergerIO{
 		oneBlocksStore:                 oneBlocksStore,
@@ -37,6 +41,8 @@ func NewMergerIO(
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 		writeObjectFunc:                writeObjectFunc,
 		downloadFileFunc:               downloadFileFunc,
+		retryAttempts:                  retryAttempts,
+		retryCooldown:                  retryCooldown,
 	}
 }
 
@@ -61,7 +67,7 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 		}
 	}
 
-	err = Retry(5, 500*time.Millisecond, m.writeObjectFunc)
+	err = Retry(m.retryAttempts, m.retryCooldown, m.writeObjectFunc)
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
