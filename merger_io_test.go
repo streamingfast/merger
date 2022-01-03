@@ -178,3 +178,28 @@ func TestMergerIO_MergeUpload_WriteObjectError(t *testing.T) {
 	err = mio.MergeUpload(114, files)
 	require.Error(t, err)
 }
+
+func TestMergerIO_FetchMergeFile(t *testing.T) {
+	files := []*bundle.OneBlockFile{
+		bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
+		bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
+		bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
+		bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
+		bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-90-suffix"),
+	}
+
+	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
+	require.NoError(t, err)
+	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
+	require.NoError(t, err)
+	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil)
+
+	err = mio.MergeUpload(114, files)
+	require.Nil(t, err)
+
+	obf, err := mio.FetchMergeFile(114)
+	// test file is empty
+	require.Error(t, err)
+	require.Errorf(t, err, "EOF")
+	require.Nil(t, obf)
+}
