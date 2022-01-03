@@ -20,13 +20,15 @@ type MergerIO struct {
 	oneBlocksStore                 dstore.Store
 	destStore                      dstore.Store
 	maxOneBlockOperationsBatchSize int
+	writeObjectFunc                func() error
 }
 
-func NewMergerIO(oneBlocksStore dstore.Store, destStore dstore.Store, maxOneBlockOperationsBatchSize int) *MergerIO {
+func NewMergerIO(oneBlocksStore dstore.Store, destStore dstore.Store, maxOneBlockOperationsBatchSize int, writeObjectFunc func() error) *MergerIO {
 	return &MergerIO{
 		oneBlocksStore:                 oneBlocksStore,
 		destStore:                      destStore,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
+		writeObjectFunc:                writeObjectFunc,
 	}
 }
 
@@ -40,11 +42,15 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
 	zlog.Debug("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Uint64("lower_block_num", oneBlockFiles[0].Num), zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num))
 
-	err = Retry(5, 500*time.Millisecond, func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
-		defer cancel()
-		return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.DownloadFile))
-	})
+	if m.writeObjectFunc == nil {
+		m.writeObjectFunc = func() error {
+			ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+			defer cancel()
+			return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.DownloadFile))
+		}
+	}
+
+	err = Retry(5, 500*time.Millisecond, m.writeObjectFunc)
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
