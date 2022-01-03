@@ -98,12 +98,45 @@ func TestMergerIO_FetchOneBlockFiles_GetBlockReaderFactoryError(t *testing.T) {
 	require.Nil(t, oneBlockFiles)
 }
 
+func TestMergerIO_FetchOneBlockFiles_ReadBlockError(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	baseDir := path.Dir(filename)
+	baseDir = path.Join(baseDir, "bundle/test_data")
+	oneBlockStoreStore, err := dstore.NewStore("file://"+baseDir, "dbin", "", true)
+	require.NoError(t, err)
+
+	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(blockReaderFactoryError)
+
+	mergerIO := &MergerIO{
+		oneBlocksStore:                 oneBlockStoreStore,
+		maxOneBlockOperationsBatchSize: 3,
+	}
+
+	oneBlockFiles, err := mergerIO.FetchOneBlockFiles(context.Background())
+	require.Error(t, err)
+	require.Errorf(t, err, "yo")
+	require.Nil(t, oneBlockFiles)
+}
+
 func blockReaderFactory(reader io.Reader) (bstream.BlockReader, error) {
 	return NewBlockReader(reader)
 }
 
+func blockReaderFactoryNil(reader io.Reader) (bstream.BlockReader, error) {
+	return nil, fmt.Errorf("yo")
+}
+
+func blockReaderFactoryError(reader io.Reader) (bstream.BlockReader, error) {
+	return NewBlockReaderError(reader)
+}
+
 // BlockReader reads the dbin format where each element is assumed to be a `bstream.Block`.
 type BlockReader struct {
+	src *dbin.Reader
+}
+
+// BlockReaderError forces an error on Read
+type BlockReaderError struct {
 	src *dbin.Reader
 }
 
@@ -121,6 +154,13 @@ func NewBlockReader(reader io.Reader) (out *BlockReader, err error) {
 	}
 
 	return &BlockReader{
+		src: dbinReader,
+	}, nil
+}
+
+func NewBlockReaderError(reader io.Reader) (out *BlockReaderError, err error) {
+	dbinReader := dbin.NewReader(reader)
+	return &BlockReaderError{
 		src: dbinReader,
 	}, nil
 }
@@ -148,6 +188,10 @@ func (l *BlockReader) Read() (*bstream.Block, error) {
 
 	// In all other cases, we are in an error path
 	return nil, fmt.Errorf("failed reading next dbin message: %s", err)
+}
+
+func (l *BlockReaderError) Read() (*bstream.Block, error) {
+	return nil, fmt.Errorf("yo")
 }
 
 func blockFromProto(b *pbbstream.Block) (*bstream.Block, error) {
