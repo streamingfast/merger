@@ -141,7 +141,13 @@ func (m *Merger) launch() (err error) {
 
 		m.bundler.Commit(highestBundleBlockNum)
 
-		zlog.Info("bundle merged and committed", zap.Stringer("bundle", m.bundler), zap.Time("last_merge_one_block_time", m.bundler.LastMergeOneBlockFile().BlockTime))
+		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()
+		var lastMergedBlockTime time.Time
+		if lastMergedOneBlockFile != nil {
+			lastMergedBlockTime = lastMergedOneBlockFile.BlockTime
+		}
+
+		zlog.Info("bundle merged and committed", zap.Stringer("bundle", m.bundler), zap.Time("last_merge_one_block_time", lastMergedBlockTime))
 
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
 		zlog.Info("saving state", zap.Stringer("state", state))
