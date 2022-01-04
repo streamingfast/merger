@@ -312,3 +312,15 @@ func TestNewOneBlockFilesDeleter(t *testing.T) {
 	require.NotNil(t, filesDeleter)
 	require.IsType(t, &oneBlockFilesDeleter{}, filesDeleter)
 }
+
+func TestOneBlockFilesDeleter_Start_ZeroLengthOneBlockFiles(t *testing.T) {
+	targetPath := "/tmp/oneblockstore"
+	var oneBlockFiles []*bundle.OneBlockFile
+
+	oneBlockStoreStore, err := dstore.NewDBinStore(targetPath)
+	require.NoError(t, err)
+	filesDeleter := NewOneBlockFilesDeleter(oneBlockStoreStore)
+
+	filesDeleter.Delete(oneBlockFiles)
+	filesDeleter.Start(1, 100)
+}
