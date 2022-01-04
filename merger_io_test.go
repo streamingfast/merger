@@ -304,3 +304,11 @@ func TestMergerIO_FetchMergeFile_OpenObjectError(t *testing.T) {
 	require.Errorf(t, err, "not found")
 	require.Nil(t, obf)
 }
+
+func TestNewOneBlockFilesDeleter(t *testing.T) {
+	oneBlockStoreStore, err := dstore.NewDBinStore("/tmp/oneblockstore")
+	require.NoError(t, err)
+	filesDeleter := NewOneBlockFilesDeleter(oneBlockStoreStore)
+	require.NotNil(t, filesDeleter)
+	require.IsType(t, &oneBlockFilesDeleter{}, filesDeleter)
+}
