@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"path"
 	"runtime"
 	"testing"
@@ -323,4 +324,40 @@ func TestOneBlockFilesDeleter_Start_ZeroLengthOneBlockFiles(t *testing.T) {
 
 	filesDeleter.Delete(oneBlockFiles)
 	filesDeleter.Start(1, 100)
+}
+
+func TestOneBlockFilesDeleter_Start(t *testing.T) {
+
+	targetPath := "/tmp/oneblockstore"
+	filenames := []string{
+		"0000000114-20210728T105016.0-00000114a-00000113a-90-suffix",
+		"0000000115-20210728T105116.0-00000115a-00000114a-90-suffix",
+		"0000000116-20210728T105216.0-00000116a-00000115a-90-suffix",
+		"0000000117-20210728T105316.0-00000117a-00000116a-90-suffix",
+		"0000000118-20210728T105316.0-00000118a-00000117a-90-suffix",
+	}
+	var oneBlockFiles []*bundle.OneBlockFile
+
+	oneBlockStoreStore, err := dstore.NewDBinStore(targetPath)
+	require.NoError(t, err)
+	filesDeleter := NewOneBlockFilesDeleter(oneBlockStoreStore)
+
+	for _, filename := range filenames {
+		f := fmt.Sprintf("%s/%s", targetPath, filename)
+		if err = ioutil.WriteFile(f, []byte{}, 0644); err != nil {
+			panic(err)
+		}
+		oneBlockFiles = append(oneBlockFiles, bundle.MustNewOneBlockFile(filename))
+	}
+
+	filesDeleter.Start(1, 100)
+	filesDeleter.Delete(oneBlockFiles)
+	time.Sleep(20 * time.Second)
+
+	files, err := ioutil.ReadDir(targetPath)
+	if err != nil {
+		panic(err)
+	}
+
+	require.Equal(t, len(files), 0)
 }

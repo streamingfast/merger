@@ -152,6 +152,7 @@ func (m *Merger) launch() (err error) {
 		zlog.Info("saving state", zap.Stringer("state", state))
 		err = SaveState(state, m.stateFile)
 		if err != nil {
+			// froch(just log here)
 			return fmt.Errorf("failed to save state: %s", err)
 		}
 
