@@ -338,7 +338,7 @@ func TestOneBlockFilesDeleter_Start(t *testing.T) {
 	}
 	var oneBlockFiles []*bundle.OneBlockFile
 
-	oneBlockStoreStore, err := dstore.NewDBinStore(targetPath)
+	oneBlockStoreStore, err := dstore.NewStore(targetPath, "", "", false)
 	require.NoError(t, err)
 	filesDeleter := NewOneBlockFilesDeleter(oneBlockStoreStore)
 
@@ -352,7 +352,7 @@ func TestOneBlockFilesDeleter_Start(t *testing.T) {
 
 	filesDeleter.Start(1, 100)
 	filesDeleter.Delete(oneBlockFiles)
-	time.Sleep(20 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	files, err := ioutil.ReadDir(targetPath)
 	if err != nil {
