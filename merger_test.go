@@ -668,7 +668,7 @@ func TestMerger_Launch_SaveStateError(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-90-suffix"),
 		},
 		blockLimit:                118,
-		expectedHighestBlockLimit: 118,
+		expectedHighestBlockLimit: 117,
 		expectedLastMergeBlockID:  "00000119a",
 	}
 
@@ -695,8 +695,11 @@ func TestMerger_Launch_SaveStateError(t *testing.T) {
 
 	statefile := "/tmp/path/doesnt/exist/statefile"
 	merger := NewMerger(bundler, 0, "", fetchMergedFile, fetchOneBlockFiles, deleteFiles, mergeUpload, nil, statefile)
-	err := merger.launch()
-	require.Error(t, err)
+	go merger.Launch()
+	select {
+	case <-time.After(2 * time.Second):
+		merger.Shutdown(nil)
+	}
 }
 
 func TestMerger_Launch_LoadStateError(t *testing.T) {

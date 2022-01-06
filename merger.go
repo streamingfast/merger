@@ -134,7 +134,7 @@ func (m *Merger) launch() (err error) {
 
 		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
 
-		if err := m.mergeUploadFunc(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
+		if err = m.mergeUploadFunc(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
 			return err
 		}
 
@@ -152,8 +152,7 @@ func (m *Merger) launch() (err error) {
 		zlog.Info("saving state", zap.Stringer("state", state))
 		err = SaveState(state, m.stateFile)
 		if err != nil {
-			// froch(just log here)
-			return fmt.Errorf("failed to save state: %s", err)
+			zlog.Error("failed to save state", zap.Error(err))
 		}
 
 		metrics.HeadBlockTimeDrift.SetBlockTime(m.bundler.LastMergeOneBlockFile().BlockTime)
