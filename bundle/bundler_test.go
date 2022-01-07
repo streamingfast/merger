@@ -157,7 +157,7 @@ func TestBundler_AddPreMergedOneBlockFiles(t *testing.T) {
 		ID: c.lastMergeBlockID,
 	}
 
-	bundler.AddPreMergedOneBlockFiles([]*OneBlockFile{})
+	bundler.BundlePreMergedOneBlockFiles([]*OneBlockFile{})
 	last := bundler.LastMergeOneBlockFile()
 	limit := bundler.ExclusiveHighestBlockLimit()
 	require.IsType(t, OneBlockFile{}, *last)
@@ -165,7 +165,7 @@ func TestBundler_AddPreMergedOneBlockFiles(t *testing.T) {
 	require.Equal(t, limit, c.blockLimit)
 
 	for _, f := range c.files {
-		bundler.AddPreMergedOneBlockFiles([]*OneBlockFile{MustNewOneBlockFile(f)})
+		bundler.BundlePreMergedOneBlockFiles([]*OneBlockFile{MustNewOneBlockFile(f)})
 	}
 
 	last = bundler.LastMergeOneBlockFile()
@@ -292,20 +292,6 @@ func TestBundler_IsComplete(t *testing.T) {
 			expectedCompleted:          true,
 			expectedHighestBlockLimit:  118,
 		},
-		{
-			name: "highest first",
-			files: []string{
-				"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
-				"0000000116-20210728T105016.0-00000116a-00000115a-90-suffix",
-				"0000000117-20210728T105016.0-00000117a-00000116a-90-suffix",
-				"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
-				"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
-			},
-			lastMergeBlockID:           "00000114a",
-			exclusiveHighestBlockLimit: 115,
-			expectedCompleted:          true,
-			expectedHighestBlockLimit:  118,
-		},
 	}
 
 	for _, c := range cases {
@@ -317,7 +303,7 @@ func TestBundler_IsComplete(t *testing.T) {
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(MustNewOneBlockFile(f))
 			}
-			completed, highestBlockLimit := bundler.IsComplete()
+			completed, highestBlockLimit := bundler.BundleCompleted()
 			require.Equal(t, c.expectedCompleted, completed)
 			require.Equal(t, c.expectedHighestBlockLimit, highestBlockLimit)
 		})
@@ -444,7 +430,7 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}
-			completed, highestBlockLimit := bundler.IsComplete()
+			completed, highestBlockLimit := bundler.BundleCompleted()
 			require.True(t, completed)
 			mergeableFiles := bundler.ToBundle(highestBlockLimit)
 			bundler.Commit(highestBlockLimit)
@@ -493,7 +479,7 @@ func TestBundler_Complicated(t *testing.T) {
 		bundler.AddOneBlockFile(f)
 	}
 
-	completed, highestBlockLimit := bundler.IsComplete()
+	completed, highestBlockLimit := bundler.BundleCompleted()
 	require.True(t, completed)
 	mergeableFiles := bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
@@ -501,14 +487,14 @@ func TestBundler_Complicated(t *testing.T) {
 	ids := ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000100a", "00000101a", "00000102a", "00000102b", "00000103b", "00000103a", "00000104a"}, ids)
 
-	completed, highestBlockLimit = bundler.IsComplete()
+	completed, highestBlockLimit = bundler.BundleCompleted()
 	require.True(t, completed)
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
 	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000106a", "00000107a", "00000108b", "00000109b", "00000108a", "00000109a"}, ids)
 
-	completed, highestBlockLimit = bundler.IsComplete()
+	completed, highestBlockLimit = bundler.BundleCompleted()
 	require.True(t, completed)
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
@@ -516,7 +502,7 @@ func TestBundler_Complicated(t *testing.T) {
 	ids = ToIDs(mergeableFiles)
 	require.Equal(t, []string{"00000110b", "00000110c", "00000111c", "00000110a", "00000111a", "00000112a", "00000113a", "00000114a"}, ids)
 
-	completed, highestBlockLimit = bundler.IsComplete()
+	completed, highestBlockLimit = bundler.BundleCompleted()
 	require.True(t, completed)
 	mergeableFiles = bundler.ToBundle(highestBlockLimit)
 	bundler.Commit(highestBlockLimit)
@@ -558,7 +544,7 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 	}
 
 	// Let's merge a first back of block from 100 to 104
-	completed, highestBlockLimit := bundler.IsComplete()
+	completed, highestBlockLimit := bundler.BundleCompleted()
 	require.True(t, completed)
 	mergeableFiles := bundler.ToBundle(highestBlockLimit)
 	ids := ToIDs(mergeableFiles)
@@ -569,7 +555,7 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 	bundler.AddOneBlockFile(MustNewOneBlockFile("000000095-20210728T105015.01-00000095b-00000094a-90-suffix"))
 
 	//that new file should not trigger a merge
-	completed, highestBlockLimit = bundler.IsComplete()
+	completed, highestBlockLimit = bundler.BundleCompleted()
 	require.False(t, completed)
 
 	// Add missing file for this back in time fork
@@ -588,13 +574,13 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 	bundler.AddOneBlockFile(MustNewOneBlockFile("000000108-20210728T105015.12-00000108b-00000107b-90-suffix"))
 	bundler.AddOneBlockFile(MustNewOneBlockFile("000000109-20210728T105015.12-00000109b-00000108b-90-suffix"))
 
-	completed, highestBlockLimit = bundler.IsComplete()
+	completed, highestBlockLimit = bundler.BundleCompleted()
 	//should not trigger merge yet
 	require.False(t, completed)
 
 	bundler.AddOneBlockFile(MustNewOneBlockFile("000000110-20210728T105015.12-00000110b-00000109b-90-suffix"))
 
-	completed, highestBlockLimit = bundler.IsComplete()
+	completed, highestBlockLimit = bundler.BundleCompleted()
 	//here we go!
 	require.True(t, completed)
 
@@ -720,7 +706,7 @@ func TestBundler_Purge(t *testing.T) {
 				bundler.AddOneBlockFile(f)
 			}
 
-			completed, highestBlockLimit := bundler.IsComplete()
+			completed, highestBlockLimit := bundler.BundleCompleted()
 			if completed {
 				bundler.Commit(highestBlockLimit)
 			}

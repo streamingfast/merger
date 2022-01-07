@@ -122,7 +122,7 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 	return exists
 }
 
-func (b *Bundler) AddPreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {
+func (b *Bundler) BundlePreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -196,7 +196,8 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	if err != nil { //if there is no root it can't be too old
 		return false
 	}
-	//
+
+	//Find the smallest root of all chains in forkdb
 	lowestRootBlockNum := uint64(math.MaxUint64)
 	for _, root := range roots {
 		block := b.db.BlockForID(root)
@@ -204,6 +205,8 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 			lowestRootBlockNum = block.BlockNum
 		}
 	}
+
+	// return true is blockNum is small that all the root block of all chains
 	return blockNum < lowestRootBlockNum
 }
 
@@ -219,21 +222,14 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 	return block.BlockNum, nil
 }
 
-func (b *Bundler) IsComplete() (complete bool, highestBlockLimit uint64) {
+func (b *Bundler) BundleCompleted() (complete bool, highestBlockLimit uint64) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-
-	roots, err := b.db.Roots()
-	if err == forkable.NoLinkErr || len(roots) > 1 {
-		return false, 0
-	}
 
 	longest := b.longestChain()
 	for _, blockID := range longest {
 		blk := b.db.BlockForID(blockID)
 
-		// 7 - 8 - 9 - 11
-		// highest block limit == 10
 		if blk.BlockNum >= b.exclusiveHighestBlockLimit {
 			return true, highestBlockLimit
 		}
@@ -274,9 +270,9 @@ func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 		return out[i].BlockTime.Before(out[j].BlockTime)
 	})
 
-	if uint64(len(out)) != b.bundleSize {
-		panic(fmt.Sprintf("toBundle() called with missing block files; out: %d, bundleSize: %d", len(out), b.bundleSize))
-	}
+	//if uint64(len(out)) != b.bundleSize {
+	//	panic(fmt.Sprintf("toBundle() called with missing block files; out: %d, bundleSize: %d", len(out), b.bundleSize))
+	//}
 
 	return out
 }

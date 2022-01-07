@@ -352,12 +352,10 @@ func TestOneBlockFilesDeleter_Start(t *testing.T) {
 
 	filesDeleter.Start(1, 100)
 	filesDeleter.Delete(oneBlockFiles)
-	time.Sleep(5 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	files, err := ioutil.ReadDir(targetPath)
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	require.Equal(t, len(files), 0)
 }

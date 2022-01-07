@@ -85,15 +85,20 @@ func (m *Merger) launch() (err error) {
 			return nil
 		}
 
-		zlog.Debug("verifying if bundle file already exist in store")
+		zlog.Info("verifying if bundle file already exist in store", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()))
 		if oneBlockFiles, err := m.fetchMergedFileFunc(m.bundler.BundleInclusiveLowerBlock()); err == nil {
-			zlog.Info("adding files from already merge bundle", zap.Int("file_count", len(oneBlockFiles)))
-			m.bundler.AddPreMergedOneBlockFiles(oneBlockFiles)
+			if len(oneBlockFiles) > 0 {
+				zlog.Info("adding files from already merge bundle", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()), zap.Int("file_count", len(oneBlockFiles)))
+				m.bundler.BundlePreMergedOneBlockFiles(oneBlockFiles) // this will change state and skip to next bundle ...
+				m.bundler.Purge(func([]*bundle.OneBlockFile) {})      // no file deletion, just move LIB on forkdb
+
+				//let check if next bundle has also been merged by another process
+				//no bundle can be completed at this time
+				continue
+			}
 		}
 
-		m.bundler.Purge(func([]*bundle.OneBlockFile) {}) // no file deletion, just move LIB on forkdb
-
-		isBundleComplete, highestBundleBlockNum := m.bundler.IsComplete()
+		isBundleComplete, highestBundleBlockNum := m.bundler.BundleCompleted() // multiple bundle can be completed. No need to fetch more on block file
 		if !isBundleComplete {
 			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 			tooOldFiles, lastOneBlockFileAdded, err := m.retrieveOneBlockFile(ctx)
@@ -110,8 +115,8 @@ func (m *Merger) launch() (err error) {
 				zlog.Info("one block retrieved", zap.Uint64("last_block_file", lastOneBlockFileAdded.Num))
 			}
 
-			isBundleComplete, highestBundleBlockNum = m.bundler.IsComplete()
-			if lastOneBlockFileAdded == nil || !isBundleComplete {
+			isBundleComplete, highestBundleBlockNum = m.bundler.BundleCompleted()
+			if !isBundleComplete {
 
 				zlog.Info("bundle not completed after retrieving one block file", zap.Stringer("bundle", m.bundler))
 				if last := m.bundler.LastMergeOneBlockFile(); last != nil {
