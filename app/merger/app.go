@@ -104,7 +104,7 @@ func (a *App) Run() error {
 
 	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
 	if foundAny {
-		err = bundler.Boostrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
 			if fetchErr != nil {
 				return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)

@@ -127,12 +127,12 @@ func (m *Merger) launch() (err error) {
 			}
 		}
 
+		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
 		zlog.Info("merging bundle",
 			zap.Uint64("highest_bundle_block_num", highestBundleBlockNum),
 			zap.Stringer("bundle", m.bundler),
+			zap.Int("count", len(bundleFiles)),
 		)
-
-		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
 
 		if err = m.mergeUploadFunc(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
 			return err
@@ -141,12 +141,9 @@ func (m *Merger) launch() (err error) {
 		m.bundler.Commit(highestBundleBlockNum)
 
 		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()
-		var lastMergedBlockTime time.Time
-		if lastMergedOneBlockFile != nil {
-			lastMergedBlockTime = lastMergedOneBlockFile.BlockTime
-		}
-
-		zlog.Info("bundle merged and committed", zap.Stringer("bundle", m.bundler), zap.Time("last_merge_one_block_time", lastMergedBlockTime))
+		zlog.Info("bundle merged and committed", zap.Stringer("bundle", m.bundler), zap.Time("last_merge_one_block_time", lastMergedOneBlockFile.BlockTime))
+		metrics.HeadBlockTimeDrift.SetBlockTime(lastMergedOneBlockFile.BlockTime)
+		metrics.HeadBlockNumber.SetUint64(lastMergedOneBlockFile.Num)
 
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
 		zlog.Info("saving state", zap.Stringer("state", state))
@@ -154,9 +151,6 @@ func (m *Merger) launch() (err error) {
 		if err != nil {
 			zlog.Error("failed to save state", zap.Error(err))
 		}
-
-		metrics.HeadBlockTimeDrift.SetBlockTime(m.bundler.LastMergeOneBlockFile().BlockTime)
-		metrics.HeadBlockNumber.SetUint64(m.bundler.LastMergeOneBlockFile().Num)
 
 		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
 			if len(oneBlockFilesToDelete) > 0 {

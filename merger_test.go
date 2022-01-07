@@ -449,7 +449,7 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 		return nil
 	}
 
-	err := bundler.Boostrap(merger.fetchMergedFileFunc)
+	err := bundler.Bootstrap(merger.fetchMergedFileFunc)
 	require.NoError(t, err)
 
 	err = merger.launch()
@@ -603,6 +603,76 @@ func TestMerger_Launch_Drift(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fail()
 	case <-done:
+		merger.Shutdown(nil)
+	}
+}
+
+func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
+	c := struct {
+		name          string
+		mergedFiles   [][]*bundle.OneBlockFile
+		oneBlockFiles []*bundle.OneBlockFile
+	}{
+		name: "",
+		mergedFiles: [][]*bundle.OneBlockFile{
+			{
+				bundle.MustNewOneBlockFile("0000000113-20210728T105016.0-00000113a-00000112a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
+			},
+			{
+				bundle.MustNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000119-20210728T105116.0-00000119a-00000118a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000120-20210728T105216.0-00000120a-00000119a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000121-20210728T105316.0-00000121a-00000120a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000122-20210728T105016.0-00000122a-00000121a-90-suffix"),
+			},
+		},
+		oneBlockFiles: []*bundle.OneBlockFile{
+			bundle.MustNewOneBlockFile("0000000123-20210728T105116.0-00000123a-00000122a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000124-20210728T105216.0-00000124a-00000123a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000125-20210728T105316.0-00000125a-00000124a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000126-20210728T105416.0-00000126a-00000125a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000127-20210728T105416.0-00000127a-00000126a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000128-20210728T105416.0-00000128a-00000127a-90-suffix"),
+		},
+	}
+
+	bundler := bundle.NewBundler(5, 118)
+	merger := NewMerger(bundler, 0, "", nil, nil, nil, nil, nil, "")
+
+	var mergedFilesCallCount int
+	merger.fetchMergedFileFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+		defer func() { mergedFilesCallCount += 1 }()
+		if mergedFilesCallCount >= 2 {
+			return nil, nil
+		}
+		return c.mergedFiles[mergedFilesCallCount], nil
+	}
+
+	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		if mergedFilesCallCount >= 2 {
+			defer merger.Shutdown(nil)
+		}
+		return c.oneBlockFiles, nil
+	}
+
+	merger.mergeUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+		return nil
+	}
+
+	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
+		return
+	}
+
+	go merger.Launch()
+	select {
+	case <-time.After(30 * time.Second):
+		t.Error("too long")
+	case <-merger.Terminated():
+		require.Equal(t, 123, int(merger.bundler.ExclusiveHighestBlockLimit()))
 		merger.Shutdown(nil)
 	}
 }

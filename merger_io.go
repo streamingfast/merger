@@ -235,6 +235,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 	}
 }
 
+// TODO(froch, 20220107): remove this code, dead code with new mindreader and correct filenames
 func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 	defer mergeFileReader.Close()
 

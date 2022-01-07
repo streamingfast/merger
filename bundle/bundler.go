@@ -43,7 +43,7 @@ func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
 	return b.exclusiveHighestBlockLimit - b.bundleSize
 }
 
-func (b *Bundler) Boostrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -130,6 +130,7 @@ func (b *Bundler) AddPreMergedOneBlockFiles(oneBlockFiles []*OneBlockFile) {
 		return
 	}
 	for _, oneBlockFile := range oneBlockFiles {
+		oneBlockFile.Merged = true
 		b.addOneBlockFile(oneBlockFile)
 	}
 	b.lastMergeOneBlockFile = oneBlockFiles[len(oneBlockFiles)-1]
@@ -222,15 +223,23 @@ func (b *Bundler) IsComplete() (complete bool, highestBlockLimit uint64) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	roots, err := b.db.Roots()
+	if err == forkable.NoLinkErr || len(roots) > 1 {
+		return false, 0
+	}
+
 	longest := b.longestChain()
 	for _, blockID := range longest {
 		blk := b.db.BlockForID(blockID)
 
+		// 7 - 8 - 9 - 11
+		// highest block limit == 10
 		if blk.BlockNum >= b.exclusiveHighestBlockLimit {
 			return true, highestBlockLimit
 		}
 		highestBlockLimit = blk.BlockNum
 	}
+
 	return false, 0
 }
 
@@ -238,7 +247,8 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	return b.toBundle(inclusiveHighestBlockLimit)
+	out := b.toBundle(inclusiveHighestBlockLimit)
+	return out
 }
 func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 
@@ -263,6 +273,10 @@ func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 
 		return out[i].BlockTime.Before(out[j].BlockTime)
 	})
+
+	if uint64(len(out)) != b.bundleSize {
+		panic(fmt.Sprintf("toBundle() called with missing block files; out: %d, bundleSize: %d", len(out), b.bundleSize))
+	}
 
 	return out
 }

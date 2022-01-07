@@ -181,7 +181,7 @@ func TestBundler_IsComplete(t *testing.T) {
 		name                       string
 		files                      []string
 		lastMergeBlockID           string
-		blockLimit                 uint64
+		exclusiveHighestBlockLimit uint64
 		expectedCompleted          bool
 		expectedLowerBlockNumLimit uint64
 		expectedHighestBlockLimit  uint64
@@ -198,10 +198,10 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000104-20210728T105016.0-00000104a-00000103a-90-suffix",
 				"0000000106-20210728T105016.0-00000106a-00000104a-90-suffix",
 			},
-			lastMergeBlockID:          "00000099a",
-			blockLimit:                105,
-			expectedCompleted:         true,
-			expectedHighestBlockLimit: 104,
+			lastMergeBlockID:           "00000099a",
+			exclusiveHighestBlockLimit: 105,
+			expectedCompleted:          true,
+			expectedHighestBlockLimit:  104,
 		},
 		{
 			name: "file 0 incomplete",
@@ -214,10 +214,10 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000103-20210728T105016.0-00000103a-00000102a-90-suffix",
 				"0000000104-20210728T105016.0-00000104a-00000103a-90-suffix",
 			},
-			lastMergeBlockID:          "00000099a",
-			blockLimit:                105,
-			expectedCompleted:         false,
-			expectedHighestBlockLimit: 0,
+			lastMergeBlockID:           "00000099a",
+			exclusiveHighestBlockLimit: 105,
+			expectedCompleted:          false,
+			expectedHighestBlockLimit:  0,
 		},
 		{
 			name: "file 0 no longest chain",
@@ -229,10 +229,10 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000103-20210728T105016.0-00000103b-00000102b-90-suffix",
 				"0000000103-20210728T105016.0-00000103a-00000102a-90-suffix",
 			},
-			lastMergeBlockID:          "00000099a",
-			blockLimit:                105,
-			expectedCompleted:         false,
-			expectedHighestBlockLimit: 0,
+			lastMergeBlockID:           "00000099a",
+			exclusiveHighestBlockLimit: 105,
+			expectedCompleted:          false,
+			expectedHighestBlockLimit:  0,
 		},
 		{
 			name: "file 5",
@@ -250,10 +250,10 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000111-20210728T105016.0-00000111a-00000110a-90-suffix",
 				"0000000112-20210728T105016.0-00000112a-00000111a-90-suffix",
 			},
-			lastMergeBlockID:          "00000104a",
-			blockLimit:                110,
-			expectedCompleted:         true,
-			expectedHighestBlockLimit: 109,
+			lastMergeBlockID:           "00000104a",
+			exclusiveHighestBlockLimit: 110,
+			expectedCompleted:          true,
+			expectedHighestBlockLimit:  109,
 		},
 		{
 			name: "file 10",
@@ -273,10 +273,10 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000114-20210728T105016.13-00000114a-00000113a-90-suffix",
 				"0000000115-20210728T105016.14-00000115a-00000114a-90-suffix",
 			},
-			lastMergeBlockID:          "00000109a",
-			blockLimit:                115,
-			expectedCompleted:         true,
-			expectedHighestBlockLimit: 114,
+			lastMergeBlockID:           "00000109a",
+			exclusiveHighestBlockLimit: 115,
+			expectedCompleted:          true,
+			expectedHighestBlockLimit:  114,
 		},
 		{
 			name: "file 15",
@@ -287,16 +287,30 @@ func TestBundler_IsComplete(t *testing.T) {
 				"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
 				"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
 			},
-			lastMergeBlockID:          "00000114a",
-			blockLimit:                120,
-			expectedCompleted:         true,
-			expectedHighestBlockLimit: 118,
+			lastMergeBlockID:           "00000114a",
+			exclusiveHighestBlockLimit: 120,
+			expectedCompleted:          true,
+			expectedHighestBlockLimit:  118,
+		},
+		{
+			name: "highest first",
+			files: []string{
+				"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
+				"0000000116-20210728T105016.0-00000116a-00000115a-90-suffix",
+				"0000000117-20210728T105016.0-00000117a-00000116a-90-suffix",
+				"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
+				"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
+			},
+			lastMergeBlockID:           "00000114a",
+			exclusiveHighestBlockLimit: 115,
+			expectedCompleted:          true,
+			expectedHighestBlockLimit:  118,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(5, c.blockLimit)
+			bundler := NewBundler(5, c.exclusiveHighestBlockLimit)
 			bundler.lastMergeOneBlockFile = &OneBlockFile{
 				ID: c.lastMergeBlockID,
 			}
@@ -836,7 +850,7 @@ func TestBundler_Boostrap(t *testing.T) {
 			require.Errorf(t, err, "no longest chain available")
 
 			var mergeFileReads []int
-			err = bundler.Boostrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
+			err = bundler.Bootstrap(func(lowBlockNum uint64) ([]*OneBlockFile, error) {
 				mergeFileReads = append(mergeFileReads, int(lowBlockNum))
 
 				if oneBlockFiles, found := c.mergeFiles[lowBlockNum]; found {
