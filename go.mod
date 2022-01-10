@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/golang/protobuf v1.5.2
-	github.com/streamingfast/bstream v0.0.2-0.20211209212822-3666e8806588
+	github.com/streamingfast/bstream v0.0.2-0.20220110200944-b8fdce6e0f12
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dgrpc v0.0.0-20210901144702-c57c3701768b
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447

@@ -12,7 +12,7 @@ import (
 )
 
 type Bundler struct {
-	db         *forkable.ForkDB
+	forkDB     *forkable.ForkDB
 	bundleSize uint64
 
 	lastMergeOneBlockFile      *OneBlockFile
@@ -25,7 +25,7 @@ func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bund
 	zlog.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("first_exclusive_highest_block_limit", firstExclusiveHighestBlockLimit))
 	return &Bundler{
 		bundleSize:                 bundleSize,
-		db:                         forkable.NewForkDB(),
+		forkDB:                     forkable.NewForkDB(),
 		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
 	}
 }
@@ -57,6 +57,7 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 }
 
 func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+
 	libNum := uint64(math.MaxUint64)
 	lowBlockNum := initialLowBlockNum
 
@@ -67,23 +68,34 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 		if err != nil {
 			return fmt.Errorf("failed to fetch merged file for low block num: %d: %w", lowBlockNum, err)
 		}
-		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].Num > oneBlockFiles[j].Num })
-		for _, f := range oneBlockFiles {
-			if libNum == math.MaxUint64 {
-				zlog.Info("found lib to reach", zap.Uint64("lib_block_num", libNum))
-				libNum = f.LibNum()
-			}
-			f.Merged = true
-			b.addOneBlockFile(f)
-			if f.Num == libNum {
-				return nil
-			}
+
+		if libNum == math.MaxUint64 {
+			libNum = findLibNum(oneBlockFiles)
 		}
 
+		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].Num < oneBlockFiles[j].Num })
+		for _, f := range oneBlockFiles {
+			f.Merged = true
+			b.addOneBlockFile(f)
+		}
+		if b.forkDB.HasLIB() {
+			return nil
+		}
 		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum), zap.Uint64("lib_num_to_reach", libNum))
 
 		lowBlockNum = lowBlockNum - b.bundleSize
 	}
+}
+
+func findLibNum(oneBlockFiles []*OneBlockFile) uint64 {
+	libNum := uint64(0)
+	for _, oneBlockFile := range oneBlockFiles {
+		if oneBlockFile.LibNum() > libNum {
+			libNum = oneBlockFile.LibNum()
+		}
+	}
+
+	return libNum
 }
 
 func (b *Bundler) LastMergeOneBlockFile() *OneBlockFile {
@@ -109,7 +121,7 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 }
 
 func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
-	if block := b.db.BlockForID(oneBlockFile.ID); block != nil {
+	if block := b.forkDB.BlockForID(oneBlockFile.ID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		for filename := range oneBlockFile.Filenames { //this is an ugly patch. ash stepd ;-)
 			obf.Filenames[filename] = Empty
@@ -118,7 +130,12 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 	}
 
 	blockRef := bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num)
-	exists = b.db.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
+	exists = b.forkDB.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
+
+	if !b.forkDB.HasLIB() { // always skip processing until LIB is set
+		b.forkDB.SetLIB(bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num), oneBlockFile.PreviousID, oneBlockFile.LibNum())
+	}
+
 	return exists
 }
 
@@ -143,7 +160,7 @@ func (b *Bundler) LongestOneBlockFileChain() (oneBlockFiles []*OneBlockFile) {
 
 	lc := b.longestChain()
 	for _, id := range lc {
-		oneBlockFiles = append(oneBlockFiles, b.db.BlockForID(id).Object.(*OneBlockFile))
+		oneBlockFiles = append(oneBlockFiles, b.forkDB.BlockForID(id).Object.(*OneBlockFile))
 	}
 	sort.Slice(oneBlockFiles, func(i, j int) bool {
 		if oneBlockFiles[i].BlockTime.Equal(oneBlockFiles[j].BlockTime) {
@@ -164,35 +181,19 @@ func (b *Bundler) LongestChain() []string {
 
 func (b *Bundler) longestChain() []string {
 
-	roots, err := b.db.Roots()
+	tree, err := b.forkDB.BuildTree()
 	if err != nil {
-		return nil //this is happening when there is no links in db
+		return nil //this is happening when there is no links in forkDB
 	}
 
-	var longestChain []string
-
-	for _, root := range roots {
-		tree := b.db.BuildTreeWithID(root)
-		lc := tree.Chains().LongestChain()
-
-		if lc == nil || len(longestChain) == len(lc) {
-			// found multiple chains with same length
-			return nil
-		}
-
-		if len(longestChain) < len(lc) {
-			longestChain = lc
-		}
-	}
-
-	return longestChain
+	return tree.Chains().LongestChain()
 }
 
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	roots, err := b.db.Roots()
+	roots, err := b.forkDB.Roots()
 	if err != nil { //if there is no root it can't be too old
 		return false
 	}
@@ -200,7 +201,7 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	//Find the smallest root of all chains in forkdb
 	lowestRootBlockNum := uint64(math.MaxUint64)
 	for _, root := range roots {
-		block := b.db.BlockForID(root)
+		block := b.forkDB.BlockForID(root)
 		if block.BlockNum < lowestRootBlockNum {
 			lowestRootBlockNum = block.BlockNum
 		}
@@ -218,7 +219,7 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 	if longestChain == nil || len(longestChain) == 0 {
 		return 0, fmt.Errorf("no longest chain available")
 	}
-	block := b.db.BlockForID(longestChain[0])
+	block := b.forkDB.BlockForID(longestChain[0])
 	return block.BlockNum, nil
 }
 
@@ -226,9 +227,32 @@ func (b *Bundler) BundleCompleted() (complete bool, highestBlockLimit uint64) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	//{
+	//name: "wrong longest chain",
+	//	files: []string{
+	//	"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
+	//	"0000000116-20210728T105016.0-00000116a-00000115a-90-suffix",
+	//	"0000000117-20210728T105016.0-00000117a-00000116a-90-suffix",
+	//	"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
+	//	"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
+	//
+	//	"0000000300-20210728T105016.0-00000300a-00000299a-150-suffix",
+	//	"0000000301-20210728T105016.0-00000301a-00000300a-150-suffix",
+	//	"0000000302-20210728T105016.0-00000302a-00000301a-150-suffix",
+	//	"0000000303-20210728T105016.0-00000303a-00000302a-150-suffix",
+	//	"0000000304-20210728T105016.0-00000304a-00000303a-150-suffix",
+	//	"0000000305-20210728T105016.0-00000305a-00000304a-150-suffix",
+	//},
+	//	lastMergeBlockID:           "00000114a",
+	//	exclusiveHighestBlockLimit: 120,
+	//	expectedCompleted:          false,
+	//	expectedHighestBlockLimit:  118,
+	//},
+
 	longest := b.longestChain()
+
 	for _, blockID := range longest {
-		blk := b.db.BlockForID(blockID)
+		blk := b.forkDB.BlockForID(blockID)
 
 		if blk.BlockNum >= b.exclusiveHighestBlockLimit {
 			return true, highestBlockLimit
@@ -253,7 +277,7 @@ func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 	//995a - 996a - 997a - 998a - 999a - 1000a - 1001a - 1002a - 1003a - 1004a - 1005a - 1006a -- 1101
 	//									 - 1001b - 1002b - 1003b - 1004b
 
-	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
+	b.forkDB.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
 		blkNum := oneBlockFile.Num
 		if !oneBlockFile.Merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files
@@ -290,7 +314,7 @@ func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 
 	for _, file := range oneBlockFiles {
 		if highestOneBlockFile == nil || file.Num >= highestOneBlockFile.Num {
-			highestOneBlockFile = b.db.BlockForID(file.ID).Object.(*OneBlockFile)
+			highestOneBlockFile = b.forkDB.BlockForID(file.ID).Object.(*OneBlockFile)
 		}
 		file.Merged = true
 	}
@@ -307,11 +331,12 @@ func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 	if b.lastMergeOneBlockFile == nil {
 		return
 	}
+
 	lastMergeOneBlockFileLibNum := b.lastMergeOneBlockFile.LibNum()
-	libRef := b.db.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), lastMergeOneBlockFileLibNum)
+	libRef := b.forkDB.BlockInCurrentChain(bstream.NewBlockRef(b.lastMergeOneBlockFile.ID, b.lastMergeOneBlockFile.Num), lastMergeOneBlockFileLibNum)
 	collected := map[string]*OneBlockFile{}
 	if libRef != bstream.BlockRefEmpty {
-		purgedBlocks := b.db.MoveLIB(libRef)
+		purgedBlocks := b.forkDB.MoveLIB(libRef)
 		for _, block := range purgedBlocks {
 			oneBlockFile := block.Object.(*OneBlockFile)
 			if oneBlockFile.Merged && !oneBlockFile.Deleted {
@@ -320,7 +345,7 @@ func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 		}
 	}
 
-	b.db.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
+	b.forkDB.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
 		if oneBlockFile.Merged && !oneBlockFile.Deleted {
 			collected[oneBlockFile.ID] = oneBlockFile

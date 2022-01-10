@@ -267,16 +267,16 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 
 	srcOneBlockFiles := []*bundle.OneBlockFile{
 		bundle.MustNewOneBlockFile("0000000001-20210728T105016.01-00000001a-00000000a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-0-suffix"),
+		bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-1-suffix"),
 
-		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000007-20210728T105016.09-00000007a-00000006a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000008-20210728T105016.10-00000008a-00000007a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000009-20210728T105016.11-00000009a-00000008a-0-suffix"),
+		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000007-20210728T105016.09-00000007a-00000006a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000008-20210728T105016.10-00000008a-00000007a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000009-20210728T105016.11-00000009a-00000008a-1-suffix"),
 
-		bundle.MustNewOneBlockFile("0000000010-20210728T105016.12-00000010a-00000009a-0-suffix"),
+		bundle.MustNewOneBlockFile("0000000010-20210728T105016.12-00000010a-00000009a-1-suffix"),
 	}
 
 	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
@@ -475,10 +475,10 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 
 	srcOneBlockFiles := []*bundle.OneBlockFile{
 		bundle.MustNewOneBlockFile("0000000001-20210728T105016.01-00000001a-00000000a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-0-suffix"),
+		bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-1-suffix"),
 	}
 
 	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
@@ -618,26 +618,26 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 		mergedFiles: map[uint64][]*bundle.OneBlockFile{
 			uint64(113): {
 				bundle.MustNewOneBlockFile("0000000113-20210728T105016.0-00000113a-00000112a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-113-suffix"),
+				bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-113-suffix"),
+				bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-113-suffix"),
+				bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-113-suffix"),
 			},
 			uint64(118): {
-				bundle.MustNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000119-20210728T105116.0-00000119a-00000118a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000120-20210728T105216.0-00000120a-00000119a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000121-20210728T105316.0-00000121a-00000120a-90-suffix"),
-				bundle.MustNewOneBlockFile("0000000122-20210728T105016.0-00000122a-00000121a-90-suffix"),
+				bundle.MustNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-117-suffix"),
+				bundle.MustNewOneBlockFile("0000000119-20210728T105116.0-00000119a-00000118a-117-suffix"),
+				bundle.MustNewOneBlockFile("0000000120-20210728T105216.0-00000120a-00000119a-117-suffix"),
+				bundle.MustNewOneBlockFile("0000000121-20210728T105316.0-00000121a-00000120a-117-suffix"),
+				bundle.MustNewOneBlockFile("0000000122-20210728T105016.0-00000122a-00000121a-117-suffix"),
 			},
 		},
 		oneBlockFiles: []*bundle.OneBlockFile{
-			bundle.MustNewOneBlockFile("0000000123-20210728T105116.0-00000123a-00000122a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000124-20210728T105216.0-00000124a-00000123a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000125-20210728T105316.0-00000125a-00000124a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000126-20210728T105416.0-00000126a-00000125a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000127-20210728T105416.0-00000127a-00000126a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000128-20210728T105416.0-00000128a-00000127a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000123-20210728T105116.0-00000123a-00000122a-122-suffix"),
+			bundle.MustNewOneBlockFile("0000000124-20210728T105216.0-00000124a-00000123a-122-suffix"),
+			bundle.MustNewOneBlockFile("0000000125-20210728T105316.0-00000125a-00000124a-122-suffix"),
+			bundle.MustNewOneBlockFile("0000000126-20210728T105416.0-00000126a-00000125a-122-suffix"),
+			bundle.MustNewOneBlockFile("0000000127-20210728T105416.0-00000127a-00000126a-122-suffix"),
+			bundle.MustNewOneBlockFile("0000000128-20210728T105416.0-00000128a-00000127a-122-suffix"),
 		},
 	}
 
@@ -687,10 +687,10 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 		name: "sunny path",
 		files: []*bundle.OneBlockFile{
 			bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-90-suffix"),
+			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-114-suffix"),
+			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-114-suffix"),
+			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-114-suffix"),
+			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-114-suffix"),
 		},
 		blockLimit:                118,
 		expectedHighestBlockLimit: 118,

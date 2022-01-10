@@ -143,6 +143,8 @@ func (m *Merger) launch() (err error) {
 			return err
 		}
 
+		zlog.Info("bundle files uploaded")
+
 		m.bundler.Commit(highestBundleBlockNum)
 
 		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()

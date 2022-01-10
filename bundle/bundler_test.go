@@ -190,13 +190,13 @@ func TestBundler_IsComplete(t *testing.T) {
 			name: "file 0",
 			files: []string{
 				"0000000100-20210728T105016.0-00000100a-00000099a-90-suffix",
-				"0000000101-20210728T105016.0-00000101a-00000100a-90-suffix",
-				"0000000102-20210728T105016.0-00000102a-00000101a-90-suffix",
-				"0000000102-20210728T105016.0-00000102b-00000101a-90-suffix",
-				"0000000103-20210728T105016.0-00000103b-00000102b-90-suffix",
-				"0000000103-20210728T105016.0-00000103a-00000102a-90-suffix",
-				"0000000104-20210728T105016.0-00000104a-00000103a-90-suffix",
-				"0000000106-20210728T105016.0-00000106a-00000104a-90-suffix",
+				"0000000101-20210728T105016.0-00000101a-00000100a-100-suffix",
+				"0000000102-20210728T105016.0-00000102a-00000101a-100-suffix",
+				"0000000102-20210728T105016.0-00000102b-00000101a-100-suffix",
+				"0000000103-20210728T105016.0-00000103b-00000102b-100-suffix",
+				"0000000103-20210728T105016.0-00000103a-00000102a-100-suffix",
+				"0000000104-20210728T105016.0-00000104a-00000103a-100-suffix",
+				"0000000106-20210728T105016.0-00000106a-00000104a-100-suffix",
 			},
 			lastMergeBlockID:           "00000099a",
 			exclusiveHighestBlockLimit: 105,
@@ -207,12 +207,12 @@ func TestBundler_IsComplete(t *testing.T) {
 			name: "file 0 incomplete",
 			files: []string{
 				"0000000100-20210728T105016.0-00000100a-00000099a-90-suffix",
-				"0000000101-20210728T105016.0-00000101a-00000100a-90-suffix",
-				"0000000102-20210728T105016.0-00000102a-00000101a-90-suffix",
-				"0000000102-20210728T105016.0-00000102b-00000101a-90-suffix",
-				"0000000103-20210728T105016.0-00000103b-00000102b-90-suffix",
-				"0000000103-20210728T105016.0-00000103a-00000102a-90-suffix",
-				"0000000104-20210728T105016.0-00000104a-00000103a-90-suffix",
+				"0000000101-20210728T105016.0-00000101a-00000100a-100-suffix",
+				"0000000102-20210728T105016.0-00000102a-00000101a-100-suffix",
+				"0000000102-20210728T105016.0-00000102b-00000101a-100-suffix",
+				"0000000103-20210728T105016.0-00000103b-00000102b-100-suffix",
+				"0000000103-20210728T105016.0-00000103a-00000102a-100-suffix",
+				"0000000104-20210728T105016.0-00000104a-00000103a-100-suffix",
 			},
 			lastMergeBlockID:           "00000099a",
 			exclusiveHighestBlockLimit: 105,
@@ -223,11 +223,11 @@ func TestBundler_IsComplete(t *testing.T) {
 			name: "file 0 no longest chain",
 			files: []string{
 				"0000000100-20210728T105016.0-00000100a-00000099a-90-suffix",
-				"0000000101-20210728T105016.0-00000101a-00000100a-90-suffix",
-				"0000000102-20210728T105016.0-00000102a-00000101a-90-suffix",
-				"0000000102-20210728T105016.0-00000102b-00000101a-90-suffix",
-				"0000000103-20210728T105016.0-00000103b-00000102b-90-suffix",
-				"0000000103-20210728T105016.0-00000103a-00000102a-90-suffix",
+				"0000000101-20210728T105016.0-00000101a-00000100a-100-suffix",
+				"0000000102-20210728T105016.0-00000102a-00000101a-100-suffix",
+				"0000000102-20210728T105016.0-00000102b-00000101a-100-suffix",
+				"0000000103-20210728T105016.0-00000103b-00000102b-100-suffix",
+				"0000000103-20210728T105016.0-00000103a-00000102a-100-suffix",
 			},
 			lastMergeBlockID:           "00000099a",
 			exclusiveHighestBlockLimit: 105,
@@ -238,17 +238,17 @@ func TestBundler_IsComplete(t *testing.T) {
 			name: "file 5",
 			files: []string{
 				"0000000106-20210728T105016.0-00000106a-00000104a-90-suffix",
-				"0000000107-20210728T105016.0-00000107a-00000106a-90-suffix",
-				"0000000108-20210728T105016.0-00000108b-00000107a-90-suffix",
-				"0000000109-20210728T105016.0-00000109b-00000108b-90-suffix",
-				"0000000110-20210728T105016.0-00000110b-00000109b-90-suffix",
-				"0000000110-20210728T105016.0-00000110c-00000109b-90-suffix",
-				"0000000111-20210728T105016.0-00000111c-00000110c-90-suffix",
-				"0000000108-20210728T105016.0-00000108a-00000107a-90-suffix",
-				"0000000109-20210728T105016.0-00000109a-00000108a-90-suffix",
-				"0000000110-20210728T105016.0-00000110a-00000109a-90-suffix",
-				"0000000111-20210728T105016.0-00000111a-00000110a-90-suffix",
-				"0000000112-20210728T105016.0-00000112a-00000111a-90-suffix",
+				"0000000107-20210728T105016.0-00000107a-00000106a-106-suffix",
+				"0000000108-20210728T105016.0-00000108b-00000107a-106-suffix",
+				"0000000109-20210728T105016.0-00000109b-00000108b-106-suffix",
+				"0000000110-20210728T105016.0-00000110b-00000109b-106-suffix",
+				"0000000110-20210728T105016.0-00000110c-00000109b-106-suffix",
+				"0000000111-20210728T105016.0-00000111c-00000110c-106-suffix",
+				"0000000108-20210728T105016.0-00000108a-00000107a-106-suffix",
+				"0000000109-20210728T105016.0-00000109a-00000108a-106-suffix",
+				"0000000110-20210728T105016.0-00000110a-00000109a-106-suffix",
+				"0000000111-20210728T105016.0-00000111a-00000110a-106-suffix",
+				"0000000112-20210728T105016.0-00000112a-00000111a-106-suffix",
 			},
 			lastMergeBlockID:           "00000104a",
 			exclusiveHighestBlockLimit: 110,
@@ -259,19 +259,19 @@ func TestBundler_IsComplete(t *testing.T) {
 			name: "file 10",
 			files: []string{
 				"0000000107-20210728T105016.1-00000107a-00000106a-90-suffix",
-				"0000000108-20210728T105016.2-00000108b-00000107a-90-suffix",
-				"0000000109-20210728T105016.3-00000109b-00000108b-90-suffix",
-				"0000000110-20210728T105016.4-00000110b-00000109b-90-suffix",
-				"0000000110-20210728T105016.5-00000110c-00000109b-90-suffix",
-				"0000000111-20210728T105016.6-00000111c-00000110c-90-suffix",
-				"0000000108-20210728T105016.7-00000108a-00000107a-90-suffix",
-				"0000000109-20210728T105016.8-00000109a-00000108a-90-suffix",
-				"0000000110-20210728T105016.9-00000110a-00000109a-90-suffix",
-				"0000000111-20210728T105016.10-00000111a-00000110a-90-suffix",
-				"0000000112-20210728T105016.11-00000112a-00000111a-90-suffix",
-				"0000000113-20210728T105016.12-00000113a-00000112a-90-suffix",
-				"0000000114-20210728T105016.13-00000114a-00000113a-90-suffix",
-				"0000000115-20210728T105016.14-00000115a-00000114a-90-suffix",
+				"0000000108-20210728T105016.2-00000108b-00000107a-107-suffix",
+				"0000000109-20210728T105016.3-00000109b-00000108b-107-suffix",
+				"0000000110-20210728T105016.4-00000110b-00000109b-107-suffix",
+				"0000000110-20210728T105016.5-00000110c-00000109b-107-suffix",
+				"0000000111-20210728T105016.6-00000111c-00000110c-107-suffix",
+				"0000000108-20210728T105016.7-00000108a-00000107a-107-suffix",
+				"0000000109-20210728T105016.8-00000109a-00000108a-107-suffix",
+				"0000000110-20210728T105016.9-00000110a-00000109a-107-suffix",
+				"0000000111-20210728T105016.10-00000111a-00000110a-107-suffix",
+				"0000000112-20210728T105016.11-00000112a-00000111a-107-suffix",
+				"0000000113-20210728T105016.12-00000113a-00000112a-107-suffix",
+				"0000000114-20210728T105016.13-00000114a-00000113a-107-suffix",
+				"0000000115-20210728T105016.14-00000115a-00000114a-107-suffix",
 			},
 			lastMergeBlockID:           "00000109a",
 			exclusiveHighestBlockLimit: 115,
@@ -282,15 +282,57 @@ func TestBundler_IsComplete(t *testing.T) {
 			name: "file 15",
 			files: []string{
 				"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
-				"0000000116-20210728T105016.0-00000116a-00000115a-90-suffix",
-				"0000000117-20210728T105016.0-00000117a-00000116a-90-suffix",
-				"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
-				"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
+				"0000000116-20210728T105016.0-00000116a-00000115a-115-suffix",
+				"0000000117-20210728T105016.0-00000117a-00000116a-115-suffix",
+				"0000000118-20210728T105016.0-00000118a-00000117a-115-suffix",
+				"0000000120-20210728T105016.0-00000120a-00000118a-115-suffix",
 			},
 			lastMergeBlockID:           "00000114a",
 			exclusiveHighestBlockLimit: 120,
 			expectedCompleted:          true,
 			expectedHighestBlockLimit:  118,
+		},
+		{
+			name: "multiple root",
+			files: []string{
+				"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
+				"0000000116-20210728T105016.0-00000116a-00000115a-115-suffix",
+				"0000000117-20210728T105016.0-00000117a-00000116a-115-suffix",
+				"0000000118-20210728T105016.0-00000118a-00000117a-115-suffix",
+				"0000000120-20210728T105016.0-00000120a-00000118a-115-suffix",
+
+				"0000000300-20210728T105016.0-00000300a-00000299a-150-suffix",
+				"0000000301-20210728T105016.0-00000301a-00000300a-150-suffix",
+				"0000000302-20210728T105016.0-00000302a-00000301a-150-suffix",
+				"0000000303-20210728T105016.0-00000303a-00000302a-150-suffix",
+				"0000000304-20210728T105016.0-00000304a-00000303a-150-suffix",
+				"0000000305-20210728T105016.0-00000305a-00000304a-150-suffix",
+			},
+			lastMergeBlockID:           "00000114a",
+			exclusiveHighestBlockLimit: 120,
+			expectedCompleted:          true,
+			expectedHighestBlockLimit:  118,
+		},
+		{
+			name: "No lib",
+			files: []string{
+				"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
+				"0000000116-20210728T105016.0-00000116a-00000115a-90-suffix",
+				"0000000117-20210728T105016.0-00000117a-00000116a-90-suffix",
+				"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
+				//"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
+
+				"0000000300-20210728T105016.0-00000300a-00000299a-150-suffix",
+				"0000000301-20210728T105016.0-00000301a-00000300a-150-suffix",
+				"0000000302-20210728T105016.0-00000302a-00000301a-150-suffix",
+				"0000000303-20210728T105016.0-00000303a-00000302a-150-suffix",
+				"0000000304-20210728T105016.0-00000304a-00000303a-150-suffix",
+				"0000000305-20210728T105016.0-00000305a-00000304a-150-suffix",
+			},
+			lastMergeBlockID:           "00000114a",
+			exclusiveHighestBlockLimit: 120,
+			expectedCompleted:          false,
+			expectedHighestBlockLimit:  0,
 		},
 	}
 
@@ -305,10 +347,9 @@ func TestBundler_IsComplete(t *testing.T) {
 			}
 			completed, highestBlockLimit := bundler.BundleCompleted()
 			require.Equal(t, c.expectedCompleted, completed)
-			require.Equal(t, c.expectedHighestBlockLimit, highestBlockLimit)
+			require.Equal(t, int(c.expectedHighestBlockLimit), int(highestBlockLimit))
 		})
 	}
-
 }
 
 func MustTestNewMergedOneBlockFile(fileName string) *OneBlockFile {
@@ -330,13 +371,13 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			name: "file 0",
 			files: []*OneBlockFile{
 				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
-				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90-suffix"),
-				MustNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-90-suffix"),
-				MustNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-90-suffix"),
-				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90-suffix"),
-				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90-suffix"),
-				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-100-suffix"),
+				MustNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-100-suffix"),
+				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
+				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-100-suffix"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-100-suffix"),
 			},
 			lastMergeBlockID:         "00000099a",
 			blockLimit:               105,
@@ -347,17 +388,17 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			name: "file 5",
 			files: []*OneBlockFile{
 				MustNewOneBlockFile("0000000106-20210728T105016.01-00000106a-00000104a-90-suffix"),
-				MustNewOneBlockFile("0000000107-20210728T105016.02-00000107a-00000106a-90-suffix"),
-				MustNewOneBlockFile("0000000108-20210728T105016.03-00000108b-00000107a-90-suffix"),
-				MustNewOneBlockFile("0000000109-20210728T105016.04-00000109b-00000108b-90-suffix"),
-				MustNewOneBlockFile("0000000110-20210728T105016.05-00000110b-00000109b-90-suffix"),
-				MustNewOneBlockFile("0000000110-20210728T105016.06-00000110c-00000109b-90-suffix"),
-				MustNewOneBlockFile("0000000111-20210728T105016.07-00000111c-00000110c-90-suffix"),
-				MustNewOneBlockFile("0000000108-20210728T105016.08-00000108a-00000107a-90-suffix"),
-				MustNewOneBlockFile("0000000109-20210728T105016.09-00000109a-00000108a-90-suffix"),
-				MustNewOneBlockFile("0000000110-20210728T105016.10-00000110a-00000109a-90-suffix"),
-				MustNewOneBlockFile("0000000111-20210728T105016.11-00000111a-00000110a-90-suffix"),
-				MustNewOneBlockFile("0000000112-20210728T105016.12-00000112a-00000111a-90-suffix"),
+				MustNewOneBlockFile("0000000107-20210728T105016.02-00000107a-00000106a-106-suffix"),
+				MustNewOneBlockFile("0000000108-20210728T105016.03-00000108b-00000107a-106-suffix"),
+				MustNewOneBlockFile("0000000109-20210728T105016.04-00000109b-00000108b-106-suffix"),
+				MustNewOneBlockFile("0000000110-20210728T105016.05-00000110b-00000109b-106-suffix"),
+				MustNewOneBlockFile("0000000110-20210728T105016.06-00000110c-00000109b-106-suffix"),
+				MustNewOneBlockFile("0000000111-20210728T105016.07-00000111c-00000110c-106-suffix"),
+				MustNewOneBlockFile("0000000108-20210728T105016.08-00000108a-00000107a-106-suffix"),
+				MustNewOneBlockFile("0000000109-20210728T105016.09-00000109a-00000108a-106-suffix"),
+				MustNewOneBlockFile("0000000110-20210728T105016.10-00000110a-00000109a-106-suffix"),
+				MustNewOneBlockFile("0000000111-20210728T105016.11-00000111a-00000110a-106-suffix"),
+				MustNewOneBlockFile("0000000112-20210728T105016.12-00000112a-00000111a-106-suffix"),
 			},
 			lastMergeBlockID:         "00000104a",
 			blockLimit:               110,
@@ -368,19 +409,19 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			name: "file 10",
 			files: []*OneBlockFile{
 				MustTestNewMergedOneBlockFile("0000000107-20210728T105016.01-00000107a-00000106a-90-suffix"),
-				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.02-00000108b-00000107a-90-suffix"),
-				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.03-00000109b-00000108b-90-suffix"),
-				MustNewOneBlockFile("0000000110-20210728T105016.04-00000110b-00000109b-90-suffix"),
-				MustNewOneBlockFile("0000000110-20210728T105016.05-00000110c-00000109b-90-suffix"),
-				MustNewOneBlockFile("0000000111-20210728T105016.06-00000111c-00000110c-90-suffix"),
-				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.07-00000108a-00000107a-90-suffix"),
-				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.08-00000109a-00000108a-90-suffix"),
-				MustNewOneBlockFile("0000000110-20210728T105016.09-00000110a-00000109a-90-suffix"),
-				MustNewOneBlockFile("0000000111-20210728T105016.10-00000111a-00000110a-90-suffix"),
-				MustNewOneBlockFile("0000000112-20210728T105016.11-00000112a-00000111a-90-suffix"),
-				MustNewOneBlockFile("0000000113-20210728T105016.12-00000113a-00000112a-90-suffix"),
-				MustNewOneBlockFile("0000000114-20210728T105016.13-00000114a-00000113a-90-suffix"),
-				MustNewOneBlockFile("0000000115-20210728T105016.14-00000115a-00000114a-90-suffix"),
+				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.02-00000108b-00000107a-107-suffix"),
+				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.03-00000109b-00000108b-107-suffix"),
+				MustNewOneBlockFile("0000000110-20210728T105016.04-00000110b-00000109b-107-suffix"),
+				MustNewOneBlockFile("0000000110-20210728T105016.05-00000110c-00000109b-107-suffix"),
+				MustNewOneBlockFile("0000000111-20210728T105016.06-00000111c-00000110c-107-suffix"),
+				MustTestNewMergedOneBlockFile("0000000108-20210728T105016.07-00000108a-00000107a-107-suffix"),
+				MustTestNewMergedOneBlockFile("0000000109-20210728T105016.08-00000109a-00000108a-107-suffix"),
+				MustNewOneBlockFile("0000000110-20210728T105016.09-00000110a-00000109a-107-suffix"),
+				MustNewOneBlockFile("0000000111-20210728T105016.10-00000111a-00000110a-107-suffix"),
+				MustNewOneBlockFile("0000000112-20210728T105016.11-00000112a-00000111a-107-suffix"),
+				MustNewOneBlockFile("0000000113-20210728T105016.12-00000113a-00000112a-107-suffix"),
+				MustNewOneBlockFile("0000000114-20210728T105016.13-00000114a-00000113a-107-suffix"),
+				MustNewOneBlockFile("0000000115-20210728T105016.14-00000115a-00000114a-107-suffix"),
 			},
 			lastMergeBlockID:         "00000109a",
 			blockLimit:               115,
@@ -391,10 +432,10 @@ func TestBundler_MergeableFiles(t *testing.T) {
 			name: "file 15",
 			files: []*OneBlockFile{
 				MustNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90-suffix"),
-				MustNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90-suffix"),
-				MustNewOneBlockFile("0000000117-20210728T105016.0-00000117a-00000116a-90-suffix"),
-				MustNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-90-suffix"),
-				MustNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90-suffix"),
+				MustNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-115-suffix"),
+				MustNewOneBlockFile("0000000117-20210728T105016.0-00000117a-00000116a-115-suffix"),
+				MustNewOneBlockFile("0000000118-20210728T105016.0-00000118a-00000117a-115-suffix"),
+				MustNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-115-suffix"),
 			},
 			lastMergeBlockID:         "00000114a",
 			blockLimit:               120,
@@ -404,17 +445,17 @@ func TestBundler_MergeableFiles(t *testing.T) {
 		{
 			name: "file with holes",
 			files: []*OneBlockFile{
-				MustNewOneBlockFile("0000000100-20210728T105016.0-00000100a-00000099a-90-suffix"),
+				MustNewOneBlockFile("0000000100-20210728T105016.0-00000100a-00000099a-99-suffix"),
 
-				MustNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-90-suffix"),
-				MustNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-90-suffix"),
+				MustNewOneBlockFile("0000000115-20210728T105016.0-00000115a-00000114a-100-suffix"),
+				MustNewOneBlockFile("0000000116-20210728T105016.0-00000116a-00000115a-115-suffix"),
 
-				MustNewOneBlockFile("0000000117-20210728T105016.0-00000117b-00000116b-90-suffix"),
-				MustNewOneBlockFile("0000000118-20210728T105016.0-00000118b-00000117b-90-suffix"),
+				MustNewOneBlockFile("0000000117-20210728T105016.0-00000117b-00000116b-115-suffix"),
+				MustNewOneBlockFile("0000000118-20210728T105016.0-00000118b-00000117b-115-suffix"),
 
-				MustNewOneBlockFile("0000000117-20210728T105016.1-00000117a-00000116a-90-suffix"),
-				MustNewOneBlockFile("0000000118-20210728T105016.1-00000118a-00000117a-90-suffix"),
-				MustNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-90-suffix"),
+				MustNewOneBlockFile("0000000117-20210728T105016.1-00000117a-00000116a-115-suffix"),
+				MustNewOneBlockFile("0000000118-20210728T105016.1-00000118a-00000117a-115-suffix"),
+				MustNewOneBlockFile("0000000120-20210728T105016.0-00000120a-00000118a-115-suffix"),
 			},
 			lastMergeBlockID:         "00000114a",
 			blockLimit:               120,
@@ -446,31 +487,31 @@ func TestBundler_Complicated(t *testing.T) {
 
 	files := []*OneBlockFile{
 		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
-		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90-suffix"),
-		MustNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-90-suffix"),
-		MustNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-90-suffix"),
-		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90-suffix"),
-		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90-suffix"),
-		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90-suffix"),
-		MustNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-90-suffix"),
-		MustNewOneBlockFile("0000000108-20210728T105016.10-00000108b-00000107a-90-suffix"),
-		MustNewOneBlockFile("0000000109-20210728T105016.11-00000109b-00000108b-90-suffix"),
-		MustNewOneBlockFile("0000000110-20210728T105016.12-00000110b-00000109b-90-suffix"),
-		MustNewOneBlockFile("0000000110-20210728T105016.13-00000110c-00000109b-90-suffix"),
-		MustNewOneBlockFile("0000000111-20210728T105016.14-00000111c-00000110c-90-suffix"),
-		MustNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-90-suffix"),
-		MustNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-90-suffix"),
-		MustNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-90-suffix"),
-		MustNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-90-suffix"),
-		MustNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-90-suffix"),
-		MustNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-90-suffix"),
-		MustNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-90-suffix"),
-		MustNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a-90-suffix"),
-		MustNewOneBlockFile("0000000116-20210728T105016.23-00000116a-00000115a-90-suffix"),
-		MustNewOneBlockFile("0000000117-20210728T105016.24-00000117a-00000116a-90-suffix"),
-		MustNewOneBlockFile("0000000118-20210728T105016.25-00000118a-00000117a-90-suffix"),
-		MustNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a-90-suffix"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
+		MustNewOneBlockFile("0000000102-20210728T105016.04-00000102b-00000101a-100-suffix"),
+		MustNewOneBlockFile("0000000103-20210728T105016.05-00000103b-00000102b-100-suffix"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-100-suffix"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-100-suffix"),
+		MustNewOneBlockFile("0000000107-20210728T105016.09-00000107a-00000106a-100-suffix"),
+		MustNewOneBlockFile("0000000108-20210728T105016.10-00000108b-00000107a-100-suffix"),
+		MustNewOneBlockFile("0000000109-20210728T105016.11-00000109b-00000108b-100-suffix"),
+		MustNewOneBlockFile("0000000110-20210728T105016.12-00000110b-00000109b-100-suffix"),
+		MustNewOneBlockFile("0000000110-20210728T105016.13-00000110c-00000109b-100-suffix"),
+		MustNewOneBlockFile("0000000111-20210728T105016.14-00000111c-00000110c-100-suffix"),
+		MustNewOneBlockFile("0000000108-20210728T105016.15-00000108a-00000107a-100-suffix"),
+		MustNewOneBlockFile("0000000109-20210728T105016.16-00000109a-00000108a-100-suffix"),
+		MustNewOneBlockFile("0000000110-20210728T105016.17-00000110a-00000109a-100-suffix"),
+		MustNewOneBlockFile("0000000111-20210728T105016.18-00000111a-00000110a-100-suffix"),
+		MustNewOneBlockFile("0000000112-20210728T105016.19-00000112a-00000111a-100-suffix"),
+		MustNewOneBlockFile("0000000113-20210728T105016.20-00000113a-00000112a-100-suffix"),
+		MustNewOneBlockFile("0000000114-20210728T105016.21-00000114a-00000113a-100-suffix"),
+		MustNewOneBlockFile("0000000115-20210728T105016.22-00000115a-00000114a-100-suffix"),
+		MustNewOneBlockFile("0000000116-20210728T105016.23-00000116a-00000115a-100-suffix"),
+		MustNewOneBlockFile("0000000117-20210728T105016.24-00000117a-00000116a-100-suffix"),
+		MustNewOneBlockFile("0000000118-20210728T105016.25-00000118a-00000117a-100-suffix"),
+		MustNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a-100-suffix"),
 	}
 
 	bundler := NewBundler(5, 105)
@@ -523,18 +564,18 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 	// load forkdb with some history ...
 	files := []*OneBlockFile{
 		MustTestNewMergedOneBlockFile("0000000094-20210728T105016.01-00000094a-00000093a-90-suffix"),
-		MustTestNewMergedOneBlockFile("0000000095-20210728T105016.01-00000095a-00000094a-90-suffix"),
-		MustTestNewMergedOneBlockFile("0000000096-20210728T105016.01-00000096a-00000095a-90-suffix"),
-		MustTestNewMergedOneBlockFile("0000000097-20210728T105016.01-00000097a-00000096a-90-suffix"),
-		MustTestNewMergedOneBlockFile("0000000098-20210728T105016.01-00000098a-00000097a-90-suffix"),
-		MustTestNewMergedOneBlockFile("0000000099-20210728T105016.01-00000099a-00000098a-90-suffix"),
+		MustTestNewMergedOneBlockFile("0000000095-20210728T105016.01-00000095a-00000094a-94-suffix"),
+		MustTestNewMergedOneBlockFile("0000000096-20210728T105016.01-00000096a-00000095a-94-suffix"),
+		MustTestNewMergedOneBlockFile("0000000097-20210728T105016.01-00000097a-00000096a-94-suffix"),
+		MustTestNewMergedOneBlockFile("0000000098-20210728T105016.01-00000098a-00000097a-94-suffix"),
+		MustTestNewMergedOneBlockFile("0000000099-20210728T105016.01-00000099a-00000098a-94-suffix"),
 
-		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
-		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90-suffix"),
-		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90-suffix"),
-		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90-suffix"),
-		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90-suffix"),
+		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-94-suffix"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-94-suffix"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-94-suffix"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-94-suffix"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-94-suffix"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-94-suffix"),
 	}
 
 	bundler := NewBundler(5, 105)
@@ -606,6 +647,7 @@ func TestBundler_Purge(t *testing.T) {
 		expectedFileToDeleteCount int
 		expectedLongestFirstBlock string
 		expectedLibID             string
+		expectedCompleted         bool
 	}{
 		{
 			name: "Sunny path",
@@ -615,9 +657,10 @@ func TestBundler_Purge(t *testing.T) {
 				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
 				MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
 				MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101-suffix"),
-				MustNewOneBlockFile("0000000106-20210728T105016.08-000	00106a-00000104a-101-suffix"),
+				MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-101-suffix"),
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-101-suffix"),
+			expectedCompleted:         true,
 			expectedLongestFirstBlock: "00000101a",
 			expectedFileToDeleteCount: 5,
 			expectedLibID:             "00000101a",
@@ -638,6 +681,7 @@ func TestBundler_Purge(t *testing.T) {
 			expectedLongestFirstBlock: "00000101a",
 			expectedFileToDeleteCount: 7,
 			expectedLibID:             "00000101a",
+			expectedCompleted:         true,
 		},
 		{
 			name: "Purger fork",
@@ -655,35 +699,36 @@ func TestBundler_Purge(t *testing.T) {
 			expectedLongestFirstBlock: "00000103a",
 			expectedFileToDeleteCount: 7,
 			expectedLibID:             "00000103a",
+			expectedCompleted:         true,
 		},
 		{
 			name: "Purge nothing never merged anything",
 			files: []*OneBlockFile{
 				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
 			},
 			lastMergerBlock:           nil,
 			expectedLongestFirstBlock: "00000100a",
 			expectedFileToDeleteCount: 0,
-			expectedLibID:             "",
+			expectedLibID:             "00000100a",
 		},
 		{
 			name: "Purge nothing",
 			files: []*OneBlockFile{
 				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
 			},
 			lastMergerBlock:           MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
 			expectedLongestFirstBlock: "00000100a",
 			expectedFileToDeleteCount: 0,
-			expectedLibID:             "",
+			expectedLibID:             "00000100a",
 		},
 		{
 			name: "Purge multiple root",
 			files: []*OneBlockFile{
 				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100b-00000099b-90-suffix"),
-				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101b-00000100b-100-suffix"),
-				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101b-100-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101b-00000100b-90-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102b-00000101b-90-suffix"),
 
 				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
 				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
@@ -696,6 +741,7 @@ func TestBundler_Purge(t *testing.T) {
 			expectedLongestFirstBlock: "00000103a",
 			expectedFileToDeleteCount: 8,
 			expectedLibID:             "00000103a",
+			expectedCompleted:         true,
 		},
 	}
 
@@ -707,6 +753,7 @@ func TestBundler_Purge(t *testing.T) {
 			}
 
 			completed, highestBlockLimit := bundler.BundleCompleted()
+			require.Equal(t, c.expectedCompleted, completed)
 			if completed {
 				bundler.Commit(highestBlockLimit)
 			}
@@ -715,9 +762,9 @@ func TestBundler_Purge(t *testing.T) {
 				require.Equal(t, c.expectedFileToDeleteCount, len(purgedOneBlockFiles))
 			})
 
-			require.Equal(t, c.expectedLibID, bundler.db.LIBID())
+			require.Equal(t, c.expectedLibID, bundler.forkDB.LIBID())
 
-			_, err := bundler.db.Roots()
+			_, err := bundler.forkDB.Roots()
 			if c.expectedLongestFirstBlock == "" {
 				require.Errorf(t, err, "no link")
 				return
@@ -777,7 +824,7 @@ func TestBundler_Boostrap(t *testing.T) {
 			firstExclusiveHighestBlockLimit: 115,
 			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{110},
-			expectedFirstBlockNum:           113,
+			expectedFirstBlockNum:           110,
 		},
 		{
 			name:                            "First bundle with no merge file existing",
@@ -820,7 +867,7 @@ func TestBundler_Boostrap(t *testing.T) {
 			firstExclusiveHighestBlockLimit: 105,
 			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{100, 95},
-			expectedFirstBlockNum:           98,
+			expectedFirstBlockNum:           95,
 		},
 	}
 
