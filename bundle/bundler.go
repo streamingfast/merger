@@ -56,9 +56,11 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	return nil
 }
 
+//100 - - - - - - 200 - - - - - - 300 - - - - - Live (400) 401  410  411
+//                192             282                 375        376  376
+
 func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
 
-	libNum := uint64(math.MaxUint64)
 	lowBlockNum := initialLowBlockNum
 
 	for {
@@ -69,10 +71,6 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 			return fmt.Errorf("failed to fetch merged file for low block num: %d: %w", lowBlockNum, err)
 		}
 
-		if libNum == math.MaxUint64 {
-			libNum = findLibNum(oneBlockFiles)
-		}
-
 		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].Num < oneBlockFiles[j].Num })
 		for _, f := range oneBlockFiles {
 			f.Merged = true
@@ -81,7 +79,7 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 		if b.forkDB.HasLIB() {
 			return nil
 		}
-		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum), zap.Uint64("lib_num_to_reach", libNum))
+		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum))
 
 		lowBlockNum = lowBlockNum - b.bundleSize
 	}
