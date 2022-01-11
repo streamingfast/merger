@@ -78,7 +78,7 @@ func TestWalkFS(t *testing.T) {
 	assert.EqualValues(t, expectedFiles, files)
 }
 
-func TestFindNextBaseBlock(t *testing.T) {
+func TestFindLastMergedLowBlockNum(t *testing.T) {
 
 	tests := []struct {
 		name                  string
@@ -101,7 +101,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 			writtenFiles:          []string{"0000000000", "0000000100", "0000000200"},
 			chunkSize:             100,
 			minimalBlockNum:       0,
-			expectedNextBaseBlock: 300,
+			expectedNextBaseBlock: 200,
 			expectedFoundAny:      true,
 		},
 		{
@@ -109,7 +109,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 			writtenFiles:          []string{"0000009900", "0000010000", "0000010100"},
 			chunkSize:             100,
 			minimalBlockNum:       3,
-			expectedNextBaseBlock: 10200,
+			expectedNextBaseBlock: 10100,
 			expectedFoundAny:      true,
 		},
 	}
@@ -128,7 +128,7 @@ func TestFindNextBaseBlock(t *testing.T) {
 				require.NoError(t, err)
 			}
 			bstream.GetProtocolFirstStreamableBlock = test.minimalBlockNum
-			nextBaseMergedBlock, foundAny, err := FindNextBaseMergedBlock(s, test.chunkSize)
+			nextBaseMergedBlock, foundAny, err := FindLastMergedLowBlockNum(s, test.chunkSize)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectedFoundAny, foundAny)
 

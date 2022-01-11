@@ -96,7 +96,8 @@ func (a *App) Run() error {
 
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
-		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, bundleSize)
+		lastMergedLowBlockNum, found, err := merger.FindLastMergedLowBlockNum(mergedBlocksStore, bundleSize)
+		nextExclusiveHighestBlockLimit := lastMergedLowBlockNum + bundleSize + bundleSize
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}

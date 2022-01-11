@@ -25,8 +25,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// FindNextBaseMergedBlock will return an error if there is a gap found ...
-func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (uint64, bool, error) {
+// FindLastMergedLowBlockNum will return an error if there is a gap found ...
+func FindLastMergedLowBlockNum(mergedBlocksStore dstore.Store, chunkSize uint64) (uint64, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 	defer cancel()
 	foundAny := false
@@ -58,7 +58,7 @@ func FindNextBaseMergedBlock(mergedBlocksStore dstore.Store, chunkSize uint64) (
 		return 0, foundAny, err
 	}
 
-	return lastNumber + chunkSize, foundAny, err
+	return lastNumber, foundAny, err
 }
 
 func getLeadingZeroes(blockNum uint64) (leadingZeros int) {
