@@ -296,10 +296,6 @@ func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneB
 			return nil, err
 		}
 	}
-	zlog.Info("Processed, already existing merged file",
-		zap.Uint64("lower_block", lowerBlock),
-		zap.Uint64("highest_block", highestBlock),
-	)
 
 	return
 }

@@ -65,12 +65,23 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	initialLowBlockNum := b.bundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
-	zlog.Info("Bootstrapping", zap.Uint64("initial_low_block_num", initialLowBlockNum))
+	lastMergedLowBlockNum := b.bundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
 
-	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
+	oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lastMergedLowBlockNum)
+	if err != nil {
+		return fmt.Errorf("searching for lib: failed to fetch merged file for low block num: %d: %w", lastMergedLowBlockNum, err)
+	}
+
+	libNumToStartFrom := findLibNum(oneBlockFiles)
+	zlog.Info("Bootstrapping ", zap.Uint64("lib_num_to_start_from", libNumToStartFrom), zap.Uint64("last_merged_low_block_num", lastMergedLowBlockNum))
+
+	err = b.loadOneBlocksFromLib(libNumToStartFrom, lastMergedLowBlockNum, fetchOneBlockFilesFromMergedFile)
 	if err != nil {
 		return fmt.Errorf("loading one block files: %w", err)
+	}
+
+	if !b.forkDB.HasLIB() {
+		return fmt.Errorf("bootstrap completed and lib not set")
 	}
 
 	zlog.Info("Bootstrapped", zap.Uint64("lib_num", b.forkDB.LIBNum()), zap.String("lib_id", b.forkDB.LIBID()))
@@ -80,12 +91,10 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 //100 - - - - - - 200 - - - - - - 300 - - - - - Live (400) 401  410  411
 //                192             282                 375        376  376
 
-func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
-
-	lowBlockNum := initialLowBlockNum
-
+func (b *Bundler) loadOneBlocksFromLib(libNumToStartFrom uint64, lastMergedLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
+	lowBlockNum := (libNumToStartFrom / b.bundleSize) * b.bundleSize
 	for {
-		zlog.Info("fetching one block files", zap.Uint64("at_low_block_num", lowBlockNum))
+		zlog.Info("fetching merged files", zap.Uint64("at_low_block_num", lowBlockNum))
 
 		oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lowBlockNum)
 		if err != nil {
@@ -98,13 +107,15 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 			f.Deleted = true //one block files from merged file do not need to be deleted by merger
 			b.addOneBlockFile(f)
 		}
-		if b.forkDB.HasLIB() {
-			return nil
-		}
-		zlog.Info("processed one block files", zap.Uint64("at_low_block_num", lowBlockNum))
+		zlog.Info("processed merge file", zap.Uint64("at_low_block_num", lowBlockNum))
 
-		lowBlockNum = lowBlockNum - b.bundleSize
+		lowBlockNum = lowBlockNum + b.bundleSize
+
+		if lowBlockNum > lastMergedLowBlockNum {
+			break
+		}
 	}
+	return nil
 }
 
 func findLibNum(oneBlockFiles []*OneBlockFile) uint64 {
@@ -141,6 +152,7 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 }
 
 func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
+	zlog.Debug("adding one block file", zap.String("file_name", oneBlockFile.CanonicalName))
 	if block := b.forkDB.BlockForID(oneBlockFile.ID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		for filename := range oneBlockFile.Filenames { //this is an ugly patch. ash stepd ;-)
