@@ -36,7 +36,18 @@ func (b *Bundler) String() string {
 		lastMergeBlockNum = b.lastMergeOneBlockFile.Num
 	}
 
-	return fmt.Sprintf("bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d", b.bundleSize, lastMergeBlockNum, b.BundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
+	lc := b.longestChain()
+	return fmt.Sprintf(
+		"\nbundle_size: %d, \nlast_merge_block_num: %d, \ninclusive_lower_block_num: %d, \nexclusive_highest_block_limit: %d \nlib_num: %d \nlib id:%s  \nlongest chain lenght: %d",
+		b.bundleSize,
+		lastMergeBlockNum,
+		b.BundleInclusiveLowerBlock(),
+		b.exclusiveHighestBlockLimit,
+		b.forkDB.LIBNum(),
+		b.forkDB.LIBID(),
+
+		len(lc),
+	)
 }
 
 func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
