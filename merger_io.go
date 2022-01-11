@@ -272,30 +272,29 @@ func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneB
 	highestBlock := uint64(0)
 	for {
 		block, err := blkReader.Read()
+		if block != nil {
+			if block.Num() < lowerBlock {
+				lowerBlock = block.Num()
+			}
+
+			if block.Num() > highestBlock {
+				highestBlock = block.Num()
+			}
+
+			// we do this little dance to ensure that the 'canonical filename' will match any other oneblockfiles
+			// the oneblock encoding/decoding stay together inside 'bundle' package
+			fileName := bundle.BlockFileName(block)
+			oneBlockFile := bundle.MustNewOneBlockFile(fileName)
+			oneBlockFile.Merged = true
+			oneBlockFiles = append(oneBlockFiles, oneBlockFile)
+		}
+
 		if err != nil {
-			return nil, err
-		}
-
-		if block.Num() < lowerBlock {
-			lowerBlock = block.Num()
-		}
-
-		if block.Num() > highestBlock {
-			highestBlock = block.Num()
-		}
-
-		if block == nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
-		// we do this little dance to ensure that the 'canonical filename' will match any other oneblockfiles
-		// the oneblock encoding/decoding stay together inside 'bundle' package
-		fileName := bundle.BlockFileName(block)
-		oneBlockFile := bundle.MustNewOneBlockFile(fileName)
-		oneBlockFile.Merged = true
-		oneBlockFiles = append(oneBlockFiles, oneBlockFile)
 	}
 	zlog.Info("Processed, already existing merged file",
 		zap.Uint64("lower_block", lowerBlock),

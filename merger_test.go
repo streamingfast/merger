@@ -17,6 +17,7 @@ package merger
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -609,6 +610,9 @@ func TestMerger_Launch_Drift(t *testing.T) {
 }
 
 func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
+	//todo: froch this test is failing when run with...
+	//go test -count 100000 -run TestMerger_PreMergedBlocks_Purge ./...
+
 	c := struct {
 		name          string
 		mergedFiles   map[uint64][]*bundle.OneBlockFile
@@ -652,13 +656,15 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 	merger.fetchOneBlockFiles = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 		cycleCount += 1
 		if cycleCount == 2 {
-			merger.Shutdown(nil)
 			return c.oneBlockFiles, err
 		}
 		return nil, err
 	}
 
 	merger.mergeUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+		if cycleCount == 2 {
+			merger.Shutdown(io.EOF)
+		}
 		return nil
 	}
 
