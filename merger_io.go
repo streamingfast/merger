@@ -46,35 +46,58 @@ func NewMergerIO(
 	}
 }
 
+//func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+//	if len(oneBlockFiles) == 0 {
+//		return nil // nothing to do
+//	}
+//
+//	t0 := time.Now()
+//
+//	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
+//	zlog.Debug("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Uint64("lower_block_num", oneBlockFiles[0].Num), zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num))
+//
+//	if m.writeObjectFunc == nil {
+//		m.writeObjectFunc = func() error {
+//			ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+//			defer cancel()
+//			if m.downloadFileFunc == nil {
+//				m.downloadFileFunc = m.DownloadFile
+//			}
+//			return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.downloadFileFunc))
+//		}
+//	}
+//
+//	err = Retry(m.retryAttempts, m.retryCooldown, m.writeObjectFunc)
+//	if err != nil {
+//		return fmt.Errorf("write object error: %s", err)
+//	}
+//
+//	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
+//
+//	return nil
+//}
+
 func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
-		return nil // nothing to do
+		return
 	}
-
 	t0 := time.Now()
 
 	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
-	zlog.Debug("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Uint64("lower_block_num", oneBlockFiles[0].Num), zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num))
+	zlog.Info("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Uint64("lower_block_num", oneBlockFiles[0].Num), zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num))
 
-	if m.writeObjectFunc == nil {
-		m.writeObjectFunc = func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
-			defer cancel()
-			if m.downloadFileFunc == nil {
-				m.downloadFileFunc = m.DownloadFile
-			}
-			return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.downloadFileFunc))
-		}
-	}
-
-	err = Retry(m.retryAttempts, m.retryCooldown, m.writeObjectFunc)
+	err = Retry(5, 500*time.Millisecond, func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+		defer cancel()
+		return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.DownloadFile))
+	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
 
 	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
-	return nil
+	return
 }
 
 func (m *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
