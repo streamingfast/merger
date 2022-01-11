@@ -113,6 +113,8 @@ func (m *Merger) launch() (err error) {
 
 			if lastOneBlockFileAdded != nil {
 				zlog.Info("one block retrieved", zap.Uint64("last_block_file", lastOneBlockFileAdded.Num))
+				metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.BlockTime)
+				metrics.HeadBlockNumber.SetUint64(lastOneBlockFileAdded.Num)
 			}
 
 			isBundleComplete, highestBundleBlockNum = m.bundler.BundleCompleted()
@@ -149,8 +151,6 @@ func (m *Merger) launch() (err error) {
 
 		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()
 		zlog.Info("bundle merged and committed", zap.Stringer("bundle", m.bundler), zap.Time("last_merge_one_block_time", lastMergedOneBlockFile.BlockTime))
-		metrics.HeadBlockTimeDrift.SetBlockTime(lastMergedOneBlockFile.BlockTime)
-		metrics.HeadBlockNumber.SetUint64(lastMergedOneBlockFile.Num)
 
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
 		zlog.Info("saving state", zap.Stringer("state", state))

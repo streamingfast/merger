@@ -82,7 +82,7 @@ func (a *App) Run() error {
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	bundleSize := uint64(100)
-	needBootstrap := true
+	needBootstrap := false
 	state, err := merger.LoadState(a.config.StateFile)
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
@@ -107,7 +107,7 @@ func (a *App) Run() error {
 		err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
 			if fetchErr != nil {
-				return nil, fmt.Errorf("fetching one block file from merged file with low block num:%d %w", lowBlockNum, fetchErr)
+				return nil, fmt.Errorf("fetching one block files from merged file with low block num:%d %w", lowBlockNum, fetchErr)
 			}
 			return oneBlockFiles, err
 		})
