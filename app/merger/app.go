@@ -83,7 +83,17 @@ func (a *App) Run() error {
 
 	bundleSize := uint64(100)
 	needBootstrap := true
-	state, err := merger.LoadState(a.config.StateFile)
+
+	var state *merger.State
+	if a.config.NextExclusiveHighestBlockLimit > 0 {
+		needBootstrap = false
+		state = &merger.State{
+			ExclusiveHighestBlockLimit: a.config.NextExclusiveHighestBlockLimit,
+		}
+	} else {
+		state, err = merger.LoadState(a.config.StateFile)
+	}
+
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
 		nextExclusiveHighestBlockLimit, found, err := merger.FindNextBaseMergedBlock(mergedBlocksStore, bundleSize)
@@ -93,10 +103,8 @@ func (a *App) Run() error {
 		if !found {
 			needBootstrap = false
 			nextExclusiveHighestBlockLimit = ((bstream.GetProtocolFirstStreamableBlock / bundleSize) * bundleSize) + bundleSize
-			if a.config.NextExclusiveHighestBlockLimit > 0 {
-				nextExclusiveHighestBlockLimit = a.config.NextExclusiveHighestBlockLimit
-			}
 		}
+
 		state = &merger.State{
 			ExclusiveHighestBlockLimit: nextExclusiveHighestBlockLimit,
 		}
