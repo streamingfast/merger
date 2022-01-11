@@ -41,7 +41,7 @@ func (b *Bundler) String() string {
 		"\nbundle_size: %d, \nlast_merge_block_num: %d, \ninclusive_lower_block_num: %d, \nexclusive_highest_block_limit: %d \nlib_num: %d \nlib id:%s  \nlongest chain lenght: %d",
 		b.bundleSize,
 		lastMergeBlockNum,
-		b.BundleInclusiveLowerBlock(),
+		b.bundleInclusiveLowerBlock(),
 		b.exclusiveHighestBlockLimit,
 		b.forkDB.LIBNum(),
 		b.forkDB.LIBID(),
@@ -51,6 +51,13 @@ func (b *Bundler) String() string {
 }
 
 func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	return b.bundleInclusiveLowerBlock()
+}
+
+func (b *Bundler) bundleInclusiveLowerBlock() uint64 {
 	return b.exclusiveHighestBlockLimit - b.bundleSize
 }
 
@@ -58,7 +65,7 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	initialLowBlockNum := b.BundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
+	initialLowBlockNum := b.bundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
 	zlog.Info("Bootstrapping", zap.Uint64("initial_low_block_num", initialLowBlockNum))
 
 	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
@@ -200,6 +207,18 @@ func (b *Bundler) longestChain() []string {
 	}
 
 	return tree.Chains().LongestChain()
+}
+
+func (b *Bundler) LongestChainLastBlockFile() *OneBlockFile {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+
+	ch := b.longestChain()
+	if len(ch) == 0 {
+		return nil
+	}
+	blk := b.forkDB.BlockForID(ch[len(ch)-1])
+	return blk.Object.(*OneBlockFile)
 }
 
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {

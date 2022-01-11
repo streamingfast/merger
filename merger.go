@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"github.com/streamingfast/merger/bundle"
-
 	"github.com/streamingfast/merger/metrics"
+
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 )
@@ -113,18 +113,20 @@ func (m *Merger) launch() (err error) {
 
 			if lastOneBlockFileAdded != nil {
 				zlog.Info("one block retrieved", zap.Uint64("last_block_file", lastOneBlockFileAdded.Num))
-				metrics.HeadBlockTimeDrift.SetBlockTime(lastOneBlockFileAdded.BlockTime)
-				metrics.HeadBlockNumber.SetUint64(lastOneBlockFileAdded.Num)
+				highest := m.bundler.LongestChainLastBlockFile()
+				if highest != nil &&
+					highest.Num >= m.bundler.BundleInclusiveLowerBlock() &&
+					highest.Num < m.bundler.ExclusiveHighestBlockLimit() {
+					metrics.HeadBlockTimeDrift.SetBlockTime(highest.BlockTime)
+					metrics.HeadBlockNumber.SetUint64(highest.Num)
+				}
+
 			}
 
 			isBundleComplete, highestBundleBlockNum = m.bundler.BundleCompleted()
 			if !isBundleComplete {
 
 				zlog.Info("bundle not completed after retrieving one block file", zap.Stringer("bundle", m.bundler))
-				if last := m.bundler.LastMergeOneBlockFile(); last != nil {
-					metrics.HeadBlockTimeDrift.SetBlockTime(last.BlockTime)
-				}
-
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
 					continue
