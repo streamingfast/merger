@@ -82,7 +82,7 @@ func (a *App) Run() error {
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	bundleSize := uint64(100)
-	foundAny := false
+	needBootstrap := true
 	state, err := merger.LoadState(a.config.StateFile)
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
@@ -90,8 +90,8 @@ func (a *App) Run() error {
 		if err != nil {
 			return fmt.Errorf("finding where to start: %w", err)
 		}
-		foundAny = found
-		if !foundAny {
+		if !found {
+			needBootstrap = false
 			nextExclusiveHighestBlockLimit = ((bstream.GetProtocolFirstStreamableBlock / bundleSize) * bundleSize) + bundleSize
 			if a.config.NextExclusiveHighestBlockLimit > 0 {
 				nextExclusiveHighestBlockLimit = a.config.NextExclusiveHighestBlockLimit
@@ -103,7 +103,7 @@ func (a *App) Run() error {
 	}
 
 	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
-	if foundAny {
+	if needBootstrap {
 		err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
 			if fetchErr != nil {

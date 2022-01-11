@@ -48,11 +48,14 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	defer b.mutex.Unlock()
 
 	initialLowBlockNum := b.BundleInclusiveLowerBlock()
+	zlog.Info("Bootstrapping", zap.Uint64("initial_low_block_num", initialLowBlockNum))
 
 	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
 	if err != nil {
 		return fmt.Errorf("loading one block files: %w", err)
 	}
+
+	zlog.Info("Bootstrapped", zap.Uint64("lib_num", b.forkDB.LIBNum()), zap.String("lib_id", b.forkDB.LIBID()))
 	return nil
 }
 
@@ -74,6 +77,7 @@ func (b *Bundler) loadOneBlocksToLib(initialLowBlockNum uint64, fetchOneBlockFil
 		sort.Slice(oneBlockFiles, func(i, j int) bool { return oneBlockFiles[i].Num < oneBlockFiles[j].Num })
 		for _, f := range oneBlockFiles {
 			f.Merged = true
+			f.Deleted = true //one block files from merged file do not need to be deleted by merger
 			b.addOneBlockFile(f)
 		}
 		if b.forkDB.HasLIB() {
