@@ -823,12 +823,12 @@ func TestBundler_Boostrap(t *testing.T) {
 			name:                            "Sunny path",
 			firstExclusiveHighestBlockLimit: 115,
 			mergeFiles:                      mergeFiles,
-			expectedMergeFilesRead:          []int{110},
-			expectedFirstBlockNum:           110,
+			expectedMergeFilesRead:          []int{105},
+			expectedFirstBlockNum:           106,
 		},
 		{
 			name:                            "First bundle with no merge file existing",
-			firstExclusiveHighestBlockLimit: 5,
+			firstExclusiveHighestBlockLimit: 10,
 			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          nil,
 			expectedFirstBlockNum:           0,
@@ -836,7 +836,7 @@ func TestBundler_Boostrap(t *testing.T) {
 		},
 		{
 			name:                            "First bundle with merge file",
-			firstExclusiveHighestBlockLimit: 5,
+			firstExclusiveHighestBlockLimit: 10,
 			mergeFiles: map[uint64][]*OneBlockFile{
 				0: {
 					MustNewOneBlockFile("0000000001-20210728T105016.07-00000001a-00000000a-00-suffix"),
@@ -857,14 +857,14 @@ func TestBundler_Boostrap(t *testing.T) {
 		},
 		{
 			name:                            "First and last from single file",
-			firstExclusiveHighestBlockLimit: 110,
+			firstExclusiveHighestBlockLimit: 115,
 			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{105},
 			expectedFirstBlockNum:           106,
 		},
 		{
 			name:                            "Find lib over 2 files",
-			firstExclusiveHighestBlockLimit: 105,
+			firstExclusiveHighestBlockLimit: 110,
 			mergeFiles:                      mergeFiles,
 			expectedMergeFilesRead:          []int{100, 95},
 			expectedFirstBlockNum:           95,

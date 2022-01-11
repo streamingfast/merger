@@ -82,7 +82,7 @@ func (a *App) Run() error {
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	bundleSize := uint64(100)
-	needBootstrap := false
+	needBootstrap := true
 	state, err := merger.LoadState(a.config.StateFile)
 	if err != nil || state == nil {
 		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))

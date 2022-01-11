@@ -411,7 +411,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 }
 
 func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(5, 10)
 
 	merger := NewMerger(bundler, time.Second, "", nil, nil, nil, nil, nil, "")
 
@@ -455,7 +455,7 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 	err = merger.launch()
 	require.NoError(t, err)
 
-	require.Equal(t, []uint64{0, 0, 5}, mergeFilesFetched) //one time from the bootstrap and 2 time from main loop
+	require.Equal(t, []uint64{0, 5}, mergeFilesFetched) //one time from the bootstrap and 2 time from main loop
 }
 
 func TestNewMerger_Check_StateFile(t *testing.T) {

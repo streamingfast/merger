@@ -47,7 +47,7 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	initialLowBlockNum := b.BundleInclusiveLowerBlock()
+	initialLowBlockNum := b.BundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
 	zlog.Info("Bootstrapping", zap.Uint64("initial_low_block_num", initialLowBlockNum))
 
 	err := b.loadOneBlocksToLib(initialLowBlockNum, fetchOneBlockFilesFromMergedFile)
