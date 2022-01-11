@@ -47,7 +47,7 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 
 		if len(data) == 0 {
 			r.readBuffer = nil
-			continue
+			return 0, fmt.Errorf("one-block-file corrupt: empty data: filename: %s", obf.CanonicalName)
 		}
 
 		if r.headerPassed {

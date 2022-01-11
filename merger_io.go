@@ -137,6 +137,7 @@ func (m *MergerIO) DownloadFile(ctx context.Context, oneBlockFile *bundle.OneBlo
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
 		out, err = m.oneBlocksStore.OpenObject(ctx, filename)
+		zlog.Debug("downloading one block", zap.String("file_name", filename))
 		if err != nil {
 			continue
 		}
