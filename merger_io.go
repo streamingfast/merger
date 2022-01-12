@@ -125,12 +125,12 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 		if oneBlockFile.InnerLibNum == nil {
 			data, err := oneBlockFile.Data(ctx, m.downloadFileFunc)
 			if err != nil {
-				return fmt.Errorf("getting one block file data: %w", err)
+				return fmt.Errorf("getting one block file data %q: %w", filename, err)
 			}
 
 			blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
 			if err != nil {
-				return fmt.Errorf("unable to read one block: %s:%w", filename, err)
+				return fmt.Errorf("unable to read one block %q: %w", filename, err)
 			}
 
 			block, err := blockReader.Read()
@@ -139,7 +139,6 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 			}
 
 			oneBlockFile.InnerLibNum = &block.LibNum
-
 		}
 		oneBlockFiles = append(oneBlockFiles, oneBlockFile)
 
@@ -210,7 +209,7 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bundle.OneBlockFile) {
 
 	var fileNames []string
 	for _, oneBlockFile := range oneBlockFiles {
-		for filename, _ := range oneBlockFile.Filenames {
+		for filename := range oneBlockFile.Filenames {
 			fileNames = append(fileNames, filename)
 		}
 	}
