@@ -911,21 +911,21 @@ func TestBundler_Boostrap(t *testing.T) {
 func TestBundler_IsBlockTooOld(t *testing.T) {
 	oneBlockFiles := []*OneBlockFile{
 		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
-		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90-suffix"),
-		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90-suffix"),
-		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90-suffix"),
-		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90-suffix"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-100-suffix"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-100-suffix"),
 	}
 
 	oneBlockFilesTwoRoots := []*OneBlockFile{
 		MustNewOneBlockFile("000000095-20210728T105016.01-00000095b-00000094a-90-suffix"),
 		MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
-		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-90-suffix"),
-		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-90-suffix"),
-		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-90-suffix"),
-		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-90-suffix"),
-		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-90-suffix"),
+		MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+		MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-100-suffix"),
+		MustNewOneBlockFile("0000000103-20210728T105016.06-00000103a-00000102a-100-suffix"),
+		MustNewOneBlockFile("0000000104-20210728T105016.07-00000104a-00000103a-100-suffix"),
+		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-100-suffix"),
 	}
 
 	cases := []struct {
@@ -981,7 +981,7 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 			name:           "at first block 2 roots",
 			files:          oneBlockFilesTwoRoots,
 			blockNum:       95,
-			expectedResult: false,
+			expectedResult: true,
 		},
 		{
 			name:           "before first block 2 roots",

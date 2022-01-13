@@ -2,7 +2,6 @@ package bundle
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 
@@ -25,7 +24,7 @@ func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bund
 	zlog.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("first_exclusive_highest_block_limit", firstExclusiveHighestBlockLimit))
 	return &Bundler{
 		bundleSize:                 bundleSize,
-		forkDB:                     forkable.NewForkDB(),
+		forkDB:                     forkable.NewForkDB(forkable.ForkDBWithLogger(zlog)),
 		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
 	}
 }
@@ -87,9 +86,6 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	zlog.Info("Bootstrapped", zap.Uint64("lib_num", b.forkDB.LIBNum()), zap.String("lib_id", b.forkDB.LIBID()))
 	return nil
 }
-
-//100 - - - - - - 200 - - - - - - 300 - - - - - Live (400) 401  410  411
-//                192             282                 375        376  376
 
 func (b *Bundler) loadOneBlocksFromLib(libNumToStartFrom uint64, lastMergedLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
 	lowBlockNum := (libNumToStartFrom / b.bundleSize) * b.bundleSize
@@ -238,24 +234,13 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	//todo: flag all blocks older then the root block off the longest chain.
-
-	roots, err := b.forkDB.Roots()
-	if err != nil { //if there is no root it can't be too old
+	rootID, err := b.forkDB.Root()
+	if err != nil {
 		return false
 	}
-
-	//Find the smallest root of all chains in forkdb
-	lowestRootBlockNum := uint64(math.MaxUint64)
-	for _, root := range roots {
-		block := b.forkDB.BlockForID(root)
-		if block.BlockNum < lowestRootBlockNum {
-			lowestRootBlockNum = block.BlockNum
-		}
-	}
-
-	// return true is blockNum is small that all the root block of all chains
-	return blockNum < lowestRootBlockNum
+	rootOneBlockFile := b.forkDB.BlockForID(rootID).Object.(*OneBlockFile)
+	//root is always <= to the forkdb lib.
+	return blockNum < rootOneBlockFile.Num
 }
 
 func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
@@ -273,28 +258,6 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 func (b *Bundler) BundleCompleted() (complete bool, highestBlockLimit uint64) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-
-	//{
-	//name: "wrong longest chain",
-	//	files: []string{
-	//	"0000000115-20210728T105016.0-00000115a-00000114a-90-suffix",
-	//	"0000000116-20210728T105016.0-00000116a-00000115a-90-suffix",
-	//	"0000000117-20210728T105016.0-00000117a-00000116a-90-suffix",
-	//	"0000000118-20210728T105016.0-00000118a-00000117a-90-suffix",
-	//	"0000000120-20210728T105016.0-00000120a-00000118a-90-suffix",
-	//
-	//	"0000000300-20210728T105016.0-00000300a-00000299a-150-suffix",
-	//	"0000000301-20210728T105016.0-00000301a-00000300a-150-suffix",
-	//	"0000000302-20210728T105016.0-00000302a-00000301a-150-suffix",
-	//	"0000000303-20210728T105016.0-00000303a-00000302a-150-suffix",
-	//	"0000000304-20210728T105016.0-00000304a-00000303a-150-suffix",
-	//	"0000000305-20210728T105016.0-00000305a-00000304a-150-suffix",
-	//},
-	//	lastMergeBlockID:           "00000114a",
-	//	exclusiveHighestBlockLimit: 120,
-	//	expectedCompleted:          false,
-	//	expectedHighestBlockLimit:  118,
-	//},
 
 	longest := b.longestChain()
 
@@ -320,9 +283,6 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 
 	var out []*OneBlockFile
-	//1100
-	//995a - 996a - 997a - 998a - 999a - 1000a - 1001a - 1002a - 1003a - 1004a - 1005a - 1006a -- 1101
-	//									 - 1001b - 1002b - 1003b - 1004b
 
 	b.forkDB.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
@@ -341,16 +301,8 @@ func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 		return out[i].BlockTime.Before(out[j].BlockTime)
 	})
 
-	//if uint64(len(out)) != b.bundleSize {
-	//	panic(fmt.Sprintf("toBundle() called with missing block files; out: %d, bundleSize: %d", len(out), b.bundleSize))
-	//}
-
 	return out
 }
-
-//1100
-//995a - 996a - 997a - 998a - 999a - 1000a - 1001a - 1002a - 1003a - 1004a - 1005a - 1006a -- 1101
-//									 - 1001b - 1002b - 1003b - 1004b
 
 func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 	b.mutex.Lock()
