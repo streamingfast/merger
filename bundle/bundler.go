@@ -38,7 +38,7 @@ func (b *Bundler) String() string {
 
 	lc := b.longestChain()
 	return fmt.Sprintf(
-		"\nbundle_size: %d, \nlast_merge_block_num: %d, \ninclusive_lower_block_num: %d, \nexclusive_highest_block_limit: %d \nlib_num: %d \nlib id:%s  \nlongest chain lenght: %d",
+		"bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d lib_num: %d lib id:%s longest chain lenght: %d",
 		b.bundleSize,
 		lastMergeBlockNum,
 		b.bundleInclusiveLowerBlock(),
@@ -165,6 +165,7 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 	exists = b.forkDB.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
 
 	if !b.forkDB.HasLIB() { // always skip processing until LIB is set
+		zlog.Info("trying to set lib", zap.Uint64("current_block_num", oneBlockFile.Num), zap.Uint64("lib_num_candidate", oneBlockFile.LibNum()))
 		b.forkDB.SetLIB(bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num), oneBlockFile.PreviousID, oneBlockFile.LibNum())
 	}
 
@@ -236,6 +237,8 @@ func (b *Bundler) LongestChainLastBlockFile() *OneBlockFile {
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
+
+	//todo: flag all blocks older then the root block off the longest chain.
 
 	roots, err := b.forkDB.Roots()
 	if err != nil { //if there is no root it can't be too old
