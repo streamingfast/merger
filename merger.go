@@ -149,6 +149,13 @@ func (m *Merger) launch() (err error) {
 		zlog.Info("bundle files uploaded")
 
 		m.bundler.Commit(highestBundleBlockNum)
+
+		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()
+		if lastMergedOneBlockFile == nil {
+			// sanity check
+			return fmt.Errorf("unable to process, expected a last merger one block file")
+		}
+
 		zlog.Info("bundle merged and committed", zap.Object("bundle", m.bundler))
 
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
