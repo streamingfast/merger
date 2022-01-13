@@ -152,7 +152,6 @@ func (b *Bundler) AddOneBlockFile(oneBlockFile *OneBlockFile) (exist bool) {
 }
 
 func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
-	zlog.Debug("adding one block file", zap.String("file_name", oneBlockFile.CanonicalName))
 	if block := b.forkDB.BlockForID(oneBlockFile.ID); block != nil {
 		obf := block.Object.(*OneBlockFile)
 		for filename := range oneBlockFile.Filenames { //this is an ugly patch. ash stepd ;-)
@@ -160,6 +159,7 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 		}
 		return true
 	}
+	zlog.Debug("adding one block file", zap.String("file_name", oneBlockFile.CanonicalName))
 
 	blockRef := bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num)
 	exists = b.forkDB.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
