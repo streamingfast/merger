@@ -8,6 +8,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Bundler struct {
@@ -47,6 +48,23 @@ func (b *Bundler) String() string {
 
 		len(lc),
 	)
+}
+
+func (b *Bundler) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
+	encoder.AddUint64("bundle_size", b.bundleSize)
+	encoder.AddUint64("inclusive_lower_block_num", b.bundleInclusiveLowerBlock())
+	encoder.AddUint64("exclusive_highest_block_limit", b.exclusiveHighestBlockLimit)
+
+	if b.lastMergeOneBlockFile != nil {
+		encoder.AddUint64("last_merge_one_block_num", b.lastMergeOneBlockFile.Num)
+		encoder.AddTime("last_merge_one_block_time", b.lastMergeOneBlockFile.BlockTime)
+	}
+
+	encoder.AddUint64("lib_num", b.forkDB.LIBNum())
+	encoder.AddString("lib_id", b.forkDB.LIBID())
+	encoder.AddInt("longest_chain_length", len(b.longestChain()))
+
+	return nil
 }
 
 func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
@@ -160,10 +178,13 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 	blockRef := bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num)
 	exists = b.forkDB.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
 
-	if !b.forkDB.HasLIB() { // always skip processing until LIB is set
-		zlog.Info("trying to set lib", zap.Uint64("current_block_num", oneBlockFile.Num), zap.Uint64("lib_num_candidate", oneBlockFile.LibNum()))
-		b.forkDB.SetLIB(bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num), oneBlockFile.PreviousID, oneBlockFile.LibNum())
+	level := zap.DebugLevel
+	if !b.forkDB.HasLIB() {
+		level = zap.InfoLevel
 	}
+
+	zlog.Check(level, "setting lib value").Write(zap.Uint64("current_block_num", oneBlockFile.Num), zap.Uint64("lib_num_candidate", oneBlockFile.LibNum()))
+	b.forkDB.SetLIB(bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num), oneBlockFile.PreviousID, oneBlockFile.LibNum())
 
 	return exists
 }
@@ -238,6 +259,7 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	if err != nil {
 		return false
 	}
+
 	rootOneBlockFile := b.forkDB.BlockForID(rootID).Object.(*OneBlockFile)
 	//root is always <= to the forkdb lib.
 	return blockNum < rootOneBlockFile.Num
@@ -281,10 +303,9 @@ func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
 	return out
 }
 func (b *Bundler) toBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {
-
 	var out []*OneBlockFile
 
-	b.forkDB.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
+	b.forkDB.IterateLinks(func(_, _ string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
 		blkNum := oneBlockFile.Num
 		if !oneBlockFile.Merged && blkNum <= inclusiveHighestBlockLimit { //get all none merged files

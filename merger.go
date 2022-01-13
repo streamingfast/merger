@@ -70,7 +70,7 @@ func NewMerger(
 }
 
 func (m *Merger) Launch() {
-	zlog.Info("starting merger", zap.Stringer("bundle", m.bundler))
+	zlog.Info("starting merger", zap.Object("bundle", m.bundler))
 
 	m.startServer()
 
@@ -125,8 +125,7 @@ func (m *Merger) launch() (err error) {
 
 			isBundleComplete, highestBundleBlockNum = m.bundler.BundleCompleted()
 			if !isBundleComplete {
-
-				zlog.Info("bundle not completed after retrieving one block file", zap.Stringer("bundle", m.bundler))
+				zlog.Info("bundle not completed after retrieving one block file", zap.Object("bundle", m.bundler))
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
 					continue
@@ -139,7 +138,7 @@ func (m *Merger) launch() (err error) {
 		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
 		zlog.Info("merging bundle",
 			zap.Uint64("highest_bundle_block_num", highestBundleBlockNum),
-			zap.Stringer("bundle", m.bundler),
+			zap.Object("bundle", m.bundler),
 			zap.Int("count", len(bundleFiles)),
 		)
 
@@ -150,9 +149,7 @@ func (m *Merger) launch() (err error) {
 		zlog.Info("bundle files uploaded")
 
 		m.bundler.Commit(highestBundleBlockNum)
-
-		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()
-		zlog.Info("bundle merged and committed", zap.Stringer("bundle", m.bundler), zap.Time("last_merge_one_block_time", lastMergedOneBlockFile.BlockTime))
+		zlog.Info("bundle merged and committed", zap.Object("bundle", m.bundler))
 
 		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
 		zlog.Info("saving state", zap.Stringer("state", state))
