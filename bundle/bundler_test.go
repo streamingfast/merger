@@ -1087,3 +1087,59 @@ func TestBundler_LongestOneBlockFileChain_SameBlockTime(t *testing.T) {
 	longest := bundler.LongestOneBlockFileChain()
 	require.Equal(t, len(longest), 6)
 }
+
+func TestBundler_SetLIB(t *testing.T) {
+	cases := []struct {
+		name            string
+		files           []*OneBlockFile
+		lastMergerBlock *OneBlockFile
+		expectedLibID   string
+	}{
+		{
+			name: "Sunny path",
+			files: []*OneBlockFile{
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-101-suffix"),
+			},
+			expectedLibID: "00000101a",
+		},
+		{
+			name: "With hole",
+			files: []*OneBlockFile{
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-101-suffix"),
+
+				MustNewOneBlockFile("0000000200-20210728T105016.03-00000200a-00000199a-190-suffix"),
+			},
+			expectedLibID: "00000101a",
+		}, {
+			name: "With block after hole",
+			files: []*OneBlockFile{
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-101-suffix"),
+
+				MustNewOneBlockFile("0000000200-20210728T105016.03-00000200a-00000199a-190-suffix"),
+
+				MustNewOneBlockFile("0000000103-20210728T105016.03-00000103a-00000102a-102-suffix"),
+			},
+			expectedLibID: "00000102a",
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+
+			bundler := NewBundler(5, 107)
+
+			for _, f := range c.files {
+				bundler.AddOneBlockFile(f)
+			}
+
+			require.Equal(t, c.expectedLibID, bundler.forkDB.LIBID())
+		})
+	}
+
+}
