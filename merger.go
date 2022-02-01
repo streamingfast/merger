@@ -153,7 +153,7 @@ func (m *Merger) launch() (err error) {
 		lastMergedOneBlockFile := m.bundler.LastMergeOneBlockFile()
 		if lastMergedOneBlockFile == nil {
 			// sanity check
-			return fmt.Errorf("unable to process, expected a last merger one block file")
+			return fmt.Errorf("unable to process, expected a least merger one block file")
 		}
 
 		zlog.Info("bundle merged and committed", zap.Object("bundle", m.bundler))

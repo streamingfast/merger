@@ -183,6 +183,13 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 		level = zap.InfoLevel
 	}
 
+	if b.forkDB.HasLIB() {
+		isPartOfCurrentChain := b.forkDB.BlockInCurrentChain(blockRef, b.forkDB.LIBNum()) != bstream.BlockRefEmpty
+		if !isPartOfCurrentChain {
+			return exists
+		}
+	}
+
 	zlog.Check(level, "setting lib value").Write(zap.Uint64("current_block_num", oneBlockFile.Num), zap.Uint64("lib_num_candidate", oneBlockFile.LibNum()))
 	b.forkDB.SetLIB(bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num), oneBlockFile.PreviousID, oneBlockFile.LibNum())
 
