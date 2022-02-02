@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type MergerIO interface {
+type IOInterface interface {
 	MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
 	FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
 	FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
@@ -27,7 +27,7 @@ type MergerIODeleter interface {
 	Delete(oneBlockFiles []*bundle.OneBlockFile)
 }
 
-type MergerIOStore struct {
+type IOStore struct {
 	oneBlocksStore                 dstore.Store
 	destStore                      dstore.Store
 	maxOneBlockOperationsBatchSize int
@@ -37,7 +37,7 @@ type MergerIOStore struct {
 	retryCooldown                  time.Duration
 }
 
-func NewMergerIO(
+func NewIOStore(
 	oneBlocksStore dstore.Store,
 	destStore dstore.Store,
 	maxOneBlockOperationsBatchSize int,
@@ -45,8 +45,8 @@ func NewMergerIO(
 	downloadFileFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error),
 	retryAttempts int,
 	retryCooldown time.Duration,
-) MergerIO {
-	return &MergerIOStore{
+) *IOStore {
+	return &IOStore{
 		oneBlocksStore:                 oneBlocksStore,
 		destStore:                      destStore,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
@@ -57,38 +57,7 @@ func NewMergerIO(
 	}
 }
 
-//func (m *MergerIOStore) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
-//	if len(oneBlockFiles) == 0 {
-//		return nil // nothing to do
-//	}
-//
-//	t0 := time.Now()
-//
-//	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
-//	zlog.Debug("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Uint64("lower_block_num", oneBlockFiles[0].Num), zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num))
-//
-//	if m.writeObjectFunc == nil {
-//		m.writeObjectFunc = func() error {
-//			ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
-//			defer cancel()
-//			if m.downloadFileFunc == nil {
-//				m.downloadFileFunc = m.DownloadFile
-//			}
-//			return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.downloadFileFunc))
-//		}
-//	}
-//
-//	err = Retry(m.retryAttempts, m.retryCooldown, m.writeObjectFunc)
-//	if err != nil {
-//		return fmt.Errorf("write object error: %s", err)
-//	}
-//
-//	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
-//
-//	return nil
-//}
-
-func (m *MergerIOStore) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+func (m *IOStore) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
 		return
 	}
@@ -111,7 +80,7 @@ func (m *MergerIOStore) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles
 	return
 }
 
-func (m *MergerIOStore) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+func (m *IOStore) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
 	defer cancel()
 	reader, err := m.destStore.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
@@ -123,7 +92,7 @@ func (m *MergerIOStore) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.
 	return out, err
 }
 
-func (m *MergerIOStore) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+func (m *IOStore) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 	fileCount := 0
 	err = m.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		fileCount++
@@ -166,7 +135,7 @@ func (m *MergerIOStore) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles [
 	return
 }
 
-func (m *MergerIOStore) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
+func (m *IOStore) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
 		out, err = m.oneBlocksStore.OpenObject(ctx, filename)

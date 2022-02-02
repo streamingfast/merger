@@ -86,7 +86,7 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 			continue
 		}
 
-		data, err := oneBlock.Data(server.Context(), m.mergerIO.DownloadOneBlockFile)
+		data, err := oneBlock.Data(server.Context(), m.io.DownloadOneBlockFile)
 		if err != nil {
 			return fmt.Errorf("unable to get one block data: %w", err)
 		}

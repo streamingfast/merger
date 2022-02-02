@@ -36,7 +36,7 @@ type Merger struct {
 	oneBlockDeletionThreads int
 
 	bundler         *bundle.Bundler
-	mergerIO        MergerIO
+	io              IOInterface
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile)
 	stateFile       string
 }
@@ -45,7 +45,7 @@ func NewMerger(
 	bundler *bundle.Bundler,
 	timeBetweenStoreLookups time.Duration,
 	grpcListenAddr string,
-	mergerIO MergerIO,
+	io IOInterface,
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
 	stateFile string,
 ) *Merger {
@@ -54,7 +54,7 @@ func NewMerger(
 		bundler:                 bundler,
 		grpcListenAddr:          grpcListenAddr,
 		timeBetweenStoreLookups: timeBetweenStoreLookups,
-		mergerIO:                mergerIO,
+		io:                      io,
 		deleteFilesFunc:         deleteFilesFunc,
 		stateFile:               stateFile,
 	}
@@ -77,7 +77,7 @@ func (m *Merger) launch() (err error) {
 		}
 
 		zlog.Info("verifying if bundle file already exist in store", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()))
-		if oneBlockFiles, err := m.mergerIO.FetchMergedOneBlockFiles(m.bundler.BundleInclusiveLowerBlock()); err == nil {
+		if oneBlockFiles, err := m.io.FetchMergedOneBlockFiles(m.bundler.BundleInclusiveLowerBlock()); err == nil {
 			if len(oneBlockFiles) > 0 {
 				zlog.Info("adding files from already merge bundle", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()), zap.Int("file_count", len(oneBlockFiles)))
 				m.bundler.BundlePreMergedOneBlockFiles(oneBlockFiles) // this will change state and skip to next bundle ...
@@ -133,7 +133,7 @@ func (m *Merger) launch() (err error) {
 			zap.Int("count", len(bundleFiles)),
 		)
 
-		if err = m.mergerIO.MergeAndUpload(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
+		if err = m.io.MergeAndUpload(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
 			return err
 		}
 
@@ -166,7 +166,7 @@ func (m *Merger) launch() (err error) {
 
 func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, lastOneBlockFileAdded *bundle.OneBlockFile, err error) {
 	addedFileCount := 0
-	oneBlockFiles, err := m.mergerIO.FetchOneBlockFiles(ctx)
+	oneBlockFiles, err := m.io.FetchOneBlockFiles(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching one block files: %w", err)
 	}

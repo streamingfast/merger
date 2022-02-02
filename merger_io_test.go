@@ -29,9 +29,9 @@ func TestNewMergerIO(t *testing.T) {
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
 
-	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
+	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 	require.NotNil(t, mio)
-	require.IsType(t, &MergerIOStore{}, mio)
+	require.IsType(t, &IOStore{}, mio)
 }
 
 func TestMergerIO_FetchOneBlockFiles(t *testing.T) {
@@ -43,7 +43,7 @@ func TestMergerIO_FetchOneBlockFiles(t *testing.T) {
 
 	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(blockReaderFactory)
 
-	mergerIO := &MergerIOStore{
+	mergerIO := &IOStore{
 		oneBlocksStore:                 oneBlockStoreStore,
 		maxOneBlockOperationsBatchSize: 3,
 	}
@@ -64,7 +64,7 @@ func TestMergerIO_FetchOneBlockFiles_GetOneBlockFileDataError(t *testing.T) {
 		return nil, fmt.Errorf("yo")
 	}
 
-	mergerIO := &MergerIOStore{
+	mergerIO := &IOStore{
 		oneBlocksStore:                 oneBlockStoreStore,
 		maxOneBlockOperationsBatchSize: 3,
 		downloadFileFunc:               downloadFileFunc,
@@ -89,7 +89,7 @@ func TestMergerIO_FetchOneBlockFiles_GetBlockReaderFactoryError(t *testing.T) {
 		return []byte{}, nil
 	}
 
-	mergerIO := &MergerIOStore{
+	mergerIO := &IOStore{
 		oneBlocksStore:                 oneBlockStoreStore,
 		maxOneBlockOperationsBatchSize: 3,
 		downloadFileFunc:               downloadFileFunc,
@@ -109,7 +109,7 @@ func TestMergerIO_FetchOneBlockFiles_ReadBlockError(t *testing.T) {
 
 	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(blockReaderFactoryError)
 
-	mergerIO := &MergerIOStore{
+	mergerIO := &IOStore{
 		oneBlocksStore:                 oneBlockStoreStore,
 		maxOneBlockOperationsBatchSize: 3,
 	}
@@ -220,7 +220,7 @@ func TestMergerIO_MergeUpload_ZeroLengthOneBlockFiles(t *testing.T) {
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
 
-	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
+	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 	err = mio.MergeAndUpload(0, []*bundle.OneBlockFile{})
 	require.Nil(t, err)
 }
@@ -238,7 +238,7 @@ func TestMergerIO_MergeUpload(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
+	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 
 	err = mio.MergeAndUpload(114, files)
 	require.NoError(t, err)
@@ -258,9 +258,9 @@ func TestMergerIO_MergeUpload_WriteObjectError(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
+	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 
-	mio.(*MergerIOStore).writeObjectFunc = func() error {
+	mio.(*IOStore).writeObjectFunc = func() error {
 		return fmt.Errorf("yo")
 	}
 
@@ -281,7 +281,7 @@ func TestMergerIO_FetchMergeFile(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
+	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 
 	err = mio.MergeAndUpload(114, files)
 	require.Nil(t, err)
@@ -298,7 +298,7 @@ func TestMergerIO_FetchMergeFile_OpenObjectError(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewMergerIO(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
+	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 
 	obf, err := mio.FetchMergedOneBlockFiles(69)
 	// file not found
