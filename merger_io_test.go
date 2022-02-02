@@ -260,7 +260,7 @@ func TestMergerIO_MergeUpload_WriteObjectError(t *testing.T) {
 	require.NoError(t, err)
 	mio := NewIOStore(oneBlockStoreStore, mergedBlocksStore, 10, nil, nil, 1, 10*time.Millisecond)
 
-	mio.(*IOStore).writeObjectFunc = func() error {
+	mio.writeObjectFunc = func() error {
 		return fmt.Errorf("yo")
 	}
 
