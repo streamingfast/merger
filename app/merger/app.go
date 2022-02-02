@@ -114,7 +114,7 @@ func (a *App) Run() error {
 	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
 	if needBootstrap {
 		err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
+			oneBlockFiles, fetchErr := io.FetchMergedOneBlockFiles(lowBlockNum)
 			if fetchErr != nil {
 				return nil, fmt.Errorf("fetching one block files from merged file with low block num %d: %w", lowBlockNum, fetchErr)
 			}
@@ -129,11 +129,11 @@ func (a *App) Run() error {
 		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.GRPCListenAddr,
-		io.FetchMergeFile,
+		io.FetchMergedOneBlockFiles,
 		io.FetchOneBlockFiles,
 		filesDeleter.Delete,
-		io.MergeUpload,
-		io.DownloadFile,
+		io.MergeAndUpload,
+		io.DownloadOneBlockFile,
 		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")

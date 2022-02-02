@@ -16,7 +16,18 @@ import (
 	"go.uber.org/zap"
 )
 
-type MergerIO struct {
+type MergerIO interface {
+	MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
+	FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
+	FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
+	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
+}
+
+type MergerIODeleter interface {
+	Delete(oneBlockFiles []*bundle.OneBlockFile)
+}
+
+type MergerIOStore struct {
 	oneBlocksStore                 dstore.Store
 	destStore                      dstore.Store
 	maxOneBlockOperationsBatchSize int
@@ -34,8 +45,8 @@ func NewMergerIO(
 	downloadFileFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error),
 	retryAttempts int,
 	retryCooldown time.Duration,
-) *MergerIO {
-	return &MergerIO{
+) MergerIO {
+	return &MergerIOStore{
 		oneBlocksStore:                 oneBlocksStore,
 		destStore:                      destStore,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
@@ -46,7 +57,7 @@ func NewMergerIO(
 	}
 }
 
-//func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+//func (m *MergerIOStore) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 //	if len(oneBlockFiles) == 0 {
 //		return nil // nothing to do
 //	}
@@ -77,7 +88,7 @@ func NewMergerIO(
 //	return nil
 //}
 
-func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+func (m *MergerIOStore) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
 		return
 	}
@@ -89,7 +100,7 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 	err = Retry(5, 500*time.Millisecond, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 		defer cancel()
-		return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.DownloadFile))
+		return m.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, m.DownloadOneBlockFile))
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
@@ -100,7 +111,7 @@ func (m *MergerIO) MergeUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bund
 	return
 }
 
-func (m *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+func (m *MergerIOStore) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
 	defer cancel()
 	reader, err := m.destStore.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
@@ -112,14 +123,14 @@ func (m *MergerIO) FetchMergeFile(lowBlockNum uint64) ([]*bundle.OneBlockFile, e
 	return out, err
 }
 
-func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+func (m *MergerIOStore) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 	fileCount := 0
 	err = m.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		fileCount++
 		oneBlockFile := bundle.MustNewOneBlockFile(filename)
 
 		if m.downloadFileFunc == nil {
-			m.downloadFileFunc = m.DownloadFile
+			m.downloadFileFunc = m.DownloadOneBlockFile
 		}
 
 		if oneBlockFile.InnerLibNum == nil {
@@ -155,7 +166,7 @@ func (m *MergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 	return
 }
 
-func (m *MergerIO) DownloadFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
+func (m *MergerIOStore) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
 		out, err = m.oneBlocksStore.OpenObject(ctx, filename)

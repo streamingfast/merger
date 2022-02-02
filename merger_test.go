@@ -33,6 +33,45 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type TestMergerIO struct {
+	mergeAndUploadFunc           func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
+	fetchMergedOneBlockFilesFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
+	fetchOneBlockFilesFunc       func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
+	downloadOneBlockFileFunc     func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
+}
+
+func (io *TestMergerIO) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	if io.mergeAndUploadFunc != nil {
+		return io.mergeAndUploadFunc(inclusiveLowerBlock, oneBlockFiles)
+	}
+
+	return nil
+}
+
+func (io *TestMergerIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+	if io.fetchMergedOneBlockFilesFunc != nil {
+		return io.fetchMergedOneBlockFilesFunc(lowBlockNum)
+	}
+
+	return nil, nil
+}
+
+func (io *TestMergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+	if io.fetchOneBlockFilesFunc != nil {
+		return io.fetchOneBlockFilesFunc(ctx)
+	}
+
+	return nil, nil
+}
+
+func (io *TestMergerIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
+	if io.downloadOneBlockFileFunc != nil {
+		return io.downloadOneBlockFileFunc(ctx, oneBlockFile)
+	}
+
+	return nil, nil
+}
+
 func TestNewMerger_SunnyPath(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
