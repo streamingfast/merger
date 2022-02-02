@@ -23,10 +23,6 @@ type IOInterface interface {
 	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
 }
 
-type MergerIODeleter interface {
-	Delete(oneBlockFiles []*bundle.OneBlockFile)
-}
-
 type IOStore struct {
 	oneBlocksStore                 dstore.Store
 	destStore                      dstore.Store
