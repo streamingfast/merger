@@ -129,11 +129,8 @@ func (a *App) Run() error {
 		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.GRPCListenAddr,
-		io.FetchMergedOneBlockFiles,
-		io.FetchOneBlockFiles,
+		io,
 		filesDeleter.Delete,
-		io.MergeAndUpload,
-		io.DownloadOneBlockFile,
 		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")
