@@ -78,7 +78,7 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	io := merger.NewMergerIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize, nil, nil, 5, 500*time.Millisecond)
+	io := merger.NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize, 5, 500*time.Millisecond)
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	bundleSize := uint64(100)
@@ -114,7 +114,7 @@ func (a *App) Run() error {
 	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
 	if needBootstrap {
 		err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-			oneBlockFiles, fetchErr := io.FetchMergeFile(lowBlockNum)
+			oneBlockFiles, fetchErr := io.FetchMergedOneBlockFiles(lowBlockNum)
 			if fetchErr != nil {
 				return nil, fmt.Errorf("fetching one block files from merged file with low block num %d: %w", lowBlockNum, fetchErr)
 			}
@@ -129,11 +129,8 @@ func (a *App) Run() error {
 		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.GRPCListenAddr,
-		io.FetchMergeFile,
-		io.FetchOneBlockFiles,
+		io,
 		filesDeleter.Delete,
-		io.MergeUpload,
-		io.DownloadFile,
 		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")

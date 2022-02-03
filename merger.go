@@ -35,24 +35,18 @@ type Merger struct {
 	timeBetweenStoreLookups time.Duration // should be very low on local filesystem
 	oneBlockDeletionThreads int
 
-	bundler              *bundle.Bundler
-	fetchMergedFileFunc  func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
-	fetchOneBlockFiles   func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
-	deleteFilesFunc      func(oneBlockFiles []*bundle.OneBlockFile)
-	mergeUploadFunc      func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
-	downloadOneBlockFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
-	stateFile            string
+	bundler         *bundle.Bundler
+	io              IOInterface
+	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile)
+	stateFile       string
 }
 
 func NewMerger(
 	bundler *bundle.Bundler,
 	timeBetweenStoreLookups time.Duration,
 	grpcListenAddr string,
-	fetchMergedFileFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error),
-	fetchOneBlockFiles func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error),
+	io IOInterface,
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
-	mergeUploadFunc func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error),
-	downloadOneBlockFunc func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error),
 	stateFile string,
 ) *Merger {
 	return &Merger{
@@ -60,12 +54,9 @@ func NewMerger(
 		bundler:                 bundler,
 		grpcListenAddr:          grpcListenAddr,
 		timeBetweenStoreLookups: timeBetweenStoreLookups,
-		fetchMergedFileFunc:     fetchMergedFileFunc,
-		fetchOneBlockFiles:      fetchOneBlockFiles,
+		io:                      io,
 		deleteFilesFunc:         deleteFilesFunc,
-		mergeUploadFunc:         mergeUploadFunc,
 		stateFile:               stateFile,
-		downloadOneBlockFunc:    downloadOneBlockFunc,
 	}
 }
 
@@ -86,7 +77,7 @@ func (m *Merger) launch() (err error) {
 		}
 
 		zlog.Info("verifying if bundle file already exist in store", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()))
-		if oneBlockFiles, err := m.fetchMergedFileFunc(m.bundler.BundleInclusiveLowerBlock()); err == nil {
+		if oneBlockFiles, err := m.io.FetchMergedOneBlockFiles(m.bundler.BundleInclusiveLowerBlock()); err == nil {
 			if len(oneBlockFiles) > 0 {
 				zlog.Info("adding files from already merge bundle", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()), zap.Int("file_count", len(oneBlockFiles)))
 				m.bundler.BundlePreMergedOneBlockFiles(oneBlockFiles) // this will change state and skip to next bundle ...
@@ -142,7 +133,7 @@ func (m *Merger) launch() (err error) {
 			zap.Int("count", len(bundleFiles)),
 		)
 
-		if err = m.mergeUploadFunc(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
+		if err = m.io.MergeAndUpload(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
 			return err
 		}
 
@@ -175,7 +166,7 @@ func (m *Merger) launch() (err error) {
 
 func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, lastOneBlockFileAdded *bundle.OneBlockFile, err error) {
 	addedFileCount := 0
-	oneBlockFiles, err := m.fetchOneBlockFiles(ctx)
+	oneBlockFiles, err := m.io.FetchOneBlockFiles(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching one block files: %w", err)
 	}
