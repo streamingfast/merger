@@ -78,7 +78,7 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	io := merger.NewIOStore(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize, nil, nil, 5, 500*time.Millisecond)
+	io := merger.NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, a.config.MaxOneBlockOperationsBatchSize, 5, 500*time.Millisecond)
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	bundleSize := uint64(100)
