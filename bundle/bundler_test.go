@@ -1126,6 +1126,15 @@ func TestBundler_SetLIB(t *testing.T) {
 				MustNewOneBlockFile("0000000103-20210728T105016.03-00000103a-00000102a-102-suffix"),
 			},
 			expectedLibID: "00000102a",
+		}, {
+			name: "old lib",
+			files: []*OneBlockFile{
+				MustNewOneBlockFile("0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"),
+				MustNewOneBlockFile("0000000101-20210728T105016.02-00000101a-00000100a-100-suffix"),
+				MustNewOneBlockFile("0000000102-20210728T105016.03-00000102a-00000101a-101-suffix"),
+				MustNewOneBlockFile("0000000103-20210728T105016.03-00000103a-00000102a-100-suffix"),
+			},
+			expectedLibID: "00000101a",
 		},
 	}
 

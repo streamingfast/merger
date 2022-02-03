@@ -184,6 +184,11 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 	}
 
 	if b.forkDB.HasLIB() {
+
+		if oneBlockFile.LibNum() <= b.forkDB.LIBNum() {
+			return exists
+		}
+
 		isPartOfCurrentChain := b.forkDB.BlockInCurrentChain(blockRef, b.forkDB.LIBNum()) != bstream.BlockRefEmpty
 		if !isPartOfCurrentChain {
 			return exists
