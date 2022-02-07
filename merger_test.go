@@ -34,15 +34,15 @@ import (
 )
 
 type TestMergerIO struct {
-	MergeAndUploadFunc           func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
+	MergeAndSaveFunc             func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
 	FetchMergedOneBlockFilesFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
 	FetchOneBlockFilesFunc       func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
 	DownloadOneBlockFileFunc     func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
 }
 
-func (io *TestMergerIO) MergeAndUpload(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
-	if io.MergeAndUploadFunc != nil {
-		return io.MergeAndUploadFunc(inclusiveLowerBlock, oneBlockFiles)
+func (io *TestMergerIO) MergeAndSave(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	if io.MergeAndSaveFunc != nil {
+		return io.MergeAndSaveFunc(inclusiveLowerBlock, oneBlockFiles)
 	}
 
 	return nil
@@ -94,7 +94,7 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		defer merger.Shutdown(nil)
 		mergedFiles = oneBlockFiles
 		return nil
@@ -153,7 +153,7 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		defer merger.Shutdown(nil)
 		mergedFiles = oneBlockFiles
 		return nil
@@ -215,7 +215,7 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		mergedFiles = oneBlockFiles
 		return nil
 	}
@@ -282,7 +282,7 @@ func TestNewMerger_Wait_For_Files(t *testing.T) {
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		defer merger.Shutdown(nil)
 		mergedFiles = oneBlockFiles
 		return nil
@@ -338,7 +338,7 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 
 	var mergedFiles []*bundle.OneBlockFile
 	mergeUploadFuncCallCount := 0
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		mergeUploadFuncCallCount++
 
 		if mergeUploadFuncCallCount == 2 {
@@ -442,7 +442,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 		t.Fatalf("Should not happen. Only forkdb should be truncated")
 	}
 
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		t.Fatalf("should not have been called")
 		return nil
 	}
@@ -494,7 +494,7 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 		t.Fatalf("should not have been call")
 	}
 
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		t.Fatalf("should not have been call")
 		return nil
 	}
@@ -543,7 +543,7 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		defer merger.Shutdown(nil)
 
 		mergedFiles = oneBlockFiles
@@ -720,7 +720,7 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 		return nil, err
 	}
 
-	mergerIO.MergeAndUploadFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		if cycleCount == 2 {
 			merger.Shutdown(io.EOF)
 		}
@@ -782,7 +782,7 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 	mergerIO := &TestMergerIO{
 		FetchMergedOneBlockFilesFunc: fetchMergedFile,
 		FetchOneBlockFilesFunc:       fetchOneBlockFiles,
-		MergeAndUploadFunc:           mergeUpload,
+		MergeAndSaveFunc:             mergeUpload,
 	}
 	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
 
@@ -838,7 +838,7 @@ func TestMerger_Launch_SaveStateError(t *testing.T) {
 	mergerIO := &TestMergerIO{
 		FetchMergedOneBlockFilesFunc: fetchMergedFile,
 		FetchOneBlockFilesFunc:       fetchOneBlockFiles,
-		MergeAndUploadFunc:           mergeUpload,
+		MergeAndSaveFunc:             mergeUpload,
 	}
 	merger := NewMerger(bundler, time.Second, "", mergerIO, deleteFiles, statefile)
 
