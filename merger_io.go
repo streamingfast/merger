@@ -23,6 +23,10 @@ type IOInterface interface {
 	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
 }
 
+type OneBlockFilesDeleter interface {
+	Delete(oneBlockFiles []*bundle.OneBlockFile)
+}
+
 type DStoreIO struct {
 	oneBlocksStore                 dstore.Store
 	destStore                      dstore.Store
