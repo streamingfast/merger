@@ -80,7 +80,7 @@ func TestOneBlockFile_ParseFilename(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			blkNum, blkTime, blkID, prevBlkID, libNum, name, err := parseFilename(test.filename)
+			blkNum, blkTime, blkID, prevBlkID, libNum, name, err := ParseFilename(test.filename)
 			if test.expectError != nil {
 				require.Equal(t, err, test.expectError)
 				return
@@ -98,19 +98,19 @@ func TestOneBlockFile_ParseFilename(t *testing.T) {
 
 func TestOneBlockFile_ParseFilename_InvalidBlockNum(t *testing.T) {
 	name := "0000000FFF-20170701T122141.0-24a07267-e5914b39"
-	_, _, _, _, _, _, err := parseFilename(name)
+	_, _, _, _, _, _, err := ParseFilename(name)
 	require.Error(t, err)
 }
 
 func TestOneBlockFile_ParseFilename_InvalidBlockTime(t *testing.T) {
 	name := "0000000100-20ABCDE1T122141.0-24a07267-e5914b39"
-	_, _, _, _, _, _, err := parseFilename(name)
+	_, _, _, _, _, _, err := ParseFilename(name)
 	require.Error(t, err)
 }
 
 func TestOneBlockFile_ParseFilename_InvalidLibNum(t *testing.T) {
 	name := "0000000100-20170701T122141.0-24a07267-e5914b39-FFFF-suffix"
-	_, _, _, _, _, _, err := parseFilename(name)
+	_, _, _, _, _, _, err := ParseFilename(name)
 	require.Error(t, err)
 }
 

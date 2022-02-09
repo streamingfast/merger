@@ -40,7 +40,7 @@ type OneBlockFile struct {
 }
 
 func MustNewOneBlockFile(fileName string) *OneBlockFile {
-	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := parseFilename(fileName)
+	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := ParseFilename(fileName)
 	if err != nil {
 		panic(err)
 	}
@@ -81,14 +81,14 @@ func (f *OneBlockFile) LibNum() uint64 {
 	return *f.InnerLibNum
 }
 
-// parseFilename parses file names formatted like:
+// ParseFilename parses file names formatted like:
 // * 0000000100-20170701T122141.0-24a07267-e5914b39
 // * 0000000101-20170701T122141.5-dbda3f44-24a07267-mindread1
 
 // * 0000000101-20170701T122141.5-dbda3f44-24a07267-100-mindread1
 // * 0000000101-20170701T122141.5-dbda3f44-24a07267-101-mindread2
 
-func parseFilename(filename string) (blockNum uint64, blockTime time.Time, blockIDSuffix string, previousBlockIDSuffix string, libNum *uint64, canonicalName string, err error) {
+func ParseFilename(filename string) (blockNum uint64, blockTime time.Time, blockIDSuffix string, previousBlockIDSuffix string, libNum *uint64, canonicalName string, err error) {
 	parts := strings.Split(filename, "-")
 	if len(parts) < 4 || len(parts) > 6 {
 		err = fmt.Errorf("wrong filename format: %q", filename)
