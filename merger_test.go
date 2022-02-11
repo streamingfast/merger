@@ -40,7 +40,7 @@ type TestMergerIO struct {
 	DownloadOneBlockFileFunc     func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
 }
 
-func (io *TestMergerIO) MergeAndSave(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+func (io *TestMergerIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 	if io.MergeAndSaveFunc != nil {
 		return io.MergeAndSaveFunc(inclusiveLowerBlock, oneBlockFiles)
 	}

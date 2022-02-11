@@ -217,7 +217,7 @@ func TestMergerIO_MergeUpload_ZeroLengthOneBlockFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 10, 1, 10*time.Millisecond)
-	err = mio.MergeAndSave(0, []*bundle.OneBlockFile{})
+	err = mio.MergeAndStore(0, []*bundle.OneBlockFile{})
 	require.Nil(t, err)
 }
 
@@ -236,7 +236,7 @@ func TestMergerIO_MergeUpload(t *testing.T) {
 	require.NoError(t, err)
 	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 10, 1, 10*time.Millisecond)
 
-	err = mio.MergeAndSave(114, files)
+	err = mio.MergeAndStore(114, files)
 	require.NoError(t, err)
 }
 
@@ -256,7 +256,7 @@ func TestMergerIO_MergeUpload_WriteObjectError(t *testing.T) {
 	require.NoError(t, err)
 	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 10, 1, 10*time.Millisecond)
 
-	err = mio.MergeAndSave(114, files)
+	err = mio.MergeAndStore(114, files)
 	require.Error(t, err)
 }
 
@@ -275,7 +275,7 @@ func TestMergerIO_FetchMergeFile(t *testing.T) {
 	require.NoError(t, err)
 	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 10, 1, 10*time.Millisecond)
 
-	err = mio.MergeAndSave(114, files)
+	err = mio.MergeAndStore(114, files)
 	require.Nil(t, err)
 
 	obf, err := mio.FetchMergedOneBlockFiles(114)

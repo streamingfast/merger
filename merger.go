@@ -133,7 +133,7 @@ func (m *Merger) launch() (err error) {
 			zap.Int("count", len(bundleFiles)),
 		)
 
-		if err = m.io.MergeAndSave(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
+		if err = m.io.MergeAndStore(m.bundler.BundleInclusiveLowerBlock(), bundleFiles); err != nil {
 			return err
 		}
 

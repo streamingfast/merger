@@ -17,7 +17,7 @@ import (
 )
 
 type IOInterface interface {
-	MergeAndSave(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
+	MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
 	FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
 	FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
 	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
@@ -29,7 +29,7 @@ type OneBlockFilesDeleter interface {
 
 type DStoreIO struct {
 	oneBlocksStore                 dstore.Store
-	destStore                      dstore.Store
+	mergedBlocksStore              dstore.Store
 	maxOneBlockOperationsBatchSize int
 	retryAttempts                  int
 	retryCooldown                  time.Duration
@@ -37,21 +37,21 @@ type DStoreIO struct {
 
 func NewDStoreIO(
 	oneBlocksStore dstore.Store,
-	destStore dstore.Store,
+	mergedBlocksStore dstore.Store,
 	maxOneBlockOperationsBatchSize int,
 	retryAttempts int,
 	retryCooldown time.Duration,
 ) *DStoreIO {
 	return &DStoreIO{
 		oneBlocksStore:                 oneBlocksStore,
-		destStore:                      destStore,
+		mergedBlocksStore:              mergedBlocksStore,
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 		retryAttempts:                  retryAttempts,
 		retryCooldown:                  retryCooldown,
 	}
 }
 
-func (s *DStoreIO) MergeAndSave(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+func (s *DStoreIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
 		return
 	}
@@ -63,7 +63,7 @@ func (s *DStoreIO) MergeAndSave(inclusiveLowerBlock uint64, oneBlockFiles []*bun
 	err = Retry(5, 500*time.Millisecond, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 		defer cancel()
-		return s.destStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, s.DownloadOneBlockFile))
+		return s.mergedBlocksStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, s.DownloadOneBlockFile))
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
@@ -77,7 +77,7 @@ func (s *DStoreIO) MergeAndSave(inclusiveLowerBlock uint64, oneBlockFiles []*bun
 func (s *DStoreIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
 	defer cancel()
-	reader, err := s.destStore.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
+	reader, err := s.mergedBlocksStore.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
 	if err != nil {
 		return nil, err
 	}
