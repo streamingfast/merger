@@ -125,6 +125,10 @@ func ParseFilename(filename string) (blockNum uint64, blockTime time.Time, block
 }
 
 func BlockFileName(block *bstream.Block) string {
+	return BlockFileNameWithSuffix(block, "generated")
+}
+
+func BlockFileNameWithSuffix(block *bstream.Block, suffix string) string {
 	blockTime := block.Time()
 	blockTimeString := fmt.Sprintf("%s.%01d", blockTime.Format("20060102T150405"), blockTime.Nanosecond()/100000000)
 
@@ -138,5 +142,5 @@ func BlockFileName(block *bstream.Block) string {
 		previousID = previousID[len(previousID)-8:]
 	}
 
-	return fmt.Sprintf("%010d-%s-%s-%s-%d-generated", block.Num(), blockTimeString, blockID, previousID, block.LibNum)
+	return fmt.Sprintf("%010d-%s-%s-%s-%d-%s", block.Num(), blockTimeString, blockID, previousID, block.LibNum, suffix)
 }
