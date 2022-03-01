@@ -3,7 +3,7 @@ module github.com/streamingfast/merger
 go 1.15
 
 require (
-	github.com/streamingfast/bstream v0.0.2-0.20220301153811-b8a6af964e31
+	github.com/streamingfast/bstream v0.0.2-0.20220301162141-6630bbe5996c
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/streamingfast/dmetrics v0.0.0-20210811180524-8494aeb34447
@@ -17,5 +17,3 @@ require (
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/olivere/elastic.v3 v3.0.75
 )
-
-replace git.apache.org/thrift.git => github.com/apache/thrift v0.0.0-20180902110319-2566ecd5d999
