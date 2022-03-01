@@ -5,11 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
-
-	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
-
 	"github.com/streamingfast/merger/bundle"
+	"github.com/stretchr/testify/require"
+	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestHealthz_Check(t *testing.T) {

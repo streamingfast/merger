@@ -26,9 +26,9 @@ import (
 	"github.com/streamingfast/merger"
 	"github.com/streamingfast/merger/bundle"
 	"github.com/streamingfast/merger/metrics"
-	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
+	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 type Config struct {

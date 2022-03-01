@@ -10,16 +10,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/merger/bundle"
-
-	"github.com/golang/protobuf/ptypes"
-
-	"github.com/golang/protobuf/proto"
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dbin"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/merger/bundle"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestNewMergerIO(t *testing.T) {
@@ -54,9 +51,6 @@ func TestMergerIO_FetchOneBlockFiles(t *testing.T) {
 }
 
 func TestMergerIO_FetchOneBlockFiles_GetOneBlockFileDataError(t *testing.T) {
-	_, filename, _, _ := runtime.Caller(0)
-	baseDir := path.Dir(filename)
-	baseDir = path.Join(baseDir, "bundle/test_data")
 	oneBlockStoreStore := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
 		return nil
 	})
@@ -75,9 +69,6 @@ func TestMergerIO_FetchOneBlockFiles_GetOneBlockFileDataError(t *testing.T) {
 }
 
 func TestMergerIO_FetchOneBlockFiles_GetBlockReaderFactoryError(t *testing.T) {
-	_, filename, _, _ := runtime.Caller(0)
-	baseDir := path.Dir(filename)
-	baseDir = path.Join(baseDir, "bundle/test_data")
 	oneBlockStoreStore := dstore.NewMockStore(func(base string, f io.Reader) (err error) {
 		return
 	})
@@ -193,16 +184,11 @@ func (l *BlockReaderError) Read() (*bstream.Block, error) {
 }
 
 func blockFromProto(b *pbbstream.Block) (*bstream.Block, error) {
-	blockTime, err := ptypes.Timestamp(b.Timestamp)
-	if err != nil {
-		return nil, fmt.Errorf("unable to turn google proto Timestamp %q into time.Time: %w", b.Timestamp.String(), err)
-	}
-
 	return bstream.MemoryBlockPayloadSetter(&bstream.Block{
 		Id:             b.Id,
 		Number:         b.Number,
 		PreviousId:     b.PreviousId,
-		Timestamp:      blockTime,
+		Timestamp:      b.Timestamp.AsTime(),
 		LibNum:         b.LibNum,
 		PayloadKind:    b.PayloadKind,
 		PayloadVersion: b.PayloadVersion,

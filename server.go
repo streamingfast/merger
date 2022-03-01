@@ -7,12 +7,11 @@ import (
 	"strings"
 
 	"github.com/streamingfast/bstream"
-	"google.golang.org/grpc/metadata"
-
 	"github.com/streamingfast/dgrpc"
-	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
 	pbmerge "github.com/streamingfast/pbgo/sf/merger/v1"
 	"go.uber.org/zap"
+	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/metadata"
 )
 
 func (m *Merger) startServer() {

@@ -17,7 +17,7 @@ package merger
 import (
 	"context"
 
-	pbhealth "github.com/streamingfast/pbgo/grpc/health/v1"
+	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func (m *Merger) Check(ctx context.Context, in *pbhealth.HealthCheckRequest) (*pbhealth.HealthCheckResponse, error) {
@@ -25,4 +25,17 @@ func (m *Merger) Check(ctx context.Context, in *pbhealth.HealthCheckRequest) (*p
 	return &pbhealth.HealthCheckResponse{
 		Status: status,
 	}, nil
+}
+
+func (m *Merger) Watch(req *pbhealth.HealthCheckRequest, stream pbhealth.Health_WatchServer) error {
+	err := stream.Send(&pbhealth.HealthCheckResponse{
+		Status: pbhealth.HealthCheckResponse_SERVING,
+	})
+	if err != nil {
+		return err
+	}
+
+	// The merger is always serving, so just want until this stream is canceled out
+	<-stream.Context().Done()
+	return nil
 }
