@@ -1,6 +1,6 @@
 module github.com/streamingfast/merger
 
-go 1.15
+go 1.16
 
 require (
 	github.com/streamingfast/bstream v0.0.2-0.20220301162141-6630bbe5996c
