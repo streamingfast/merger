@@ -16,11 +16,6 @@ package bundle
 
 import (
 	"github.com/streamingfast/logging"
-	"go.uber.org/zap"
 )
 
-var zlog *zap.Logger
-
-func init() {
-	logging.Register("github.com/streamingfast/merger/bundle", &zlog)
-}
+var zlog, _ = logging.PackageLogger("merger", "github.com/streamingfast/merger/bundle")
