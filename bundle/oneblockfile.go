@@ -39,10 +39,10 @@ type OneBlockFile struct {
 	Deleted       bool
 }
 
-func MustNewOneBlockFile(fileName string) *OneBlockFile {
+func NewOneBlockFile(fileName string) (*OneBlockFile, error) {
 	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := ParseFilename(fileName)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	return &OneBlockFile{
 		CanonicalName: canonicalName,
@@ -54,7 +54,15 @@ func MustNewOneBlockFile(fileName string) *OneBlockFile {
 		Num:         blockNum,
 		PreviousID:  previousBlockID,
 		InnerLibNum: libNum,
+	}, nil
+}
+
+func MustNewOneBlockFile(fileName string) *OneBlockFile {
+	out, err := NewOneBlockFile(fileName)
+	if err != nil {
+		panic(err)
 	}
+	return out
 }
 
 func MustNewMergedOneBlockFile(fileName string) *OneBlockFile {
