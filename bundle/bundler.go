@@ -50,6 +50,10 @@ func (b *Bundler) String() string {
 	)
 }
 
+func (b *Bundler) InitLIB(blk bstream.BlockRef) {
+	b.forkDB.InitLIB(blk)
+}
+
 func (b *Bundler) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	encoder.AddUint64("bundle_size", b.bundleSize)
 	encoder.AddUint64("inclusive_lower_block_num", b.bundleInclusiveLowerBlock())
