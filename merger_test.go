@@ -36,8 +36,8 @@ import (
 type TestMergerIO struct {
 	MergeAndSaveFunc             func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
 	FetchMergedOneBlockFilesFunc func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
-	FetchOneBlockFilesFunc       func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
 	DownloadOneBlockFileFunc     func(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
+	WalkOneBlockFilesFunc        func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error
 }
 
 func (io *TestMergerIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
@@ -56,14 +56,6 @@ func (io *TestMergerIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.
 	return nil, nil
 }
 
-func (io *TestMergerIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-	if io.FetchOneBlockFilesFunc != nil {
-		return io.FetchOneBlockFilesFunc(ctx)
-	}
-
-	return nil, nil
-}
-
 func (io *TestMergerIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
 	if io.DownloadOneBlockFileFunc != nil {
 		return io.DownloadOneBlockFileFunc(ctx, oneBlockFile)
@@ -72,11 +64,19 @@ func (io *TestMergerIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *
 	return nil, nil
 }
 
+func (io *TestMergerIO) WalkOneBlockFiles(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+	if io.WalkOneBlockFilesFunc != nil {
+		return io.WalkOneBlockFilesFunc(ctx, callback)
+	}
+	return nil
+
+}
+
 func TestNewMerger_SunnyPath(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -89,8 +89,13 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-2-suffix"),
 		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-2-suffix"),
 	}
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return srcOneBlockFiles, nil
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, o := range srcOneBlockFiles {
+			if err := callback(o); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var mergedFiles []*bundle.OneBlockFile
@@ -127,7 +132,7 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -142,9 +147,13 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000002-20210728T105016.09-00000002b-00000001b-0-suffix"), //un linkable file
 	}
 
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		oneBlockFiles = srcOneBlockFiles
-		return
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, o := range srcOneBlockFiles {
+			if err := callback(o); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var deletedFiles []*bundle.OneBlockFile
@@ -181,7 +190,7 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -199,14 +208,19 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000002-20210728T105016.09-00000002b-00000001b-0-suffix"), //too old
 		},
 	}
-	fetchOneBlockFilesCallCount := 0
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		oneBlockFiles = srcOneBlockFiles[fetchOneBlockFilesCallCount]
-		fetchOneBlockFilesCallCount++
-		if fetchOneBlockFilesCallCount == 2 {
+	walkOneBlockFilesCallCount := 0
+
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, o := range srcOneBlockFiles[walkOneBlockFilesCallCount] {
+			if err := callback(o); err != nil {
+				return err
+			}
+		}
+		walkOneBlockFilesCallCount++
+		if walkOneBlockFilesCallCount == 2 {
 			defer merger.Shutdown(nil)
 		}
-		return
+		return nil
 	}
 
 	var deletedFiles []*bundle.OneBlockFile
@@ -231,7 +245,7 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 	err := merger.launch()
 	require.NoError(t, err)
 
-	require.Equal(t, 2, fetchOneBlockFilesCallCount)
+	require.Equal(t, 2, walkOneBlockFilesCallCount)
 
 	expectedDeleted := append(clone(srcOneBlockFiles[0][0:4]), srcOneBlockFiles[1][0]) //normal purge and too old file
 	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
@@ -250,7 +264,7 @@ func TestNewMerger_Wait_For_Files(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -270,10 +284,15 @@ func TestNewMerger_Wait_For_Files(t *testing.T) {
 	}
 
 	fetchOneBlockFilesCallCount := 0
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		oneBlockFiles = srcOneBlockFiles[fetchOneBlockFilesCallCount]
+
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
 		fetchOneBlockFilesCallCount++
-		return
+		for _, o := range srcOneBlockFiles[fetchOneBlockFilesCallCount] {
+			if err := callback(o); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var deletedFiles []*bundle.OneBlockFile
@@ -307,7 +326,7 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -327,8 +346,13 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000010-20210728T105016.12-00000010a-00000009a-1-suffix"),
 	}
 
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return srcOneBlockFiles, nil
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, o := range srcOneBlockFiles {
+			if err := callback(o); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var deletedFiles []*bundle.OneBlockFile
@@ -371,7 +395,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 	bundler := bundle.NewBundler(5, 105)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		100: {
@@ -409,7 +433,8 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 	}
 
 	cycle := 0
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
 		// not actually fetching oneBlockFiles, but it is a good place to add assertions in this loop
 		switch cycle {
 		case 0:
@@ -435,7 +460,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 		}
 		cycle += 1
 
-		return nil, nil
+		return nil
 	}
 
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
@@ -463,7 +488,7 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 	bundler := bundle.NewBundler(5, 10)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		0: {
@@ -484,10 +509,9 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 		return oneBlockFile, nil
 	}
 
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
 		defer merger.Shutdown(nil)
-		return nil, nil
-
+		return nil
 	}
 
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
@@ -518,7 +542,7 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, stateFilePath)
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, stateFilePath)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, nil
@@ -532,9 +556,13 @@ func TestNewMerger_Check_StateFile(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-1-suffix"),
 	}
 
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return srcOneBlockFiles, nil
-
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, o := range srcOneBlockFiles {
+			if err := callback(o); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	var deletedFiles []*bundle.OneBlockFile
@@ -595,16 +623,17 @@ func TestBundler_Save_Load(t *testing.T) {
 	require.Equal(t, state.ExclusiveHighestBlockLimit, reloaded.ExclusiveHighestBlockLimit)
 }
 
-func TestMerger_Launch_FailFetchOneBlockFiles(t *testing.T) {
+func TestMerger_Launch_FailWalkOneBlockFiles(t *testing.T) {
 	bundler := bundle.NewBundler(5, 5)
 
 	mergerIO := &TestMergerIO{}
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) { return []*bundle.OneBlockFile{}, nil }
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return nil, fmt.Errorf("couldn't fetch one block files")
+
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		return fmt.Errorf("couldn't fetch one block files")
 	}
 
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	merger.Launch()
 }
@@ -647,15 +676,20 @@ func TestMerger_Launch_Drift(t *testing.T) {
 		return []*bundle.OneBlockFile{}, nil
 	}
 
-	fetchOneBlockFiles := func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return c.files, nil
+	walkOneBlockFiles := func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, f := range c.files {
+			if err := callback(f); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	mergerIO := &TestMergerIO{
-		FetchOneBlockFilesFunc:       fetchOneBlockFiles,
+		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		FetchMergedOneBlockFilesFunc: fetchMergedFiles,
 	}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	go merger.Launch()
 	select {
@@ -705,19 +739,24 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 	bundler := bundle.NewBundler(5, 118)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return c.mergedFiles[lowBlockNum], nil
 	}
 
 	cycleCount := 0
-	mergerIO.FetchOneBlockFilesFunc = func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+
+	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
 		cycleCount += 1
 		if cycleCount == 2 {
-			return c.oneBlockFiles, err
+			for _, o := range c.oneBlockFiles {
+				if err := callback(o); err != nil {
+					return err
+				}
+			}
 		}
-		return nil, err
+		return nil
 	}
 
 	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
@@ -771,8 +810,13 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 		return []*bundle.OneBlockFile{}, nil
 	}
 
-	fetchOneBlockFiles := func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return c.files, nil
+	walkOneBlockFiles := func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, f := range c.files {
+			if err := callback(f); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	mergeUpload := func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
@@ -781,10 +825,10 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 
 	mergerIO := &TestMergerIO{
 		FetchMergedOneBlockFilesFunc: fetchMergedFile,
-		FetchOneBlockFilesFunc:       fetchOneBlockFiles,
+		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		MergeAndSaveFunc:             mergeUpload,
 	}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
 
 	err := merger.launch()
 	require.Error(t, err)
@@ -821,8 +865,13 @@ func TestMerger_Launch_SaveStateError(t *testing.T) {
 		return []*bundle.OneBlockFile{}, nil
 	}
 
-	fetchOneBlockFiles := func(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		return c.files, nil
+	walkOneBlockFiles := func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		for _, f := range c.files {
+			if err := callback(f); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	mergeUpload := func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
@@ -837,10 +886,10 @@ func TestMerger_Launch_SaveStateError(t *testing.T) {
 
 	mergerIO := &TestMergerIO{
 		FetchMergedOneBlockFilesFunc: fetchMergedFile,
-		FetchOneBlockFilesFunc:       fetchOneBlockFiles,
+		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		MergeAndSaveFunc:             mergeUpload,
 	}
-	merger := NewMerger(bundler, time.Second, "", mergerIO, deleteFiles, statefile)
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, deleteFiles, statefile)
 
 	go merger.Launch()
 	select {

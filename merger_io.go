@@ -19,7 +19,7 @@ import (
 type IOInterface interface {
 	MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
 	FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
-	FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error)
+	WalkOneBlockFiles(ctx context.Context, callback func(*bundle.OneBlockFile) error) error
 	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
 }
 
@@ -28,26 +28,23 @@ type OneBlockFilesDeleter interface {
 }
 
 type DStoreIO struct {
-	oneBlocksStore                 dstore.Store
-	mergedBlocksStore              dstore.Store
-	maxOneBlockOperationsBatchSize int
-	retryAttempts                  int
-	retryCooldown                  time.Duration
+	oneBlocksStore    dstore.Store
+	mergedBlocksStore dstore.Store
+	retryAttempts     int
+	retryCooldown     time.Duration
 }
 
 func NewDStoreIO(
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
-	maxOneBlockOperationsBatchSize int,
 	retryAttempts int,
 	retryCooldown time.Duration,
 ) *DStoreIO {
 	return &DStoreIO{
-		oneBlocksStore:                 oneBlocksStore,
-		mergedBlocksStore:              mergedBlocksStore,
-		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
-		retryAttempts:                  retryAttempts,
-		retryCooldown:                  retryCooldown,
+		oneBlocksStore:    oneBlocksStore,
+		mergedBlocksStore: mergedBlocksStore,
+		retryAttempts:     retryAttempts,
+		retryCooldown:     retryCooldown,
 	}
 }
 
@@ -86,10 +83,8 @@ func (s *DStoreIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBl
 	return out, err
 }
 
-func (s *DStoreIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-	fileCount := 0
-	err = s.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
-		fileCount++
+func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+	return s.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
 		oneBlockFile := bundle.MustNewOneBlockFile(filename)
 
 		if oneBlockFile.InnerLibNum == nil {
@@ -109,20 +104,14 @@ func (s *DStoreIO) FetchOneBlockFiles(ctx context.Context) (oneBlockFiles []*bun
 			}
 
 			oneBlockFile.InnerLibNum = &block.LibNum
-		}
-		oneBlockFiles = append(oneBlockFiles, oneBlockFile)
+			if err := callback(oneBlockFile); err != nil {
+				return err
+			}
 
-		if fileCount >= s.maxOneBlockOperationsBatchSize {
-			return dstore.StopIteration
 		}
 		return nil
 	})
 
-	zlog.Info("retrieved list of files",
-		zap.Int("files_count", fileCount),
-	)
-
-	return
 }
 
 func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {

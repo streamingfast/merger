@@ -21,6 +21,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger/bundle"
 	"github.com/streamingfast/merger/metrics"
 
@@ -30,10 +31,11 @@ import (
 
 type Merger struct {
 	*shutter.Shutter
-	chunkSize               uint64
-	grpcListenAddr          string
-	timeBetweenStoreLookups time.Duration // should be very low on local filesystem
-	oneBlockDeletionThreads int
+	chunkSize                      uint64
+	grpcListenAddr                 string
+	timeBetweenStoreLookups        time.Duration // should be very low on local filesystem
+	oneBlockDeletionThreads        int
+	maxOneBlockOperationsBatchSize int
 
 	bundler         *bundle.Bundler
 	io              IOInterface
@@ -44,19 +46,21 @@ type Merger struct {
 func NewMerger(
 	bundler *bundle.Bundler,
 	timeBetweenStoreLookups time.Duration,
+	maxOneBlockOperationsBatchSize int,
 	grpcListenAddr string,
 	io IOInterface,
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
 	stateFile string,
 ) *Merger {
 	return &Merger{
-		Shutter:                 shutter.New(),
-		bundler:                 bundler,
-		grpcListenAddr:          grpcListenAddr,
-		timeBetweenStoreLookups: timeBetweenStoreLookups,
-		io:                      io,
-		deleteFilesFunc:         deleteFilesFunc,
-		stateFile:               stateFile,
+		Shutter:                        shutter.New(),
+		bundler:                        bundler,
+		grpcListenAddr:                 grpcListenAddr,
+		timeBetweenStoreLookups:        timeBetweenStoreLookups,
+		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
+		io:                             io,
+		deleteFilesFunc:                deleteFilesFunc,
+		stateFile:                      stateFile,
 	}
 }
 
@@ -168,20 +172,26 @@ func (m *Merger) launch() (err error) {
 
 func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, lastOneBlockFileAdded *bundle.OneBlockFile, err error) {
 	addedFileCount := 0
-	oneBlockFiles, err := m.io.FetchOneBlockFiles(ctx)
+	callback := func(o *bundle.OneBlockFile) error {
+		if m.bundler.IsBlockTooOld(o.Num) {
+			tooOld = append(tooOld, o)
+			return nil
+		}
+		exists := m.bundler.AddOneBlockFile(o)
+		if exists {
+			return nil
+		}
+		lastOneBlockFileAdded = o
+		addedFileCount++
+		if addedFileCount > m.maxOneBlockOperationsBatchSize {
+			return dstore.StopIteration
+		}
+		return nil
+	}
+
+	err = m.io.WalkOneBlockFiles(ctx, callback)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching one block files: %w", err)
-	}
-	for _, oneBlockFile := range oneBlockFiles {
-
-		switch {
-		case m.bundler.IsBlockTooOld(oneBlockFile.Num):
-			tooOld = append(tooOld, oneBlockFile)
-		default:
-			m.bundler.AddOneBlockFile(oneBlockFile)
-			lastOneBlockFileAdded = oneBlockFile
-			addedFileCount++
-		}
 	}
 
 	zlog.Info("retrieved list of files",
