@@ -104,10 +104,9 @@ func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, callback func(*bundle.
 			}
 
 			oneBlockFile.InnerLibNum = &block.LibNum
-			if err := callback(oneBlockFile); err != nil {
-				return err
-			}
-
+		}
+		if err := callback(oneBlockFile); err != nil {
+			return err
 		}
 		return nil
 	})

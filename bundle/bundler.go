@@ -35,13 +35,18 @@ func (b *Bundler) String() string {
 	if b.lastMergeOneBlockFile != nil {
 		lastMergeBlockNum = b.lastMergeOneBlockFile.Num
 	}
+	var highestLinkableBlock string
+	if lb := b.LongestChainLastBlockFile(); lb != nil {
+		highestLinkableBlock = lb.CanonicalName
+	}
 
 	lc := b.longestChain()
 	return fmt.Sprintf(
-		"bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, exclusive_highest_block_limit: %d lib_num: %d lib id:%s longest chain lenght: %d",
+		"bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, highest_linkable_block: %s, exclusive_highest_block_limit: %d, lib_num: %d, lib id:%s, longest chain lenght: %d",
 		b.bundleSize,
 		lastMergeBlockNum,
 		b.bundleInclusiveLowerBlock(),
+		highestLinkableBlock,
 		b.exclusiveHighestBlockLimit,
 		b.forkDB.LIBNum(),
 		b.forkDB.LIBID(),
@@ -58,6 +63,11 @@ func (b *Bundler) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
 	encoder.AddUint64("bundle_size", b.bundleSize)
 	encoder.AddUint64("inclusive_lower_block_num", b.bundleInclusiveLowerBlock())
 	encoder.AddUint64("exclusive_highest_block_limit", b.exclusiveHighestBlockLimit)
+
+	if lb := b.LongestChainLastBlockFile(); lb != nil {
+		encoder.AddUint64("highest_linkable_block_num", lb.Num)
+		encoder.AddString("highest_linkable_block_id", lb.ID)
+	}
 
 	if b.lastMergeOneBlockFile != nil {
 		encoder.AddUint64("last_merge_one_block_num", b.lastMergeOneBlockFile.Num)

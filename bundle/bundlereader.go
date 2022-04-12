@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/streamingfast/bstream"
-	"go.uber.org/zap"
 )
 
 type BundleReader struct {
@@ -38,7 +37,6 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 
 		obf := r.oneBlockFiles[0]
 		r.oneBlockFiles = r.oneBlockFiles[1:]
-		zlog.Info("downloading one block file", zap.String("canonical_name", obf.CanonicalName))
 		data, err := obf.Data(r.ctx, r.downloadOneBlockFile)
 
 		if err != nil {

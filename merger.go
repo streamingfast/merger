@@ -96,7 +96,7 @@ func (m *Merger) launch() (err error) {
 		isBundleComplete, highestBundleBlockNum := m.bundler.BundleCompleted() // multiple bundle can be completed. No need to fetch more on block file
 		if !isBundleComplete {
 			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
-			tooOldFiles, lastOneBlockFileAdded, err := m.retrieveOneBlockFile(ctx)
+			tooOldFiles, err := m.retrieveOneBlockFile(ctx)
 			cancel()
 			if err != nil {
 				return fmt.Errorf("retreiving one block files: %w", err)
@@ -104,18 +104,6 @@ func (m *Merger) launch() (err error) {
 
 			if len(tooOldFiles) > 0 {
 				m.deleteFilesFunc(tooOldFiles)
-			}
-
-			if lastOneBlockFileAdded != nil {
-				zlog.Info("one block retrieved", zap.Uint64("last_block_file", lastOneBlockFileAdded.Num))
-				highest := m.bundler.LongestChainLastBlockFile()
-				if highest != nil &&
-					highest.Num >= m.bundler.BundleInclusiveLowerBlock() &&
-					highest.Num < m.bundler.ExclusiveHighestBlockLimit() {
-					metrics.HeadBlockTimeDrift.SetBlockTime(highest.BlockTime)
-					metrics.HeadBlockNumber.SetUint64(highest.Num)
-				}
-
 			}
 
 			isBundleComplete, highestBundleBlockNum = m.bundler.BundleCompleted()
@@ -170,20 +158,23 @@ func (m *Merger) launch() (err error) {
 	}
 }
 
-func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, lastOneBlockFileAdded *bundle.OneBlockFile, err error) {
+func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, err error) {
 	addedFileCount := 0
+	seenFileCount := 0
+	var highestSeenBlockFile *bundle.OneBlockFile
 	callback := func(o *bundle.OneBlockFile) error {
+		highestSeenBlockFile = o
 		if m.bundler.IsBlockTooOld(o.Num) {
 			tooOld = append(tooOld, o)
 			return nil
 		}
 		exists := m.bundler.AddOneBlockFile(o)
 		if exists {
+			seenFileCount += 1
 			return nil
 		}
-		lastOneBlockFileAdded = o
 		addedFileCount++
-		if addedFileCount > m.maxOneBlockOperationsBatchSize {
+		if addedFileCount >= m.maxOneBlockOperationsBatchSize {
 			return dstore.StopIteration
 		}
 		return nil
@@ -191,12 +182,23 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.One
 
 	err = m.io.WalkOneBlockFiles(ctx, callback)
 	if err != nil {
-		return nil, nil, fmt.Errorf("fetching one block files: %w", err)
+		return nil, fmt.Errorf("fetching one block files: %w", err)
+	}
+
+	highestNum := m.bundler.BundleInclusiveLowerBlock()
+	highest := m.bundler.LongestChainLastBlockFile()
+	if highest != nil && highest.Num >= m.bundler.BundleInclusiveLowerBlock() && highest.Num < m.bundler.ExclusiveHighestBlockLimit() {
+		highestNum = highest.Num
+		metrics.HeadBlockTimeDrift.SetBlockTime(highest.BlockTime)
+		metrics.HeadBlockNumber.SetUint64(highestNum)
 	}
 
 	zlog.Info("retrieved list of files",
+		zap.Int("seen_files_count", seenFileCount),
 		zap.Int("too_old_files_count", len(tooOld)),
 		zap.Int("added_files_count", addedFileCount),
+		zap.Uint64("highest_seen_block_file", highestSeenBlockFile.Num),
+		zap.Uint64("highest_linkable_block_file", highestNum),
 	)
 
 	return
