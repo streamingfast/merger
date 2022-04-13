@@ -193,13 +193,18 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.One
 		metrics.HeadBlockNumber.SetUint64(highestNum)
 	}
 
-	zlog.Info("retrieved list of files",
+	zapFields := []zap.Field{
 		zap.Int("seen_files_count", seenFileCount),
 		zap.Int("too_old_files_count", len(tooOld)),
 		zap.Int("added_files_count", addedFileCount),
-		zap.Uint64("highest_seen_block_file", highestSeenBlockFile.Num),
 		zap.Uint64("highest_linkable_block_file", highestNum),
-	)
+	}
+
+	if highestSeenBlockFile != nil {
+		zapFields = append(zapFields, zap.Uint64("highest_seen_block_file", highestSeenBlockFile.Num), )
+	}
+
+	zlog.Info("retrieved list of files", zapFields...)
 
 	return
 }
