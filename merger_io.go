@@ -55,7 +55,12 @@ func (s *DStoreIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bu
 	t0 := time.Now()
 
 	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
-	zlog.Info("about to write merged blocks to storage location", zap.String("filename", bundleFilename), zap.Duration("write_timeout", WriteObjectTimeout), zap.Uint64("lower_block_num", oneBlockFiles[0].Num), zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num))
+	zlog.Info("about to write merged blocks to storage location",
+		zap.String("filename", bundleFilename),
+		zap.Duration("write_timeout", WriteObjectTimeout),
+		zap.Uint64("lower_block_num", oneBlockFiles[0].Num),
+		zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num),
+	)
 
 	err = Retry(5, 500*time.Millisecond, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)

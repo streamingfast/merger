@@ -62,6 +62,24 @@ func TestBundleReader_ReadByChunk(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, read, 1)
 	assert.Equal(t, r1, []byte{0x3})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 1)
+	assert.Equal(t, r1, []byte{0x4})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 1)
+	assert.Equal(t, r1, []byte{0x5})
+
+	read, err = r.Read(r1)
+	require.NoError(t, err)
+	assert.Equal(t, read, 1)
+	assert.Equal(t, r1, []byte{0x6})
+
+	read, err = r.Read(r1)
+	require.Error(t, io.EOF)
 }
 
 func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {

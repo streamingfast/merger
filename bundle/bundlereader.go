@@ -3,49 +3,66 @@ package bundle
 import (
 	"context"
 	"fmt"
-	"io"
-
 	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dhammer"
+	"go.uber.org/zap"
+	"io"
+	"sync"
 )
 
 type BundleReader struct {
-	ctx                  context.Context
-	readBuffer           []byte
-	readBufferOffset     int
-	oneBlockFiles        []*OneBlockFile
-	downloadOneBlockFile func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)
-	headerPassed         bool
+	ctx              context.Context
+	readBuffer       []byte
+	readBufferOffset int
+	oneBlockFiles    []*OneBlockFile
+	headerPassed     bool
+
+	downloader      *dhammer.Nailer
+	startDownloader sync.Once
 }
 
-func NewBundleReader(ctx context.Context, oneBlockFiles []*OneBlockFile, downloadOneBlockFile func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)) *BundleReader {
+const ParallelOneBlockDownload = 2
+
+func NewBundleReader(ctx context.Context, oneBlockFiles []*OneBlockFile, oneBlockDownloader oneBlockDownloaderFunc) *BundleReader {
 	return &BundleReader{
-		ctx:                  ctx,
-		downloadOneBlockFile: downloadOneBlockFile,
-		oneBlockFiles:        oneBlockFiles,
+		ctx:           ctx,
+		oneBlockFiles: oneBlockFiles,
+		downloader:    dhammer.NewNailer(ParallelOneBlockDownload, downloadOneBlockJob(oneBlockDownloader)),
 	}
 }
 
 func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
-	for {
-		if r.readBuffer != nil {
-			break
-		}
+	r.startDownloader.Do(func() {
+		r.downloader.Start(r.ctx)
+		go func() {
+			for _, oneBlockFile := range r.oneBlockFiles {
+				r.downloader.Push(r.ctx, oneBlockFile)
+			}
+			r.oneBlockFiles = []*OneBlockFile{}
+			zlog.Debug("finished queuing one block files to be read")
+			r.downloader.Close()
+		}()
+	})
 
-		if len(r.oneBlockFiles) <= 0 {
+	if r.readBuffer == nil {
+		// nothing in the buffer read the next one block that should be ready
+		if err := r.downloader.Err(); err != nil {
+			return 0, fmt.Errorf("parallel one block downloader failed: %w", err)
+		}
+		
+		out, hasMore := <-r.downloader.Out
+		if !hasMore {
 			return 0, io.EOF
 		}
 
-		obf := r.oneBlockFiles[0]
-		r.oneBlockFiles = r.oneBlockFiles[1:]
-		data, err := obf.Data(r.ctx, r.downloadOneBlockFile)
-
-		if err != nil {
-			return 0, err
+		if err := r.downloader.Err(); err != nil {
+			return 0, fmt.Errorf("parallel one block downloader failed: %w", err)
 		}
 
+		data := out.([]byte)
 		if len(data) == 0 {
 			r.readBuffer = nil
-			return 0, fmt.Errorf("one-block-file corrupt: empty data: filename: %s", obf.CanonicalName)
+			return 0, fmt.Errorf("one-block-file corrupt: empty data")
 		}
 
 		if r.headerPassed {
@@ -56,11 +73,10 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 		} else {
 			r.headerPassed = true
 		}
-
 		r.readBuffer = data
 		r.readBufferOffset = 0
 	}
-
+	// there are still bytes to be read
 	bytesRead = copy(p, r.readBuffer[r.readBufferOffset:])
 	r.readBufferOffset += bytesRead
 	if r.readBufferOffset >= len(r.readBuffer) {
@@ -68,4 +84,18 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 	}
 
 	return bytesRead, nil
+}
+
+func downloadOneBlockJob(oneBlockDownloader oneBlockDownloaderFunc) dhammer.NailerFunc {
+	return func(ctx context.Context, in interface{}) (interface{}, error) {
+		oneBlockFile := in.(*OneBlockFile)
+		if tracer.Enabled() {
+			zlog.Debug("downloading one block file", zap.String("failename", oneBlockFile.CanonicalName))
+		}
+		data, err := oneBlockFile.Data(ctx, oneBlockDownloader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve oneblock %s file data: %w", oneBlockFile.CanonicalName, err)
+		}
+		return data, nil
+	}
 }

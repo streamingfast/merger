@@ -24,6 +24,8 @@ import (
 	"github.com/streamingfast/bstream"
 )
 
+type oneBlockDownloaderFunc = func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)
+
 var Empty struct{}
 
 type OneBlockFile struct {
@@ -71,9 +73,9 @@ func MustNewMergedOneBlockFile(fileName string) *OneBlockFile {
 	return oneBlockFile
 }
 
-func (f *OneBlockFile) Data(ctx context.Context, downloadOneBlockFile func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)) ([]byte, error) {
+func (f *OneBlockFile) Data(ctx context.Context, oneBlockDownloader oneBlockDownloaderFunc) ([]byte, error) {
 	if len(f.MemoizeData) == 0 {
-		data, err := downloadOneBlockFile(ctx, f)
+		data, err := oneBlockDownloader(ctx, f)
 		if err != nil {
 			return nil, err
 		}

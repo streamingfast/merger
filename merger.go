@@ -201,7 +201,7 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.One
 	}
 
 	if highestSeenBlockFile != nil {
-		zapFields = append(zapFields, zap.Uint64("highest_seen_block_file", highestSeenBlockFile.Num), )
+		zapFields = append(zapFields, zap.Uint64("highest_seen_block_file", highestSeenBlockFile.Num))
 	}
 
 	zlog.Info("retrieved list of files", zapFields...)
@@ -210,6 +210,8 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.One
 }
 
 type State struct {
+	// this is the last block number of the bundle you are processing. When the current block
+	// surpassed this value the bundle will be completed and merged/uploaded
 	ExclusiveHighestBlockLimit uint64
 }
 
