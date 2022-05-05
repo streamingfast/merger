@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -141,6 +142,37 @@ func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundl
 	}
 
 	return
+}
+
+func (s *DStoreIO) FindStartBlock(ctx context.Context, lowestPossible, bundleSize uint64) (uint64, error) {
+	lowestBoundary := (lowestPossible / bundleSize) * bundleSize
+
+	var seenBoundary uint64
+	err := s.mergedBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBoundary), func(filename string) error {
+		num, err := strconv.ParseUint(filename, 10, 64)
+		if err != nil {
+			return err
+		}
+		if num < lowestBoundary { // user has decided to start its merger in the 'future'
+			return nil
+		}
+
+		if seenBoundary == 0 {
+			seenBoundary = num
+			return nil
+		}
+		if num != seenBoundary+bundleSize {
+			return fmt.Errorf("merged blocks skip from %d to %d, you have a hole in your merged block files and need to reprocess or set firstStreamableBlock above this hole", seenBoundary, num)
+		}
+		seenBoundary = num
+		return nil
+	})
+
+	if err == nil && seenBoundary == 0 {
+		return lowestBoundary, nil // no merged file exist
+	}
+
+	return seenBoundary + bundleSize, err
 }
 
 type oneBlockFilesDeleter struct {

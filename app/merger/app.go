@@ -32,15 +32,15 @@ import (
 )
 
 type Config struct {
-	StorageOneBlockFilesPath       string
-	StorageMergedBlocksFilesPath   string
-	GRPCListenAddr                 string
+	StorageOneBlockFilesPath     string
+	StorageMergedBlocksFilesPath string
+	GRPCListenAddr               string
+
+	// perf tweak
 	WritersLeewayDuration          time.Duration
 	TimeBetweenStoreLookups        time.Duration
-	StateFile                      string
 	OneBlockDeletionThreads        int
 	MaxOneBlockOperationsBatchSize int
-	NextExclusiveHighestBlockLimit uint64
 }
 
 type App struct {
@@ -82,47 +82,21 @@ func (a *App) Run() error {
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
 	bundleSize := uint64(100)
-	needBootstrap := true
-
-	var state *merger.State
-	if a.config.NextExclusiveHighestBlockLimit > 0 {
-		needBootstrap = false
-		state = &merger.State{
-			ExclusiveHighestBlockLimit: a.config.NextExclusiveHighestBlockLimit,
-		}
-	} else {
-		state, err = merger.LoadState(a.config.StateFile)
+	nextBundle, err := io.FindStartBlock(context.Background(), bstream.GetProtocolFirstStreamableBlock, bundleSize)
+	if err != nil {
+		return err
 	}
 
-	if err != nil || state == nil {
-		zlog.Warn("failed to load bundle ", zap.String("file_name", a.config.StateFile))
-		lastMergedLowBlockNum, found, err := merger.FindLastMergedLowBlockNum(mergedBlocksStore, bundleSize)
-		nextExclusiveHighestBlockLimit := lastMergedLowBlockNum + bundleSize + bundleSize
-		if err != nil {
-			return fmt.Errorf("finding where to start: %w", err)
+	bundler := bundle.NewBundler(nextBundle, bstream.GetProtocolFirstStreamableBlock, bundleSize)
+	err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+		oneBlockFiles, fetchErr := io.FetchMergedOneBlockFiles(lowBlockNum)
+		if fetchErr != nil {
+			return nil, fmt.Errorf("fetching one block files from merged file with low block num %d: %w", lowBlockNum, fetchErr)
 		}
-		if !found {
-			needBootstrap = false
-			nextExclusiveHighestBlockLimit = ((bstream.GetProtocolFirstStreamableBlock / bundleSize) * bundleSize) + bundleSize
-		}
-
-		state = &merger.State{
-			ExclusiveHighestBlockLimit: nextExclusiveHighestBlockLimit,
-		}
-	}
-
-	bundler := bundle.NewBundler(bundleSize, state.ExclusiveHighestBlockLimit)
-	if needBootstrap {
-		err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-			oneBlockFiles, fetchErr := io.FetchMergedOneBlockFiles(lowBlockNum)
-			if fetchErr != nil {
-				return nil, fmt.Errorf("fetching one block files from merged file with low block num %d: %w", lowBlockNum, fetchErr)
-			}
-			return oneBlockFiles, err
-		})
-		if err != nil {
-			return fmt.Errorf("bundle bootstrap: %w", err)
-		}
+		return oneBlockFiles, err
+	})
+	if err != nil {
+		return fmt.Errorf("bundle bootstrap: %w", err)
 	}
 
 	m := merger.NewMerger(
@@ -132,7 +106,6 @@ func (a *App) Run() error {
 		a.config.GRPCListenAddr,
 		io,
 		filesDeleter.Delete,
-		a.config.StateFile,
 	)
 	zlog.Info("merger initiated")
 

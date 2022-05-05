@@ -17,16 +17,19 @@ type Bundler struct {
 
 	lastMergeOneBlockFile      *OneBlockFile
 	exclusiveHighestBlockLimit uint64
+	lowestPossibleBundle       uint64
 
 	mutex sync.Mutex
 }
 
-func NewBundler(bundleSize uint64, firstExclusiveHighestBlockLimit uint64) *Bundler {
-	zlog.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("first_exclusive_highest_block_limit", firstExclusiveHighestBlockLimit))
+func NewBundler(nextBundle, lowestPossibleBundle, bundleSize uint64) *Bundler {
+	zlog.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("next_bundle", nextBundle), zap.Uint64("lowest_possible_bundle", lowestPossibleBundle))
+	lowestBoundary := (lowestPossibleBundle / bundleSize) * bundleSize
 	return &Bundler{
 		bundleSize:                 bundleSize,
 		forkDB:                     forkable.NewForkDB(forkable.ForkDBWithLogger(zlog)),
-		exclusiveHighestBlockLimit: firstExclusiveHighestBlockLimit,
+		lowestPossibleBundle:       lowestBoundary,
+		exclusiveHighestBlockLimit: nextBundle + bundleSize,
 	}
 }
 
@@ -95,6 +98,11 @@ func (b *Bundler) bundleInclusiveLowerBlock() uint64 {
 func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
+
+	if b.bundleInclusiveLowerBlock() < b.bundleSize || b.bundleInclusiveLowerBlock()-b.bundleSize < b.lowestPossibleBundle {
+		zlog.Info("skipping bootstrap, starting on 'lowest possible bundle'")
+		return nil
+	}
 
 	lastMergedLowBlockNum := b.bundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
 
@@ -248,6 +256,8 @@ func (b *Bundler) LongestOneBlockFileChain() (oneBlockFiles []*OneBlockFile) {
 
 	return
 }
+
+// Longest Chain of a tree connected to the LIB
 func (b *Bundler) LongestChain() []string {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -277,18 +287,24 @@ func (b *Bundler) LongestChainLastBlockFile() *OneBlockFile {
 	return blk.Object.(*OneBlockFile)
 }
 
+func (b *Bundler) libNum() *uint64 {
+	rootID, err := b.forkDB.Root()
+	if err != nil {
+		return nil
+	}
+
+	rootOneBlockFile := b.forkDB.BlockForID(rootID).Object.(*OneBlockFile)
+	return &rootOneBlockFile.Num
+}
+
 func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	rootID, err := b.forkDB.Root()
-	if err != nil {
-		return false
+	if root := b.libNum(); root != nil {
+		return blockNum < *root
 	}
-
-	rootOneBlockFile := b.forkDB.BlockForID(rootID).Object.(*OneBlockFile)
-	//root is always <= to the forkdb lib.
-	return blockNum < rootOneBlockFile.Num
+	return false
 }
 
 func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
@@ -303,22 +319,27 @@ func (b *Bundler) LongestChainFirstBlockNum() (uint64, error) {
 	return block.BlockNum, nil
 }
 
-func (b *Bundler) BundleCompleted() (complete bool, highestBlockLimit uint64) {
+func (b *Bundler) BundleCompleted() (complete bool, highestBlockLimit uint64, err error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
 	longest := b.longestChain()
 
+	if lib := b.libNum(); lib != nil {
+		if *lib >= b.exclusiveHighestBlockLimit {
+			return false, 0, fmt.Errorf("one-block-files found are ABOVE the bundle that we are trying to merge (%d is above [%d-%d]). You will have to fix your block files manually or start with a higher 'first streamable block'", *lib, b.bundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
+		}
+	}
 	for _, blockID := range longest {
 		blk := b.forkDB.BlockForID(blockID)
 
 		if blk.BlockNum >= b.exclusiveHighestBlockLimit {
-			return true, highestBlockLimit
+			return true, highestBlockLimit, nil
 		}
 		highestBlockLimit = blk.BlockNum
 	}
 
-	return false, 0
+	return false, 0, nil
 }
 
 func (b *Bundler) ToBundle(inclusiveHighestBlockLimit uint64) []*OneBlockFile {

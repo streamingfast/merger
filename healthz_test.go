@@ -12,8 +12,8 @@ import (
 
 func TestHealthz_Check(t *testing.T) {
 	ctx := context.Background()
-	bundler := bundle.NewBundler(5, 5)
-	m := NewMerger(bundler, time.Second, 10, "6969", nil, nil, "")
+	bundler := bundle.NewBundler(0, 0, 5)
+	m := NewMerger(bundler, time.Second, 10, "6969", nil, nil)
 
 	request := &pbhealth.HealthCheckRequest{}
 	resp, err := m.Check(ctx, request)

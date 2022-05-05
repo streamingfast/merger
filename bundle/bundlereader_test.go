@@ -149,7 +149,6 @@ func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 		NewTestOneBlockFileFromFile(t, "0000000002-20150730T152657.0-044698c9-13406cb6.dbin"),
 		NewTestOneBlockFileFromFile(t, "0000000003-20150730T152728.0-a88cf741-044698c9.dbin"),
 	}
-	fmt.Println(bundle)
 
 	r := NewBundleReader(context.Background(), bundle, nil)
 	allBlockData, err := ioutil.ReadAll(r)

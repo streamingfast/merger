@@ -18,16 +18,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"os"
-	"path"
-	"path/filepath"
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/bstream/forkable"
 	"github.com/streamingfast/merger/bundle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,10 +66,10 @@ func (io *TestMergerIO) WalkOneBlockFiles(ctx context.Context, callback func(*bu
 }
 
 func TestNewMerger_SunnyPath(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -129,10 +122,10 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 }
 
 func TestNewMerger_Unlinkable_File(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -187,10 +180,10 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 }
 
 func TestNewMerger_File_Too_Old(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -260,73 +253,73 @@ func clone(in []*bundle.OneBlockFile) (out []*bundle.OneBlockFile) {
 	return
 }
 
-func TestNewMerger_Wait_For_Files(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
-
-	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
-
-	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
-		return nil, fmt.Errorf("nada")
-	}
-
-	srcOneBlockFiles := [][]*bundle.OneBlockFile{
-		{},
-		{
-			bundle.MustNewOneBlockFile("0000000001-20210728T105016.01-00000001a-00000000a-0-suffix"),
-			bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-0-suffix"),
-			bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
-			bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-2-suffix"),
-		},
-		{
-			bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-2-suffix"),
-		},
-	}
-
-	fetchOneBlockFilesCallCount := 0
-
-	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
-		fetchOneBlockFilesCallCount++
-		for _, o := range srcOneBlockFiles[fetchOneBlockFilesCallCount] {
-			if err := callback(o); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	var deletedFiles []*bundle.OneBlockFile
-	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
-		deletedFiles = append(deletedFiles, oneBlockFiles...)
-	}
-
-	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
-		defer merger.Shutdown(nil)
-		mergedFiles = oneBlockFiles
-		return nil
-	}
-
-	go func() {
-		select {
-		case <-time.After(3 * time.Second):
-			panic("too long")
-		case <-merger.Terminated():
-		}
-	}()
-
-	err := merger.launch()
-	require.NoError(t, err)
-
-	assert.Equal(t, bundle.ToSortedIDs(mergedFiles), bundle.ToSortedIDs(deletedFiles))
-	assert.Equal(t, srcOneBlockFiles[1], mergedFiles)
-}
+//func TestNewMerger_Wait_For_Files(t *testing.T) {
+//	bundler := bundle.NewBundler(0, 0, 5)
+//
+//	mergerIO := &TestMergerIO{}
+//	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
+//
+//	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+//		return nil, fmt.Errorf("nada")
+//	}
+//
+//	srcOneBlockFiles := [][]*bundle.OneBlockFile{
+//		{},
+//		{
+//			bundle.MustNewOneBlockFile("0000000001-20210728T105016.01-00000001a-00000000a-0-suffix"),
+//			bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-0-suffix"),
+//			bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
+//			bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-2-suffix"),
+//		},
+//		{
+//			bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-2-suffix"),
+//		},
+//	}
+//
+//	fetchOneBlockFilesCallCount := 0
+//
+//	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+//		fetchOneBlockFilesCallCount++
+//		for _, o := range srcOneBlockFiles[fetchOneBlockFilesCallCount] {
+//			if err := callback(o); err != nil {
+//				return err
+//			}
+//		}
+//		return nil
+//	}
+//
+//	var deletedFiles []*bundle.OneBlockFile
+//	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
+//		deletedFiles = append(deletedFiles, oneBlockFiles...)
+//	}
+//
+//	var mergedFiles []*bundle.OneBlockFile
+//	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+//		defer merger.Shutdown(nil)
+//		mergedFiles = oneBlockFiles
+//		return nil
+//	}
+//
+//	go func() {
+//		select {
+//		case <-time.After(3 * time.Second):
+//			panic("too long")
+//		case <-merger.Terminated():
+//		}
+//	}()
+//
+//	err := merger.launch()
+//	require.NoError(t, err)
+//
+//	assert.Equal(t, bundle.ToSortedIDs(mergedFiles), bundle.ToSortedIDs(deletedFiles))
+//	assert.Equal(t, srcOneBlockFiles[1], mergedFiles)
+//}
 
 func TestNewMerger_Multiple_Merge(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -392,10 +385,10 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 }
 
 func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
-	bundler := bundle.NewBundler(5, 105)
+	bundler := bundle.NewBundler(100, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		100: {
@@ -485,10 +478,10 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 }
 
 func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
-	bundler := bundle.NewBundler(5, 10)
+	bundler := bundle.NewBundler(5, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		0: {
@@ -532,99 +525,8 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 	require.Equal(t, []uint64{0, 0, 5}, mergeFilesFetched) //one time from the bootstrap and 2 time from main loop
 }
 
-func TestNewMerger_Check_StateFile(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	dirPath, err := filepath.Abs(filepath.Dir(dir))
-	require.NoError(t, err)
-	stateFilePath := path.Join(dirPath, "TestNewMerger_Check_StateFile")
-	_ = os.Remove(stateFilePath)
-	bundler := bundle.NewBundler(5, 5)
-
-	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, stateFilePath)
-
-	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
-		return nil, nil
-	}
-
-	srcOneBlockFiles := []*bundle.OneBlockFile{
-		bundle.MustNewOneBlockFile("0000000001-20210728T105016.01-00000001a-00000000a-0-suffix"),
-		bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-1-suffix"),
-		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-1-suffix"),
-		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-1-suffix"),
-		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-1-suffix"),
-	}
-
-	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
-		for _, o := range srcOneBlockFiles {
-			if err := callback(o); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	var deletedFiles []*bundle.OneBlockFile
-	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
-		deletedFiles = append(deletedFiles, oneBlockFiles...)
-	}
-
-	var mergedFiles []*bundle.OneBlockFile
-	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
-		defer merger.Shutdown(nil)
-
-		mergedFiles = oneBlockFiles
-		return nil
-	}
-
-	go func(t *testing.T) {
-		t.Helper()
-		select {
-		case <-time.After(time.Second):
-			t.Fatal("too long")
-		case <-merger.Terminated():
-		}
-	}(t)
-
-	err = merger.launch()
-	require.NoError(t, err)
-
-	expectedDeleted := mergedFiles //normal purge and too old file
-	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
-
-	require.Len(t, mergedFiles, 4)
-	require.Equal(t, mergedFiles, srcOneBlockFiles[0:4])
-
-	state, err := LoadState(stateFilePath)
-	require.NoError(t, err)
-	require.Equal(t, uint64(10), state.ExclusiveHighestBlockLimit)
-}
-
-func TestBundler_Save_Load(t *testing.T) {
-	dir, err := ioutil.TempDir("", "")
-	require.NoError(t, err)
-	dirPath, err := filepath.Abs(filepath.Dir(dir))
-	require.NoError(t, err)
-	filePath := path.Join(dirPath, "bundle.test.bak")
-
-	db := forkable.NewForkDB()
-	db.AddLink(bstream.NewBlockRef("00000106a", 6), "0000010a", nil)
-	state := &State{
-		ExclusiveHighestBlockLimit: 991,
-	}
-
-	err = SaveState(state, filePath)
-	require.NoError(t, err)
-
-	reloaded, err := LoadState(filePath)
-
-	require.NoError(t, err)
-	require.Equal(t, state.ExclusiveHighestBlockLimit, reloaded.ExclusiveHighestBlockLimit)
-}
-
 func TestMerger_Launch_FailWalkOneBlockFiles(t *testing.T) {
-	bundler := bundle.NewBundler(5, 5)
+	bundler := bundle.NewBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) { return []*bundle.OneBlockFile{}, nil }
@@ -633,7 +535,7 @@ func TestMerger_Launch_FailWalkOneBlockFiles(t *testing.T) {
 		return fmt.Errorf("couldn't fetch one block files")
 	}
 
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	merger.Launch()
 }
@@ -654,12 +556,12 @@ func TestMerger_Launch_Drift(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
 			bundle.MustNewOneBlockFile("0000000121-20210728T105416.0-00000121a-00000117b-90-suffix"),
 		},
-		blockLimit:                120,
+		blockLimit:                110,
 		expectedHighestBlockLimit: 117,
 		expectedLastMergeBlockID:  "00000117a",
 	}
 
-	bundler := bundle.NewBundler(10, c.blockLimit)
+	bundler := bundle.NewBundler(c.blockLimit, 0, 10)
 	for _, f := range c.files {
 		bundler.AddOneBlockFile(f)
 	}
@@ -689,7 +591,7 @@ func TestMerger_Launch_Drift(t *testing.T) {
 		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		FetchMergedOneBlockFilesFunc: fetchMergedFiles,
 	}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	go merger.Launch()
 	select {
@@ -736,10 +638,10 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 		},
 	}
 
-	bundler := bundle.NewBundler(5, 118)
+	bundler := bundle.NewBundler(113, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return c.mergedFiles[lowBlockNum], nil
@@ -796,12 +698,12 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-114-suffix"),
 			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-114-suffix"),
 		},
-		blockLimit:                118,
+		blockLimit:                113,
 		expectedHighestBlockLimit: 118,
 		expectedLastMergeBlockID:  "00000119a",
 	}
 
-	bundler := bundle.NewBundler(5, c.blockLimit)
+	bundler := bundle.NewBundler(c.blockLimit, 0, 5)
 	for _, f := range c.files {
 		bundler.AddOneBlockFile(f)
 	}
@@ -828,91 +730,9 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		MergeAndSaveFunc:             mergeUpload,
 	}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil, "")
+	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, nil)
 
 	err := merger.launch()
 	require.Error(t, err)
 	require.Errorf(t, err, "yo")
-}
-
-func TestMerger_Launch_SaveStateError(t *testing.T) {
-	c := struct {
-		name                      string
-		files                     []*bundle.OneBlockFile
-		blockLimit                uint64
-		expectedHighestBlockLimit uint64
-		expectedLastMergeBlockID  string
-	}{
-		name: "sunny path",
-		files: []*bundle.OneBlockFile{
-			bundle.MustNewOneBlockFile("0000000114-20210728T105016.0-00000114a-00000113a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000115-20210728T105116.0-00000115a-00000114a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-90-suffix"),
-			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-90-suffix"),
-		},
-		blockLimit:                118,
-		expectedHighestBlockLimit: 117,
-		expectedLastMergeBlockID:  "00000119a",
-	}
-
-	bundler := bundle.NewBundler(5, c.blockLimit)
-	for _, f := range c.files {
-		bundler.AddOneBlockFile(f)
-	}
-
-	fetchMergedFile := func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
-		return []*bundle.OneBlockFile{}, nil
-	}
-
-	walkOneBlockFiles := func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
-		for _, f := range c.files {
-			if err := callback(f); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	mergeUpload := func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
-		return nil
-	}
-
-	deleteFiles := func(oneBlockFiles []*bundle.OneBlockFile) {
-		return
-	}
-
-	statefile := "/tmp/path/doesnt/exist/statefile"
-
-	mergerIO := &TestMergerIO{
-		FetchMergedOneBlockFilesFunc: fetchMergedFile,
-		WalkOneBlockFilesFunc:        walkOneBlockFiles,
-		MergeAndSaveFunc:             mergeUpload,
-	}
-	merger := NewMerger(bundler, time.Second, 10, "", mergerIO, deleteFiles, statefile)
-
-	go merger.Launch()
-	select {
-	case <-time.After(2 * time.Second):
-		merger.Shutdown(nil)
-	}
-}
-
-func TestMerger_Launch_LoadStateError(t *testing.T) {
-	_, err := LoadState("/tmp/path/doesnt/exist/statefile")
-	require.Error(t, err)
-
-	_, err = os.Create("/tmp/statefile")
-	require.NoError(t, err)
-
-	_, err = LoadState("/tmp/statefile")
-	require.Error(t, err)
-	require.Errorf(t, err, "EOF")
-}
-
-func TestState_String(t *testing.T) {
-	state := &State{}
-	str := state.String()
-	typ := reflect.TypeOf(str)
-	require.Equal(t, typ.Kind(), reflect.String)
 }

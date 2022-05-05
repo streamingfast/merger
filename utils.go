@@ -16,9 +16,9 @@ package merger
 
 import (
 	"fmt"
-	"log"
 	"time"
 
+	"go.uber.org/zap"
 	"gopkg.in/olivere/elastic.v3/backoff"
 )
 
@@ -36,7 +36,7 @@ func Retry(attempts int, sleep time.Duration, callback func() error) (err error)
 
 		time.Sleep(b.Next())
 
-		log.Println("retrying after error:", err)
+		zlog.Warn("retrying after error", zap.Error(err))
 	}
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }

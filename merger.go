@@ -16,9 +16,7 @@ package merger
 
 import (
 	"context"
-	"encoding/gob"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/streamingfast/dstore"
@@ -40,7 +38,6 @@ type Merger struct {
 	bundler         *bundle.Bundler
 	io              IOInterface
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile)
-	stateFile       string
 }
 
 func NewMerger(
@@ -50,7 +47,6 @@ func NewMerger(
 	grpcListenAddr string,
 	io IOInterface,
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
-	stateFile string,
 ) *Merger {
 	return &Merger{
 		Shutter:                        shutter.New(),
@@ -60,7 +56,6 @@ func NewMerger(
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 		io:                             io,
 		deleteFilesFunc:                deleteFilesFunc,
-		stateFile:                      stateFile,
 	}
 }
 
@@ -93,7 +88,10 @@ func (m *Merger) launch() (err error) {
 			}
 		}
 
-		isBundleComplete, highestBundleBlockNum := m.bundler.BundleCompleted() // multiple bundle can be completed. No need to fetch more on block file
+		isBundleComplete, highestBundleBlockNum, err := m.bundler.BundleCompleted() // multiple bundle can be completed. No need to fetch more on block file
+		if err != nil {
+			return err
+		}
 		if !isBundleComplete {
 			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
 			tooOldFiles, err := m.retrieveOneBlockFile(ctx)
@@ -106,7 +104,10 @@ func (m *Merger) launch() (err error) {
 				m.deleteFilesFunc(tooOldFiles)
 			}
 
-			isBundleComplete, highestBundleBlockNum = m.bundler.BundleCompleted()
+			isBundleComplete, highestBundleBlockNum, err = m.bundler.BundleCompleted()
+			if err != nil {
+				return err
+			}
 			if !isBundleComplete {
 				zlog.Info("bundle not completed after retrieving one block file", zap.Object("bundle", m.bundler))
 				select {
@@ -143,12 +144,6 @@ func (m *Merger) launch() (err error) {
 
 		metrics.HeadBlockTimeDrift.SetBlockTime(lastMergedOneBlockFile.BlockTime)
 		metrics.HeadBlockNumber.SetUint64(lastMergedOneBlockFile.Num)
-		state := &State{ExclusiveHighestBlockLimit: m.bundler.ExclusiveHighestBlockLimit()}
-		zlog.Info("saving state", zap.Stringer("state", state))
-		err = SaveState(state, m.stateFile)
-		if err != nil {
-			zlog.Error("failed to save state", zap.Error(err))
-		}
 
 		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
 			if len(oneBlockFilesToDelete) > 0 {
@@ -207,39 +202,4 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.One
 	zlog.Info("retrieved list of files", zapFields...)
 
 	return
-}
-
-type State struct {
-	// this is the last block number of the bundle you are processing. When the current block
-	// surpassed this value the bundle will be completed and merged/uploaded
-	ExclusiveHighestBlockLimit uint64
-}
-
-func (s *State) String() string {
-	return fmt.Sprintf("exclusive_highest_block_limit: %d", s.ExclusiveHighestBlockLimit)
-}
-
-func LoadState(filename string) (state *State, err error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	dataDecoder := gob.NewDecoder(f)
-	err = dataDecoder.Decode(&state)
-	return
-}
-
-func SaveState(state *State, filename string) error {
-	if filename == "" { // in memory mode
-		return nil
-	}
-	f, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	dataEncoder := gob.NewEncoder(f)
-	return dataEncoder.Encode(state)
 }
