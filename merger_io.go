@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,10 +30,12 @@ type OneBlockFilesDeleter interface {
 }
 
 type DStoreIO struct {
-	oneBlocksStore    dstore.Store
-	mergedBlocksStore dstore.Store
-	retryAttempts     int
-	retryCooldown     time.Duration
+	oneBlocksStore      dstore.Store
+	mergedBlocksStore   dstore.Store
+	retryAttempts       int
+	retryCooldown       time.Duration
+	lowestPossibleBlock uint64
+	bundleSize          uint64
 }
 
 func NewDStoreIO(
@@ -40,12 +43,16 @@ func NewDStoreIO(
 	mergedBlocksStore dstore.Store,
 	retryAttempts int,
 	retryCooldown time.Duration,
+	lowestPossibleBlock uint64,
+	bundleSize uint64,
 ) *DStoreIO {
 	return &DStoreIO{
-		oneBlocksStore:    oneBlocksStore,
-		mergedBlocksStore: mergedBlocksStore,
-		retryAttempts:     retryAttempts,
-		retryCooldown:     retryCooldown,
+		oneBlocksStore:      oneBlocksStore,
+		mergedBlocksStore:   mergedBlocksStore,
+		retryAttempts:       retryAttempts,
+		retryCooldown:       retryCooldown,
+		lowestPossibleBlock: lowestPossibleBlock,
+		bundleSize:          bundleSize,
 	}
 }
 
@@ -90,7 +97,11 @@ func (s *DStoreIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBl
 }
 
 func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
-	return s.oneBlocksStore.Walk(ctx, "", ".tmp", func(filename string) error {
+
+	return s.oneBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(s.lowestPossibleBlock), func(filename string) error {
+		if strings.HasSuffix(filename, ".tmp") {
+			return nil
+		}
 		oneBlockFile := bundle.MustNewOneBlockFile(filename)
 
 		if oneBlockFile.InnerLibNum == nil {
@@ -144,9 +155,9 @@ func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundl
 	return
 }
 
-func (s *DStoreIO) FindStartBlock(ctx context.Context, lowestPossible, bundleSize uint64) (uint64, error) {
-	lowestBoundary := (lowestPossible / bundleSize) * bundleSize
+func (s *DStoreIO) FindStartBlock(ctx context.Context) (uint64, error) {
 
+	lowestBoundary := (s.lowestPossibleBlock / s.bundleSize) * s.bundleSize
 	var seenBoundary uint64
 	err := s.mergedBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBoundary), func(filename string) error {
 		num, err := strconv.ParseUint(filename, 10, 64)
@@ -161,7 +172,7 @@ func (s *DStoreIO) FindStartBlock(ctx context.Context, lowestPossible, bundleSiz
 			seenBoundary = num
 			return nil
 		}
-		if num != seenBoundary+bundleSize {
+		if num != seenBoundary+s.bundleSize {
 			return fmt.Errorf("merged blocks skip from %d to %d, you have a hole in your merged block files and need to reprocess or set firstStreamableBlock above this hole", seenBoundary, num)
 		}
 		seenBoundary = num
@@ -172,7 +183,7 @@ func (s *DStoreIO) FindStartBlock(ctx context.Context, lowestPossible, bundleSiz
 		return lowestBoundary, nil // no merged file exist
 	}
 
-	return seenBoundary + bundleSize, err
+	return seenBoundary + s.bundleSize, err
 }
 
 type oneBlockFilesDeleter struct {

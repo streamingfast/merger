@@ -78,11 +78,12 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	io := merger.NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond)
+	bundleSize := uint64(100)
+
+	io := merger.NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond, bstream.GetProtocolFirstStreamableBlock, bundleSize)
 	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
 
-	bundleSize := uint64(100)
-	nextBundle, err := io.FindStartBlock(context.Background(), bstream.GetProtocolFirstStreamableBlock, bundleSize)
+	nextBundle, err := io.FindStartBlock(context.Background())
 	if err != nil {
 		return err
 	}

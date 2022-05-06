@@ -86,7 +86,7 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
 	t.Helper()
 	data, err := ioutil.ReadFile(path.Join("test_data", fileName))
 	require.NoError(t, err)
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(1 * time.Millisecond)
 	return &OneBlockFile{
 		CanonicalName: fileName,
 		Filenames:     map[string]struct{}{fileName: Empty},

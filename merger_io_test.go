@@ -15,6 +15,7 @@ import (
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger/bundle"
 	pbbstream "github.com/streamingfast/pbgo/sf/bstream/v1"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,7 +27,7 @@ func TestNewMergerIO(t *testing.T) {
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
 
-	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond)
+	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond, 0, 100)
 	require.NotNil(t, mio)
 	require.IsType(t, &DStoreIO{}, mio)
 }
@@ -51,6 +52,40 @@ func TestMergerIO_WalkOneBlockFiles(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), oneBlockFiles[2].LibNum())
+}
+
+func TestMergerIO_WalkOneBlockFilesIgnorePrevious(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	baseDir := path.Dir(filename)
+	baseDir = path.Join(baseDir, "bundle/test_data") // contains blocks: [1, 2, 3]
+	oneBlockStoreStore, err := dstore.NewStore("file://"+baseDir, "dbin", "", true)
+	require.NoError(t, err)
+
+	bstream.GetBlockReaderFactory = bstream.BlockReaderFactoryFunc(blockReaderFactory)
+
+	mergerIO := NewDStoreIO(oneBlockStoreStore, nil, 0, 0, 2, 2) // nothing below block #2, bundle size is 2
+
+	var oneBlockFiles []*bundle.OneBlockFile
+	err = mergerIO.WalkOneBlockFiles(context.Background(), func(o *bundle.OneBlockFile) error {
+		oneBlockFiles = append(oneBlockFiles, o)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 2, len(oneBlockFiles))
+	assert.Equal(t, uint64(2), oneBlockFiles[0].Num)
+	assert.Equal(t, uint64(3), oneBlockFiles[1].Num)
+
+	mergerIO = NewDStoreIO(oneBlockStoreStore, nil, 0, 0, 3, 2) // nothing below block #3, bundle size is 2
+
+	oneBlockFiles = nil
+	err = mergerIO.WalkOneBlockFiles(context.Background(), func(o *bundle.OneBlockFile) error {
+		oneBlockFiles = append(oneBlockFiles, o)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, len(oneBlockFiles))
+	assert.Equal(t, uint64(3), oneBlockFiles[0].Num)
+
 }
 
 func TestMergerIO_WalkOneBlockFiles_GetOneBlockFileDataError(t *testing.T) {
@@ -214,7 +249,7 @@ func TestMergerIO_MergeUpload_ZeroLengthOneBlockFiles(t *testing.T) {
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
 
-	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond)
+	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond, 0, 100)
 	err = mio.MergeAndStore(0, []*bundle.OneBlockFile{})
 	require.Nil(t, err)
 }
@@ -232,7 +267,7 @@ func TestMergerIO_MergeUpload(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond)
+	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond, 0, 100)
 
 	err = mio.MergeAndStore(114, files)
 	require.NoError(t, err)
@@ -252,7 +287,7 @@ func TestMergerIO_MergeUpload_WriteObjectError(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond)
+	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond, 0, 100)
 
 	err = mio.MergeAndStore(114, files)
 	require.Error(t, err)
@@ -271,7 +306,7 @@ func TestMergerIO_FetchMergeFile(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond)
+	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond, 0, 100)
 
 	err = mio.MergeAndStore(114, files)
 	require.Nil(t, err)
@@ -288,7 +323,7 @@ func TestMergerIO_FetchMergeFile_OpenObjectError(t *testing.T) {
 	require.NoError(t, err)
 	mergedBlocksStore, err := dstore.NewDBinStore("/tmp/mergedblockstore")
 	require.NoError(t, err)
-	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond)
+	mio := NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 1, 10*time.Millisecond, 0, 100)
 
 	obf, err := mio.FetchMergedOneBlockFiles(69)
 	// file not found
@@ -343,7 +378,7 @@ func TestOneBlockFilesDeleter_Start(t *testing.T) {
 
 	filesDeleter.Start(1, 100)
 	filesDeleter.Delete(oneBlockFiles)
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Millisecond)
 
 	files, err := ioutil.ReadDir(targetPath)
 	require.NoError(t, err)

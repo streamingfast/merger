@@ -94,14 +94,14 @@ func (m *Merger) launch() (err error) {
 		}
 		if !isBundleComplete {
 			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
-			tooOldFiles, err := m.retrieveOneBlockFile(ctx)
+			deletableOldFiles, err := m.retrieveOneBlockFile(ctx)
 			cancel()
 			if err != nil {
 				return fmt.Errorf("retreiving one block files: %w", err)
 			}
 
-			if len(tooOldFiles) > 0 {
-				m.deleteFilesFunc(tooOldFiles)
+			if len(deletableOldFiles) > 0 {
+				m.deleteFilesFunc(deletableOldFiles)
 			}
 
 			isBundleComplete, highestBundleBlockNum, err = m.bundler.BundleCompleted()
@@ -153,14 +153,14 @@ func (m *Merger) launch() (err error) {
 	}
 }
 
-func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.OneBlockFile, err error) {
+func (m *Merger) retrieveOneBlockFile(ctx context.Context) (deletable []*bundle.OneBlockFile, err error) {
 	addedFileCount := 0
 	seenFileCount := 0
 	var highestSeenBlockFile *bundle.OneBlockFile
 	callback := func(o *bundle.OneBlockFile) error {
 		highestSeenBlockFile = o
 		if m.bundler.IsBlockTooOld(o.Num) {
-			tooOld = append(tooOld, o)
+			deletable = append(deletable, o)
 			return nil
 		}
 		exists := m.bundler.AddOneBlockFile(o)
@@ -190,7 +190,7 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (tooOld []*bundle.One
 
 	zapFields := []zap.Field{
 		zap.Int("seen_files_count", seenFileCount),
-		zap.Int("too_old_files_count", len(tooOld)),
+		zap.Int("too_old_files_count", len(deletable)),
 		zap.Int("added_files_count", addedFileCount),
 		zap.Uint64("highest_linkable_block_file", highestNum),
 	}
