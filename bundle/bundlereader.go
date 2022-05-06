@@ -31,7 +31,7 @@ func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tra
 	return &BundleReader{
 		ctx:           ctx,
 		oneBlockFiles: oneBlockFiles,
-		downloader:    dhammer.NewNailer(ParallelOneBlockDownload, downloadOneBlockJob(logger, tracer, oneBlockDownloader)),
+		downloader:    dhammer.NewNailer(ParallelOneBlockDownload, downloadOneBlockJob(logger, tracer, oneBlockDownloader), dhammer.NailerLogger(logger), dhammer.NailerTracer(tracer)),
 		logger:        logger,
 	}
 }
