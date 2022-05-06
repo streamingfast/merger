@@ -16,21 +16,21 @@ import (
 
 func (m *Merger) startServer() {
 	gs := dgrpc.NewServer()
-	zlog.Info("grpc server created")
+	m.logger.Info("grpc server created")
 
 	lis, err := net.Listen("tcp", m.grpcListenAddr)
 	if err != nil {
 		m.Shutdown(fmt.Errorf("failed listening grpc %q: %w", m.grpcListenAddr, err))
 		return
 	}
-	zlog.Info("tcp listener created")
+	m.logger.Info("tcp listener created")
 
 	pbmerge.RegisterMergerServer(gs, m)
 	pbhealth.RegisterHealthServer(gs, m)
-	zlog.Info("server registered")
+	m.logger.Info("server registered")
 
 	go func() {
-		zlog.Info("listening & serving grpc content", zap.String("grpc_listen_addr", m.grpcListenAddr))
+		m.logger.Info("listening & serving grpc content", zap.String("grpc_listen_addr", m.grpcListenAddr))
 		if err := gs.Serve(lis); err != nil {
 			m.Shutdown(fmt.Errorf("error on grpc serve: %w", err))
 			return

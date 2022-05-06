@@ -10,6 +10,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func newBundler(nextBundle, lowestPossibleBundle, bundleSize uint64) *Bundler {
+	return NewBundler(testLogger, nextBundle, lowestPossibleBundle, bundleSize)
+}
+
 //                                  |                           |                                  |                           |
 // 100a - 101a - 102a - 103a - 104a - 106a - 107a - 108a - 109a - 110a - 111a - 112a - 113a - 114a - 115a - 116a - 117a - 118a - 120a
 //            \- 102b - 103b                     \- 108b - 109b - 110b
@@ -33,7 +37,7 @@ func TestBundler_String(t *testing.T) {
 		expectedHighestBlockLimit: 104,
 	}
 
-	bundler := NewBundler(c.nextBundle, 0, 5)
+	bundler := newBundler(c.nextBundle, 0, 5)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{
 		ID: c.lastMergeBlockID,
 	}
@@ -64,7 +68,7 @@ func TestBundler_LastMergeOneBlockFile(t *testing.T) {
 		expectedHighestBlockLimit: 104,
 	}
 
-	bundler := NewBundler(c.nextBundle, 0, 5)
+	bundler := newBundler(c.nextBundle, 0, 5)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{
 		ID: c.lastMergeBlockID,
 	}
@@ -92,7 +96,7 @@ func TestBundler_ExclusiveHighestBlockLimit(t *testing.T) {
 		expectedHighestBlockLimit: 104,
 	}
 
-	bundler := NewBundler(c.nextBundle, 0, 5)
+	bundler := newBundler(c.nextBundle, 0, 5)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{
 		ID: c.lastMergeBlockID,
 	}
@@ -121,7 +125,7 @@ func TestBundler_AddOneBlockFileUglyPatch(t *testing.T) {
 		expectedHighestBlockLimit: 104,
 	}
 
-	bundler := NewBundler(c.nextBundle, 0, 2)
+	bundler := newBundler(c.nextBundle, 0, 2)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{
 		ID: c.lastMergeBlockID,
 	}
@@ -153,7 +157,7 @@ func TestBundler_AddPreMergedOneBlockFiles(t *testing.T) {
 		expectedHighestBlockLimit: 104,
 	}
 
-	bundler := NewBundler(c.nextBundle, 0, 2)
+	bundler := newBundler(c.nextBundle, 0, 2)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{
 		ID: c.lastMergeBlockID,
 	}
@@ -353,7 +357,7 @@ func TestBundler_IsComplete(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(c.nextBundle, 0, 5)
+			bundler := newBundler(c.nextBundle, 0, 5)
 			bundler.lastMergeOneBlockFile = &OneBlockFile{
 				ID: c.lastMergeBlockID,
 			}
@@ -486,7 +490,7 @@ func TestBundler_MergeableFiles(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(c.nextBundle, 0, 5)
+			bundler := newBundler(c.nextBundle, 0, 5)
 			bundler.lastMergeOneBlockFile = &OneBlockFile{ID: c.lastMergeBlockID}
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
@@ -535,7 +539,7 @@ func TestBundler_Complicated(t *testing.T) {
 		MustNewOneBlockFile("0000000120-20210728T105016.26-00000120a-00000118a-100-suffix"),
 	}
 
-	bundler := NewBundler(100, 0, 5)
+	bundler := newBundler(100, 0, 5)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{ID: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
@@ -606,7 +610,7 @@ func TestBundler_BackToTheFuture(t *testing.T) {
 		MustNewOneBlockFile("0000000106-20210728T105016.08-00000106a-00000104a-94-suffix"),
 	}
 
-	bundler := NewBundler(100, 0, 5)
+	bundler := newBundler(100, 0, 5)
 	bundler.lastMergeOneBlockFile = &OneBlockFile{ID: "00000099a"}
 	for _, f := range files {
 		bundler.AddOneBlockFile(f)
@@ -783,7 +787,7 @@ func TestBundler_Purge(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(100, 0, 5)
+			bundler := newBundler(100, 0, 5)
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)
 			}
@@ -895,7 +899,7 @@ func TestBundler_Boostrap(t *testing.T) {
 
 	for _, c := range testCases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(c.nextBundle, 0, 5)
+			bundler := newBundler(c.nextBundle, 0, 5)
 
 			// No links in ForksDB yet
 			longestChain := bundler.LongestChain()
@@ -1021,7 +1025,7 @@ func TestBundler_IsBlockTooOld(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			bundler := NewBundler(100, 0, 5)
+			bundler := newBundler(100, 0, 5)
 
 			if c.name == "in the middle" {
 				// no root yet, can't be too old
@@ -1065,7 +1069,7 @@ func TestBundler_LongestChain_MultipleSameLength(t *testing.T) {
 		},
 	}
 
-	bundler := NewBundler(102, 0, 5)
+	bundler := newBundler(102, 0, 5)
 	for _, f := range c.files {
 		bundler.AddOneBlockFile(f)
 	}
@@ -1098,7 +1102,7 @@ func TestBundler_LongestOneBlockFileChain_SameBlockTime(t *testing.T) {
 		},
 	}
 
-	bundler := NewBundler(102, 0, 5)
+	bundler := newBundler(102, 0, 5)
 	blockTime := c.files[0].BlockTime
 
 	for _, f := range c.files {
@@ -1163,7 +1167,7 @@ func TestBundler_SetLIB(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 
-			bundler := NewBundler(102, 0, 5)
+			bundler := newBundler(102, 0, 5)
 
 			for _, f := range c.files {
 				bundler.AddOneBlockFile(f)

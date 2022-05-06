@@ -5,15 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/streamingfast/merger/bundle"
 	"github.com/stretchr/testify/require"
 	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 func TestHealthz_Check(t *testing.T) {
 	ctx := context.Background()
-	bundler := bundle.NewBundler(0, 0, 5)
-	m := NewMerger(bundler, time.Second, 10, "6969", nil, nil)
+	bundler := newBundler(0, 0, 5)
+	m := NewMerger(testLogger, bundler, time.Second, 10, "6969", nil, nil)
 
 	request := &pbhealth.HealthCheckRequest{}
 	resp, err := m.Check(ctx, request)

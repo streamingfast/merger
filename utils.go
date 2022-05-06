@@ -22,7 +22,7 @@ import (
 	"gopkg.in/olivere/elastic.v3/backoff"
 )
 
-func Retry(attempts int, sleep time.Duration, callback func() error) (err error) {
+func Retry(logger *zap.Logger, attempts int, sleep time.Duration, callback func() error) (err error) {
 	b := backoff.NewExponentialBackoff(sleep, 5*time.Second)
 	for i := 0; ; i++ {
 		err = callback()
@@ -36,7 +36,7 @@ func Retry(attempts int, sleep time.Duration, callback func() error) (err error)
 
 		time.Sleep(b.Next())
 
-		zlog.Warn("retrying after error", zap.Error(err))
+		logger.Warn("retrying after error", zap.Error(err))
 	}
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }

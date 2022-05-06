@@ -20,16 +20,19 @@ type Bundler struct {
 	lowestPossibleBundle       uint64
 
 	mutex sync.Mutex
+
+	logger *zap.Logger
 }
 
-func NewBundler(nextBundle, lowestPossibleBundle, bundleSize uint64) *Bundler {
-	zlog.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("next_bundle", nextBundle), zap.Uint64("lowest_possible_bundle", lowestPossibleBundle))
+func NewBundler(logger *zap.Logger, nextBundle, lowestPossibleBundle, bundleSize uint64) *Bundler {
+	logger.Info("new bundler", zap.Uint64("bundle_size", bundleSize), zap.Uint64("next_bundle", nextBundle), zap.Uint64("lowest_possible_bundle", lowestPossibleBundle))
 	lowestBoundary := (lowestPossibleBundle / bundleSize) * bundleSize
 	return &Bundler{
 		bundleSize:                 bundleSize,
-		forkDB:                     forkable.NewForkDB(forkable.ForkDBWithLogger(zlog)),
+		forkDB:                     forkable.NewForkDB(forkable.ForkDBWithLogger(logger)),
 		lowestPossibleBundle:       lowestBoundary,
 		exclusiveHighestBlockLimit: nextBundle + bundleSize,
+		logger:                     logger,
 	}
 }
 
@@ -104,7 +107,7 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 	defer b.mutex.Unlock()
 
 	if b.bundleInclusiveLowerBlock() < b.bundleSize || b.bundleInclusiveLowerBlock()-b.bundleSize < b.lowestPossibleBundle {
-		zlog.Info("skipping bootstrap, starting on 'lowest possible bundle'")
+		b.logger.Info("skipping bootstrap, starting on 'lowest possible bundle'")
 		return nil
 	}
 
@@ -121,7 +124,7 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 		libNumToStartFrom = libOneBlock.LibNum()
 	}
 
-	zlog.Info("bootstrapping bundler",
+	b.logger.Info("bootstrapping bundler",
 		zap.Stringer("lib_block", libOneBlock),
 		zap.Uint64("lib_num_to_start_from", libNumToStartFrom),
 		zap.Uint64("bundle_low_boundary", bundleLowBoundary),
@@ -136,14 +139,14 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 		return fmt.Errorf("bootstrap completed and lib not set")
 	}
 
-	zlog.Info("bootstrapped bundler", zap.Stringer("lib", bstream.NewBlockRef(b.forkDB.LIBID(), b.forkDB.LIBNum())))
+	b.logger.Info("bootstrapped bundler", zap.Stringer("lib", bstream.NewBlockRef(b.forkDB.LIBID(), b.forkDB.LIBNum())))
 	return nil
 }
 
 func (b *Bundler) loadOneBlocksFromLib(libNumToStartFrom uint64, lastMergedLowBlockNum uint64, fetchOneBlockFilesFromMergedFile func(lowBlockNum uint64) ([]*OneBlockFile, error)) error {
 	lowBlockNum := (libNumToStartFrom / b.bundleSize) * b.bundleSize
 	for {
-		zlog.Info("fetching merged files", zap.Uint64("at_low_block_num", lowBlockNum))
+		b.logger.Info("fetching merged files", zap.Uint64("at_low_block_num", lowBlockNum))
 
 		oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lowBlockNum)
 		if err != nil {
@@ -156,7 +159,7 @@ func (b *Bundler) loadOneBlocksFromLib(libNumToStartFrom uint64, lastMergedLowBl
 			f.Deleted = true //one block files from merged file do not need to be deleted by merger
 			b.addOneBlockFile(f)
 		}
-		zlog.Info("processed merge file", zap.Uint64("at_low_block_num", lowBlockNum))
+		b.logger.Info("processed merge file", zap.Uint64("at_low_block_num", lowBlockNum))
 
 		lowBlockNum = lowBlockNum + b.bundleSize
 
@@ -206,7 +209,7 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 		}
 		return true
 	}
-	zlog.Debug("adding one block file", zap.String("file_name", oneBlockFile.CanonicalName))
+	b.logger.Debug("adding one block file", zap.String("file_name", oneBlockFile.CanonicalName))
 
 	blockRef := bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num)
 	exists = b.forkDB.AddLink(blockRef, oneBlockFile.PreviousID, oneBlockFile)
@@ -228,7 +231,7 @@ func (b *Bundler) addOneBlockFile(oneBlockFile *OneBlockFile) (exists bool) {
 		}
 	}
 
-	zlog.Check(level, "setting lib value").Write(zap.Uint64("current_block_num", oneBlockFile.Num), zap.Uint64("lib_num_candidate", oneBlockFile.LibNum()))
+	b.logger.Check(level, "setting lib value").Write(zap.Uint64("current_block_num", oneBlockFile.Num), zap.Uint64("lib_num_candidate", oneBlockFile.LibNum()))
 	b.forkDB.SetLIB(bstream.NewBlockRef(oneBlockFile.ID, oneBlockFile.Num), oneBlockFile.PreviousID, oneBlockFile.LibNum())
 
 	return exists

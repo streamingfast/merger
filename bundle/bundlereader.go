@@ -3,11 +3,13 @@ package bundle
 import (
 	"context"
 	"fmt"
-	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dhammer"
-	"go.uber.org/zap"
 	"io"
 	"sync"
+
+	"github.com/streamingfast/bstream"
+	"github.com/streamingfast/dhammer"
+	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
 )
 
 type BundleReader struct {
@@ -19,15 +21,18 @@ type BundleReader struct {
 
 	downloader      *dhammer.Nailer
 	startDownloader sync.Once
+
+	logger *zap.Logger
 }
 
 const ParallelOneBlockDownload = 2
 
-func NewBundleReader(ctx context.Context, oneBlockFiles []*OneBlockFile, oneBlockDownloader oneBlockDownloaderFunc) *BundleReader {
+func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tracer, oneBlockFiles []*OneBlockFile, oneBlockDownloader oneBlockDownloaderFunc) *BundleReader {
 	return &BundleReader{
 		ctx:           ctx,
 		oneBlockFiles: oneBlockFiles,
-		downloader:    dhammer.NewNailer(ParallelOneBlockDownload, downloadOneBlockJob(oneBlockDownloader)),
+		downloader:    dhammer.NewNailer(ParallelOneBlockDownload, downloadOneBlockJob(logger, tracer, oneBlockDownloader)),
+		logger:        logger,
 	}
 }
 
@@ -39,7 +44,7 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 				r.downloader.Push(r.ctx, oneBlockFile)
 			}
 			r.oneBlockFiles = []*OneBlockFile{}
-			zlog.Debug("finished queuing one block files to be read")
+			r.logger.Debug("finished queuing one block files to be read")
 			r.downloader.Close()
 		}()
 	})
@@ -49,7 +54,7 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 		if err := r.downloader.Err(); err != nil {
 			return 0, fmt.Errorf("parallel one block downloader failed: %w", err)
 		}
-		
+
 		out, hasMore := <-r.downloader.Out
 		if !hasMore {
 			return 0, io.EOF
@@ -86,11 +91,11 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 	return bytesRead, nil
 }
 
-func downloadOneBlockJob(oneBlockDownloader oneBlockDownloaderFunc) dhammer.NailerFunc {
+func downloadOneBlockJob(logger *zap.Logger, tracer logging.Tracer, oneBlockDownloader oneBlockDownloaderFunc) dhammer.NailerFunc {
 	return func(ctx context.Context, in interface{}) (interface{}, error) {
 		oneBlockFile := in.(*OneBlockFile)
 		if tracer.Enabled() {
-			zlog.Debug("downloading one block file", zap.String("failename", oneBlockFile.CanonicalName))
+			logger.Debug("downloading one block file", zap.String("failename", oneBlockFile.CanonicalName))
 		}
 		data, err := oneBlockFile.Data(ctx, oneBlockDownloader)
 		if err != nil {

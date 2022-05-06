@@ -80,15 +80,15 @@ func (a *App) Run() error {
 
 	bundleSize := uint64(100)
 
-	io := merger.NewDStoreIO(oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond, bstream.GetProtocolFirstStreamableBlock, bundleSize)
-	filesDeleter := merger.NewOneBlockFilesDeleter(oneBlockStoreStore)
+	io := merger.NewDStoreIO(zlog, tracer, oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond, bstream.GetProtocolFirstStreamableBlock, bundleSize)
+	filesDeleter := merger.NewOneBlockFilesDeleter(zlog, oneBlockStoreStore)
 
 	nextBundle, err := io.FindStartBlock(context.Background())
 	if err != nil {
 		return err
 	}
 
-	bundler := bundle.NewBundler(nextBundle, bstream.GetProtocolFirstStreamableBlock, bundleSize)
+	bundler := bundle.NewBundler(zlog, nextBundle, bstream.GetProtocolFirstStreamableBlock, bundleSize)
 	err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
 		oneBlockFiles, fetchErr := io.FetchMergedOneBlockFiles(lowBlockNum)
 		if fetchErr != nil {
@@ -101,6 +101,7 @@ func (a *App) Run() error {
 	}
 
 	m := merger.NewMerger(
+		zlog,
 		bundler,
 		a.config.TimeBetweenStoreLookups,
 		a.config.MaxOneBlockOperationsBatchSize,

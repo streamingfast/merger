@@ -19,7 +19,7 @@ import (
 func TestBundleReader_ReadSimpleFiles(t *testing.T) {
 	bundle := NewTestBundle()
 
-	r := NewBundleReader(context.Background(), bundle, nil)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, nil)
 	r1 := make([]byte, 4)
 
 	read, err := r.Read(r1)
@@ -45,7 +45,7 @@ func TestBundleReader_ReadSimpleFiles(t *testing.T) {
 func TestBundleReader_ReadByChunk(t *testing.T) {
 	bundle := NewTestBundle()
 
-	r := NewBundleReader(context.Background(), bundle, nil)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, nil)
 	r1 := make([]byte, 1)
 
 	read, err := r.Read(r1)
@@ -150,7 +150,7 @@ func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 		NewTestOneBlockFileFromFile(t, "0000000003-20150730T152728.0-a88cf741-044698c9.dbin"),
 	}
 
-	r := NewBundleReader(context.Background(), bundle, nil)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, nil)
 	allBlockData, err := ioutil.ReadAll(r)
 	require.NoError(t, err)
 	dbinReader := dbin.NewReader(bytes.NewReader(allBlockData))
@@ -184,7 +184,7 @@ func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
 		return nil, fmt.Errorf("some error")
 	}
 
-	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
 	r1 := make([]byte, 4)
 
 	read, err := r.Read(r1)
@@ -202,7 +202,7 @@ func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
 		return []byte{0xAB, 0xCD, 0xEF}, nil
 	}
 
-	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
 	r1 := make([]byte, 4)
 	r.headerPassed = true
 
@@ -218,7 +218,7 @@ func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
 		return []byte{}, nil
 	}
 
-	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
 	r1 := make([]byte, 4)
 	r.headerPassed = true
 
@@ -234,7 +234,7 @@ func TestBundleReader_Read_ReadBufferNotNil(t *testing.T) {
 		return nil, fmt.Errorf("some error")
 	}
 
-	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
 	r.readBuffer = []byte{0xAB, 0xCD}
 	r1 := make([]byte, 4)
 
@@ -250,7 +250,7 @@ func TestBundleReader_Read_EmptyListOfOneBlockFiles(t *testing.T) {
 		return nil, fmt.Errorf("some error")
 	}
 
-	r := NewBundleReader(context.Background(), bundle, downloadOneBlockFile)
+	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
 	r.oneBlockFiles = []*OneBlockFile{}
 	r1 := make([]byte, 4)
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
+	"github.com/streamingfast/logging"
 	"github.com/streamingfast/merger/bundle"
 	"go.uber.org/zap"
 )
@@ -36,9 +37,13 @@ type DStoreIO struct {
 	retryCooldown       time.Duration
 	lowestPossibleBlock uint64
 	bundleSize          uint64
+	logger              *zap.Logger
+	tracer              logging.Tracer
 }
 
 func NewDStoreIO(
+	logger *zap.Logger,
+	tracer logging.Tracer,
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
 	retryAttempts int,
@@ -53,6 +58,8 @@ func NewDStoreIO(
 		retryCooldown:       retryCooldown,
 		lowestPossibleBlock: lowestPossibleBlock,
 		bundleSize:          bundleSize,
+		logger:              logger,
+		tracer:              tracer,
 	}
 }
 
@@ -63,23 +70,23 @@ func (s *DStoreIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bu
 	t0 := time.Now()
 
 	bundleFilename := fileNameForBlocksBundle(inclusiveLowerBlock)
-	zlog.Info("about to write merged blocks to storage location",
+	s.logger.Info("about to write merged blocks to storage location",
 		zap.String("filename", bundleFilename),
 		zap.Duration("write_timeout", WriteObjectTimeout),
 		zap.Uint64("lower_block_num", oneBlockFiles[0].Num),
 		zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num),
 	)
 
-	err = Retry(5, 500*time.Millisecond, func() error {
+	err = Retry(s.logger, 5, 500*time.Millisecond, func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
 		defer cancel()
-		return s.mergedBlocksStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, oneBlockFiles, s.DownloadOneBlockFile))
+		return s.mergedBlocksStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, s.logger, s.tracer, oneBlockFiles, s.DownloadOneBlockFile))
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
 	}
 
-	zlog.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
+	s.logger.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
 	return
 }
@@ -134,7 +141,7 @@ func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundl
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
 		out, err = s.oneBlocksStore.OpenObject(ctx, filename)
-		zlog.Debug("downloading one block", zap.String("file_name", filename))
+		s.logger.Debug("downloading one block", zap.String("file_name", filename))
 		if err != nil {
 			continue
 		}
@@ -190,11 +197,13 @@ type oneBlockFilesDeleter struct {
 	sync.Mutex
 	toProcess chan string
 	store     dstore.Store
+	logger    *zap.Logger
 }
 
-func NewOneBlockFilesDeleter(store dstore.Store) *oneBlockFilesDeleter {
+func NewOneBlockFilesDeleter(logger *zap.Logger, store dstore.Store) *oneBlockFilesDeleter {
 	return &oneBlockFilesDeleter{
-		store: store,
+		store:  store,
+		logger: logger,
 	}
 }
 
@@ -219,7 +228,7 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bundle.OneBlockFile) {
 			fileNames = append(fileNames, filename)
 		}
 	}
-	zlog.Info("deleting files that are too old or already seen", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
+	od.logger.Info("deleting files that are too old or already seen", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
 
 	deletable := make(map[string]struct{})
 
@@ -259,7 +268,7 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 			time.Sleep(time.Duration(100*i) * time.Millisecond)
 		}
 		if err != nil {
-			zlog.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
+			od.logger.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
 		}
 	}
 }

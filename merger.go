@@ -38,9 +38,12 @@ type Merger struct {
 	bundler         *bundle.Bundler
 	io              IOInterface
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile)
+
+	logger *zap.Logger
 }
 
 func NewMerger(
+	logger *zap.Logger,
 	bundler *bundle.Bundler,
 	timeBetweenStoreLookups time.Duration,
 	maxOneBlockOperationsBatchSize int,
@@ -56,16 +59,17 @@ func NewMerger(
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 		io:                             io,
 		deleteFilesFunc:                deleteFilesFunc,
+		logger:                         logger,
 	}
 }
 
 func (m *Merger) Launch() {
-	zlog.Info("starting merger", zap.Object("bundle", m.bundler))
+	m.logger.Info("starting merger", zap.Object("bundle", m.bundler))
 
 	m.startServer()
 
 	err := m.launch()
-	zlog.Info("merger exited", zap.Error(err))
+	m.logger.Info("merger exited", zap.Error(err))
 	m.Shutdown(err)
 }
 
@@ -75,10 +79,10 @@ func (m *Merger) launch() (err error) {
 			return nil
 		}
 
-		zlog.Info("verifying if bundle file already exist in store", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()))
+		m.logger.Info("verifying if bundle file already exist in store", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()))
 		if oneBlockFiles, err := m.io.FetchMergedOneBlockFiles(m.bundler.BundleInclusiveLowerBlock()); err == nil {
 			if len(oneBlockFiles) > 0 {
-				zlog.Info("adding files from already merge bundle", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()), zap.Int("file_count", len(oneBlockFiles)))
+				m.logger.Info("adding files from already merge bundle", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()), zap.Int("file_count", len(oneBlockFiles)))
 				m.bundler.BundlePreMergedOneBlockFiles(oneBlockFiles) // this will change state and skip to next bundle ...
 				m.bundler.Purge(func([]*bundle.OneBlockFile) {})      // no file deletion, just move LIB on forkdb
 
@@ -109,7 +113,7 @@ func (m *Merger) launch() (err error) {
 				return err
 			}
 			if !isBundleComplete {
-				zlog.Info("bundle not completed after retrieving one block file", zap.Object("bundle", m.bundler))
+				m.logger.Info("bundle not completed after retrieving one block file", zap.Object("bundle", m.bundler))
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
 					continue
@@ -120,7 +124,7 @@ func (m *Merger) launch() (err error) {
 		}
 
 		bundleFiles := m.bundler.ToBundle(highestBundleBlockNum)
-		zlog.Info("merging bundle",
+		m.logger.Info("merging bundle",
 			zap.Uint64("highest_bundle_block_num", highestBundleBlockNum),
 			zap.Object("bundle", m.bundler),
 			zap.Int("count", len(bundleFiles)),
@@ -130,7 +134,7 @@ func (m *Merger) launch() (err error) {
 			return err
 		}
 
-		zlog.Info("bundle files uploaded")
+		m.logger.Info("bundle files uploaded")
 
 		m.bundler.Commit(highestBundleBlockNum)
 
@@ -140,7 +144,7 @@ func (m *Merger) launch() (err error) {
 			return fmt.Errorf("unable to process, expected a least merger one block file")
 		}
 
-		zlog.Info("bundle merged and committed", zap.Object("bundle", m.bundler))
+		m.logger.Info("bundle merged and committed", zap.Object("bundle", m.bundler))
 
 		metrics.HeadBlockTimeDrift.SetBlockTime(lastMergedOneBlockFile.BlockTime)
 		metrics.HeadBlockNumber.SetUint64(lastMergedOneBlockFile.Num)
@@ -199,7 +203,7 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (deletable []*bundle.
 		zapFields = append(zapFields, zap.Uint64("highest_seen_block_file", highestSeenBlockFile.Num))
 	}
 
-	zlog.Info("retrieved list of files", zapFields...)
+	m.logger.Info("retrieved list of files", zapFields...)
 
 	return
 }

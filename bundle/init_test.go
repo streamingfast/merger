@@ -15,13 +15,11 @@
 package bundle
 
 import (
-	"os"
-
-	"go.uber.org/zap"
+	"github.com/streamingfast/logging"
 )
 
+var testLogger, testTracer = logging.PackageLogger("merger", "github.com/streamingfast/merger/bundle_tests")
+
 func init() {
-	if os.Getenv("DEBUG") != "" {
-		zlog, _ = zap.NewDevelopment()
-	}
+	logging.InstantiateLoggers()
 }
