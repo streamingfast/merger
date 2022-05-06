@@ -41,6 +41,10 @@ type OneBlockFile struct {
 	Deleted       bool
 }
 
+func (f *OneBlockFile) String() string {
+	return fmt.Sprintf("#%d (ID %s, ParentID %s)", f.Num, f.ID, f.PreviousID)
+}
+
 func NewOneBlockFile(fileName string) (*OneBlockFile, error) {
 	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := ParseFilename(fileName)
 	if err != nil {

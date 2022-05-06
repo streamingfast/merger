@@ -92,6 +92,10 @@ func (b *Bundler) BundleInclusiveLowerBlock() uint64 {
 }
 
 func (b *Bundler) bundleInclusiveLowerBlock() uint64 {
+	if b.exclusiveHighestBlockLimit <= b.bundleSize {
+		return 0
+	}
+
 	return b.exclusiveHighestBlockLimit - b.bundleSize
 }
 
@@ -104,17 +108,26 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 		return nil
 	}
 
-	lastMergedLowBlockNum := b.bundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
+	bundleLowBoundary := b.bundleInclusiveLowerBlock() - b.bundleSize //we want the last one merged
 
-	oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(lastMergedLowBlockNum)
+	oneBlockFiles, err := fetchOneBlockFilesFromMergedFile(bundleLowBoundary)
 	if err != nil {
-		return fmt.Errorf("searching for lib: failed to fetch merged file for low block num: %d: %w", lastMergedLowBlockNum, err)
+		return fmt.Errorf("searching for lib: failed to fetch merged files for bundle low boundary %d: %w", bundleLowBoundary, err)
 	}
 
-	libNumToStartFrom := findLibNum(oneBlockFiles)
-	zlog.Info("Bootstrapping ", zap.Uint64("lib_num_to_start_from", libNumToStartFrom), zap.Uint64("last_merged_low_block_num", lastMergedLowBlockNum))
+	libNumToStartFrom := uint64(0)
+	libOneBlock := findLIB(oneBlockFiles)
+	if libOneBlock != nil {
+		libNumToStartFrom = libOneBlock.LibNum()
+	}
 
-	err = b.loadOneBlocksFromLib(libNumToStartFrom, lastMergedLowBlockNum, fetchOneBlockFilesFromMergedFile)
+	zlog.Info("bootstrapping bundler",
+		zap.Stringer("lib_block", libOneBlock),
+		zap.Uint64("lib_num_to_start_from", libNumToStartFrom),
+		zap.Uint64("bundle_low_boundary", bundleLowBoundary),
+	)
+
+	err = b.loadOneBlocksFromLib(libNumToStartFrom, bundleLowBoundary, fetchOneBlockFilesFromMergedFile)
 	if err != nil {
 		return fmt.Errorf("loading one block files: %w", err)
 	}
@@ -123,7 +136,7 @@ func (b *Bundler) Bootstrap(fetchOneBlockFilesFromMergedFile func(lowBlockNum ui
 		return fmt.Errorf("bootstrap completed and lib not set")
 	}
 
-	zlog.Info("Bootstrapped", zap.Uint64("lib_num", b.forkDB.LIBNum()), zap.String("lib_id", b.forkDB.LIBID()))
+	zlog.Info("bootstrapped bundler", zap.Stringer("lib", bstream.NewBlockRef(b.forkDB.LIBID(), b.forkDB.LIBNum())))
 	return nil
 }
 
@@ -154,15 +167,13 @@ func (b *Bundler) loadOneBlocksFromLib(libNumToStartFrom uint64, lastMergedLowBl
 	return nil
 }
 
-func findLibNum(oneBlockFiles []*OneBlockFile) uint64 {
-	libNum := uint64(0)
+func findLIB(oneBlockFiles []*OneBlockFile) (lib *OneBlockFile) {
 	for _, oneBlockFile := range oneBlockFiles {
-		if oneBlockFile.LibNum() > libNum {
-			libNum = oneBlockFile.LibNum()
+		if lib == nil || oneBlockFile.LibNum() > lib.LibNum() {
+			lib = oneBlockFile
 		}
 	}
-
-	return libNum
+	return
 }
 
 func (b *Bundler) LastMergeOneBlockFile() *OneBlockFile {
