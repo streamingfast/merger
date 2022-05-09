@@ -98,12 +98,11 @@ func (m *Merger) launch() (err error) {
 		}
 		if !isBundleComplete {
 			ctx, cancel := context.WithTimeout(context.Background(), ListFilesTimeout)
-			deletableOldFiles, err := m.retrieveOneBlockFile(ctx)
+			deletableOldFiles, highestSeenOneBlockFile, err := m.retrieveOneBlockFile(ctx)
 			cancel()
 			if err != nil {
-				return fmt.Errorf("retreiving one block files: %w", err)
+				return fmt.Errorf("retrieving one block files: %w", err)
 			}
-
 			if len(deletableOldFiles) > 0 {
 				m.deleteFilesFunc(deletableOldFiles)
 			}
@@ -114,6 +113,9 @@ func (m *Merger) launch() (err error) {
 			}
 			if !isBundleComplete {
 				m.logger.Info("bundle not completed after retrieving one block file", zap.Object("bundle", m.bundler))
+				if err := m.bundler.CheckContinuity(highestSeenOneBlockFile); err != nil {
+					return err
+				}
 				select {
 				case <-time.After(m.timeBetweenStoreLookups):
 					continue
@@ -157,10 +159,9 @@ func (m *Merger) launch() (err error) {
 	}
 }
 
-func (m *Merger) retrieveOneBlockFile(ctx context.Context) (deletable []*bundle.OneBlockFile, err error) {
+func (m *Merger) retrieveOneBlockFile(ctx context.Context) (deletable []*bundle.OneBlockFile, highestSeenBlockFile *bundle.OneBlockFile, err error) {
 	addedFileCount := 0
 	seenFileCount := 0
-	var highestSeenBlockFile *bundle.OneBlockFile
 	callback := func(o *bundle.OneBlockFile) error {
 		highestSeenBlockFile = o
 		if m.bundler.IsBlockTooOld(o.Num) {
@@ -181,7 +182,7 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (deletable []*bundle.
 
 	err = m.io.WalkOneBlockFiles(ctx, callback)
 	if err != nil {
-		return nil, fmt.Errorf("fetching one block files: %w", err)
+		return nil, nil, fmt.Errorf("fetching one block files: %w", err)
 	}
 
 	highestNum := m.bundler.BundleInclusiveLowerBlock()

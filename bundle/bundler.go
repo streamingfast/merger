@@ -36,6 +36,23 @@ func NewBundler(logger *zap.Logger, nextBundle, lowestPossibleBundle, bundleSize
 	}
 }
 
+func (b *Bundler) CheckContinuity(highestSeenOneBlockFile *OneBlockFile) error {
+	if highestSeenOneBlockFile == nil {
+		return nil
+	}
+	if lb := b.LongestChainLastBlockFile(); lb != nil {
+		if highestSeenOneBlockFile.Num < lb.Num {
+			return nil
+		}
+		if highestSeenOneBlockFile.Num-lb.Num > 30 {
+			return fmt.Errorf("hole detected in one-block-files, shutting down merger: you will need to reprocess this range. (highest: %s, highest 'linkable': %s)", highestSeenOneBlockFile.String(), lb.String())
+		}
+
+	}
+
+	return nil
+}
+
 func (b *Bundler) String() string {
 	var lastMergeBlockNum uint64
 	if b.lastMergeOneBlockFile != nil {
@@ -48,7 +65,7 @@ func (b *Bundler) String() string {
 
 	lc := b.longestChain()
 	return fmt.Sprintf(
-		"bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, highest_linkable_block: %s, exclusive_highest_block_limit: %d, lib_num: %d, lib id:%s, longest chain lenght: %d",
+		"bundle_size: %d, last_merge_block_num: %d, inclusive_lower_block_num: %d, highest_linkable_block: %s, exclusive_highest_block_limit: %d, lib_num: %d, lib id:%s, longest chain length: %d",
 		b.bundleSize,
 		lastMergeBlockNum,
 		b.bundleInclusiveLowerBlock(),
