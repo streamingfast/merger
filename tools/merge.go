@@ -63,9 +63,16 @@ func Merge(zlog *zap.Logger, tracer logging.Tracer, oneBlocksStore, mergedBlocks
 			zlog.Error("walking oneblockfiles", zap.Error(err))
 			return err
 		}
+		if highestSeenBlockFile == nil {
+			return fmt.Errorf("no block file seen in requested range")
+		}
+
+		longestChain := bundler.LongestOneBlockFileChain()
+		if len(longestChain) == 0 {
+			return fmt.Errorf("no linkable block file seen in requested range")
+		}
 
 		var warnings []string
-		longestChain := bundler.LongestOneBlockFileChain()
 		if len(longestChain) != 100 {
 			warnings = append(warnings, fmt.Sprintf("longest chain does not contain 100 blocks, only %d", len(longestChain)))
 		}
@@ -74,6 +81,9 @@ func Merge(zlog *zap.Logger, tracer logging.Tracer, oneBlocksStore, mergedBlocks
 		}
 
 		bundle := bundler.ToBundle(next + bundleSize - 1)
+		if len(bundle) == 0 {
+			return fmt.Errorf("cannot merge 'empty' bundle")
+		}
 		zlog.Info("current bundle",
 			zap.Stringer("longest_chain_lowest_block", longestChain[0]),
 			zap.Stringer("longest_chain_highest_block", longestChain[len(longestChain)-1]),
