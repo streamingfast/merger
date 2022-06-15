@@ -183,6 +183,9 @@ func (m *Merger) retrieveOneBlockFile(ctx context.Context) (deletable []*bundle.
 	}
 
 	err = m.io.WalkOneBlockFiles(ctx, callback)
+	if err == dstore.StopIteration {
+		err = nil
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching one block files: %w", err)
 	}

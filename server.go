@@ -24,7 +24,9 @@ func (m *Merger) startServer() {
 		return
 	}
 	m.logger.Info("tcp listener created")
-
+	m.OnTerminated(func(_ error) {
+		lis.Close()
+	})
 	pbmerge.RegisterMergerServer(gs, m)
 	pbhealth.RegisterHealthServer(gs, m)
 	m.logger.Info("server registered")

@@ -84,7 +84,8 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000002-20210728T105016.02-00000002a-00000001a-0-suffix"),
 		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
 		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-2-suffix"),
-		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-2-suffix"),
+		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-4-suffix"),
+		bundle.MustNewOneBlockFile("0000000007-20210728T105016.09-00000007a-00000006a-6-suffix"), // pass LIB
 	}
 	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
 		for _, o := range srcOneBlockFiles {
@@ -109,7 +110,7 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 
 	go func() {
 		select {
-		case <-time.After(time.Second):
+		case <-time.After(time.Second * 2):
 			panic("too long")
 		case <-merger.Terminated():
 		}
@@ -141,6 +142,7 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
 		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-3-suffix"),
 		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-4-suffix"),
+		bundle.MustNewOneBlockFile("0000000007-20210728T105016.09-00000007a-00000006a-6-suffix"), // pass LIB
 		bundle.MustNewOneBlockFile("0000000002-20210728T105016.09-00000002b-00000001b-0-suffix"), //un linkable file
 	}
 
@@ -176,10 +178,10 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 	err := merger.launch()
 	require.NoError(t, err)
 
-	expectedDeleted := append(clone(srcOneBlockFiles[0:4]), srcOneBlockFiles[5])
+	expectedDeleted := append(clone(srcOneBlockFiles[0:4]), srcOneBlockFiles[6])
 	require.Equal(t, bundle.ToSortedIDs(expectedDeleted), bundle.ToSortedIDs(deletedFiles))
 
-	expectedMerged := append(clone(srcOneBlockFiles[0:4]), srcOneBlockFiles[5])
+	expectedMerged := append(clone(srcOneBlockFiles[0:4]), srcOneBlockFiles[6])
 	require.Equal(t, bundle.ToIDs(expectedMerged), bundle.ToIDs(mergedFiles))
 }
 
@@ -200,6 +202,7 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000003-20210728T105016.03-00000003a-00000002a-0-suffix"),
 			bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-3-suffix"),
 			bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-4-suffix"),
+			bundle.MustNewOneBlockFile("0000000007-20210728T105016.08-00000007a-00000006a-6-suffix"),
 		},
 		{
 			bundle.MustNewOneBlockFile("0000000002-20210728T105016.09-00000002b-00000001b-0-suffix"), //too old
@@ -323,7 +326,7 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 	bundler := newBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 15, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -336,11 +339,13 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 		bundle.MustNewOneBlockFile("0000000004-20210728T105016.06-00000004a-00000003a-1-suffix"),
 
 		bundle.MustNewOneBlockFile("0000000006-20210728T105016.08-00000006a-00000004a-1-suffix"),
-		bundle.MustNewOneBlockFile("0000000007-20210728T105016.09-00000007a-00000006a-1-suffix"),
-		bundle.MustNewOneBlockFile("0000000008-20210728T105016.10-00000008a-00000007a-1-suffix"),
-		bundle.MustNewOneBlockFile("0000000009-20210728T105016.11-00000009a-00000008a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000007-20210728T105016.09-00000007a-00000006a-6-suffix"),
+		bundle.MustNewOneBlockFile("0000000008-20210728T105016.10-00000008a-00000007a-6-suffix"),
+		bundle.MustNewOneBlockFile("0000000009-20210728T105016.11-00000009a-00000008a-6-suffix"),
 
-		bundle.MustNewOneBlockFile("0000000010-20210728T105016.12-00000010a-00000009a-1-suffix"),
+		bundle.MustNewOneBlockFile("0000000010-20210728T105016.12-00000010a-00000009a-6-suffix"),
+		bundle.MustNewOneBlockFile("0000000011-20210728T105016.13-00000011a-00000010a-10-suffix"),
+		bundle.MustNewOneBlockFile("0000000012-20210728T105016.14-00000012a-00000011a-11-suffix"),
 	}
 
 	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
@@ -610,6 +615,8 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 	//todo: froch this test is failing when run with...
 	//go test -count 100000 -run TestMerger_PreMergedBlocks_Purge ./...
 
+	fmt.Println("BEGIN TEST")
+	defer fmt.Println("END TEST")
 	c := struct {
 		name          string
 		mergedFiles   map[uint64][]*bundle.OneBlockFile
@@ -639,21 +646,24 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000126-20210728T105416.0-00000126a-00000125a-122-suffix"),
 			bundle.MustNewOneBlockFile("0000000127-20210728T105416.0-00000127a-00000126a-122-suffix"),
 			bundle.MustNewOneBlockFile("0000000128-20210728T105416.0-00000128a-00000127a-122-suffix"),
+			bundle.MustNewOneBlockFile("0000000129-20210728T105416.0-00000129a-00000128a-128-suffix"),
 		},
 	}
 
 	bundler := newBundler(113, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
+	merger := NewMerger(testLogger, bundler, time.Millisecond, 20, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+		fmt.Println("fetching", lowBlockNum)
 		return c.mergedFiles[lowBlockNum], nil
 	}
 
 	cycleCount := 0
 
 	mergerIO.WalkOneBlockFilesFunc = func(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
+		fmt.Println("walking", cycleCount)
 		cycleCount += 1
 		if cycleCount == 2 {
 			for _, o := range c.oneBlockFiles {
@@ -667,22 +677,35 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 
 	mergerIO.MergeAndSaveFunc = func(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
 		if cycleCount == 2 {
-			merger.Shutdown(io.EOF)
+			merger.Shutdown(io.EOF) // careful: this shutdown hack introduces a race condition
 		}
 		return nil
 	}
 
 	merger.deleteFilesFunc = func(oneBlockFiles []*bundle.OneBlockFile) {
+		fmt.Println("deleting files")
 		return
 	}
 
+	expectedHighestBlockLimit := uint64(133)
+
 	go merger.Launch()
 	select {
-	case <-time.After(30 * time.Second):
+	case <-time.After(1 * time.Second):
 		t.Error("too long")
-	case <-merger.Terminated():
-		require.Equal(t, 133, int(merger.bundler.ExclusiveHighestBlockLimit()))
 		merger.Shutdown(nil)
+	case <-merger.Terminated():
+		now := time.Now()
+		for { // handling the race condition in this test's particular shutdown mechanism
+			if time.Since(now) > time.Second {
+				break
+			}
+			if merger.bundler.ExclusiveHighestBlockLimit() == expectedHighestBlockLimit {
+				break
+			}
+			time.Sleep(time.Millisecond * 10)
+		}
+		require.Equal(t, expectedHighestBlockLimit, merger.bundler.ExclusiveHighestBlockLimit())
 	}
 }
 
@@ -701,6 +724,7 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 			bundle.MustNewOneBlockFile("0000000116-20210728T105216.0-00000116a-00000115a-114-suffix"),
 			bundle.MustNewOneBlockFile("0000000117-20210728T105316.0-00000117a-00000116a-114-suffix"),
 			bundle.MustNewOneBlockFile("0000000118-20210728T105316.0-00000118a-00000117a-114-suffix"),
+			bundle.MustNewOneBlockFile("0000000119-20210728T105316.0-00000119a-00000118a-118-suffix"), // for LIB
 		},
 		blockLimit:                113,
 		expectedHighestBlockLimit: 118,
