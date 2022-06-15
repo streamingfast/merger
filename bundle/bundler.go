@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -318,7 +319,7 @@ func (b *Bundler) LongestChainLastBlockFile() *OneBlockFile {
 	return blk.Object.(*OneBlockFile)
 }
 
-func (b *Bundler) libNum() *uint64 {
+func (b *Bundler) rootNum() *uint64 {
 	rootID, err := b.forkDB.Root()
 	if err != nil {
 		return nil
@@ -332,7 +333,7 @@ func (b *Bundler) IsBlockTooOld(blockNum uint64) bool {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	if root := b.libNum(); root != nil {
+	if root := b.rootNum(); root != nil {
 		return blockNum < *root
 	}
 	return false
@@ -356,11 +357,23 @@ func (b *Bundler) BundleCompleted() (complete bool, highestBlockLimit uint64, er
 
 	longest := b.longestChain()
 
-	if lib := b.libNum(); lib != nil {
-		if *lib >= b.exclusiveHighestBlockLimit {
-			return false, 0, fmt.Errorf("one-block-files found are ABOVE the bundle that we are trying to merge (%d is above [%d-%d]). You will have to fix your block files manually or start with a higher 'first streamable block'", *lib, b.bundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
+	if root := b.rootNum(); root != nil {
+		if *root >= b.exclusiveHighestBlockLimit {
+			return false, 0, fmt.Errorf("one-block-files found are ABOVE the bundle that we are trying to merge (%d is above [%d-%d]). You will have to fix your block files manually or start with a higher 'first streamable block'", *root, b.bundleInclusiveLowerBlock(), b.exclusiveHighestBlockLimit)
 		}
 	}
+
+	if len(longest) == 0 {
+		fmt.Println("no longest")
+		return
+	}
+
+	highestLIBNum := b.forkDB.BlockForID(longest[len(longest)-1]).Object.(*OneBlockFile).LibNum()
+	if highestLIBNum < b.exclusiveHighestBlockLimit {
+		b.logger.Info("not reached LIB yet", zap.Uint64("highest", highestLIBNum), zap.Uint64("limit", b.exclusiveHighestBlockLimit)) //FIXME set to debug
+		return
+	}
+
 	for _, blockID := range longest {
 		blk := b.forkDB.BlockForID(blockID)
 
@@ -422,7 +435,7 @@ func (b *Bundler) Commit(inclusiveHighestBlockLimit uint64) {
 	return
 }
 
-func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
+func (b *Bundler) Purge(cutoff time.Time, callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
@@ -437,7 +450,7 @@ func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 		purgedBlocks := b.forkDB.MoveLIB(libRef)
 		for _, block := range purgedBlocks {
 			oneBlockFile := block.Object.(*OneBlockFile)
-			if oneBlockFile.Merged && !oneBlockFile.Deleted {
+			if oneBlockFile.Merged && !oneBlockFile.Deleted && oneBlockFile.BlockTime.Before(cutoff) {
 				collected[block.BlockID] = block.Object.(*OneBlockFile)
 			}
 		}
@@ -445,7 +458,7 @@ func (b *Bundler) Purge(callback func(oneBlockFilesToDelete []*OneBlockFile)) {
 
 	b.forkDB.IterateLinks(func(blockID, previousBlockID string, object interface{}) (getNext bool) {
 		oneBlockFile := object.(*OneBlockFile)
-		if oneBlockFile.Merged && !oneBlockFile.Deleted {
+		if oneBlockFile.Merged && !oneBlockFile.Deleted && oneBlockFile.BlockTime.Before(cutoff) {
 			collected[oneBlockFile.ID] = oneBlockFile
 		}
 		return true

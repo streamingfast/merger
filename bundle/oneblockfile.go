@@ -142,19 +142,19 @@ func BlockFileName(block *bstream.Block) string {
 	return BlockFileNameWithSuffix(block, "generated")
 }
 
+func TruncateBlockID(in string) string {
+	if len(in) <= 8 {
+		return in
+	}
+	return in[len(in)-8:]
+}
+
 func BlockFileNameWithSuffix(block *bstream.Block, suffix string) string {
 	blockTime := block.Time()
 	blockTimeString := fmt.Sprintf("%s.%01d", blockTime.Format("20060102T150405"), blockTime.Nanosecond()/100000000)
 
-	blockID := block.ID()
-	if len(blockID) > 8 {
-		blockID = blockID[len(blockID)-8:]
-	}
-
-	previousID := block.PreviousID()
-	if len(previousID) > 8 {
-		previousID = previousID[len(previousID)-8:]
-	}
+	blockID := TruncateBlockID(block.ID())
+	previousID := TruncateBlockID(block.PreviousID())
 
 	return fmt.Sprintf("%010d-%s-%s-%s-%d-%s", block.Num(), blockTimeString, blockID, previousID, block.LibNum, suffix)
 }

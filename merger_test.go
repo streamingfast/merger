@@ -73,7 +73,7 @@ func TestNewMerger_SunnyPath(t *testing.T) {
 	bundler := newBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -129,7 +129,7 @@ func TestNewMerger_Unlinkable_File(t *testing.T) {
 	bundler := newBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -187,7 +187,7 @@ func TestNewMerger_File_Too_Old(t *testing.T) {
 	bundler := newBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -323,7 +323,7 @@ func TestNewMerger_Multiple_Merge(t *testing.T) {
 	bundler := newBundler(0, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return nil, fmt.Errorf("nada")
@@ -392,7 +392,7 @@ func TestNewMerger_SunnyPath_With_MergeFile_Already_Exist(t *testing.T) {
 	bundler := newBundler(100, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		100: {
@@ -485,7 +485,7 @@ func TestNewMerger_SunnyPath_With_Bootstrap(t *testing.T) {
 	bundler := newBundler(5, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergeFiles := map[uint64][]*bundle.OneBlockFile{
 		0: {
@@ -539,7 +539,7 @@ func TestMerger_Launch_FailWalkOneBlockFiles(t *testing.T) {
 		return fmt.Errorf("couldn't fetch one block files")
 	}
 
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	merger.Launch()
 }
@@ -595,7 +595,7 @@ func TestMerger_Launch_Drift(t *testing.T) {
 		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		FetchMergedOneBlockFilesFunc: fetchMergedFiles,
 	}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	go merger.Launch()
 	select {
@@ -645,7 +645,7 @@ func TestMerger_PreMergedBlocks_Purge(t *testing.T) {
 	bundler := newBundler(113, 0, 5)
 
 	mergerIO := &TestMergerIO{}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	mergerIO.FetchMergedOneBlockFilesFunc = func(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
 		return c.mergedFiles[lowBlockNum], nil
@@ -734,7 +734,7 @@ func TestMerger_Launch_MergeUploadError(t *testing.T) {
 		WalkOneBlockFilesFunc:        walkOneBlockFiles,
 		MergeAndSaveFunc:             mergeUpload,
 	}
-	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, nil)
+	merger := NewMerger(testLogger, bundler, time.Second, 10, "", mergerIO, time.Second, nil)
 
 	err := merger.launch()
 	require.Error(t, err)

@@ -35,6 +35,7 @@ type Config struct {
 	StorageOneBlockFilesPath     string
 	StorageMergedBlocksFilesPath string
 	GRPCListenAddr               string
+	OneBlockDeletionMinAge       time.Duration
 
 	// perf tweak
 	WritersLeewayDuration          time.Duration
@@ -107,6 +108,7 @@ func (a *App) Run() error {
 		a.config.MaxOneBlockOperationsBatchSize,
 		a.config.GRPCListenAddr,
 		io,
+		a.config.OneBlockDeletionMinAge,
 		filesDeleter.Delete,
 	)
 	zlog.Info("merger initiated")

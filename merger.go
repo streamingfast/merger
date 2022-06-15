@@ -32,12 +32,12 @@ type Merger struct {
 	chunkSize                      uint64
 	grpcListenAddr                 string
 	timeBetweenStoreLookups        time.Duration // should be very low on local filesystem
-	oneBlockDeletionThreads        int
 	maxOneBlockOperationsBatchSize int
 
-	bundler         *bundle.Bundler
-	io              IOInterface
-	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile)
+	bundler           *bundle.Bundler
+	io                IOInterface
+	deleteFilesFunc   func(oneBlockFiles []*bundle.OneBlockFile)
+	deleteFilesMinAge time.Duration
 
 	logger *zap.Logger
 }
@@ -49,6 +49,7 @@ func NewMerger(
 	maxOneBlockOperationsBatchSize int,
 	grpcListenAddr string,
 	io IOInterface,
+	deleteFilesMinAge time.Duration,
 	deleteFilesFunc func(oneBlockFiles []*bundle.OneBlockFile),
 ) *Merger {
 	return &Merger{
@@ -59,6 +60,7 @@ func NewMerger(
 		maxOneBlockOperationsBatchSize: maxOneBlockOperationsBatchSize,
 		io:                             io,
 		deleteFilesFunc:                deleteFilesFunc,
+		deleteFilesMinAge:              deleteFilesMinAge,
 		logger:                         logger,
 	}
 }
@@ -83,8 +85,8 @@ func (m *Merger) launch() (err error) {
 		if oneBlockFiles, err := m.io.FetchMergedOneBlockFiles(m.bundler.BundleInclusiveLowerBlock()); err == nil {
 			if len(oneBlockFiles) > 0 {
 				m.logger.Info("adding files from already merge bundle", zap.Uint64("bundle_inclusive_lower_block", m.bundler.BundleInclusiveLowerBlock()), zap.Int("file_count", len(oneBlockFiles)))
-				m.bundler.BundlePreMergedOneBlockFiles(oneBlockFiles) // this will change state and skip to next bundle ...
-				m.bundler.Purge(func([]*bundle.OneBlockFile) {})      // no file deletion, just move LIB on forkdb
+				m.bundler.BundlePreMergedOneBlockFiles(oneBlockFiles)         // this will change state and skip to next bundle ...
+				m.bundler.Purge(time.Time{}, func([]*bundle.OneBlockFile) {}) // no file deletion, just move LIB on forkdb
 
 				//let check if next bundle has also been merged by another process
 				//no bundle can be completed at this time
@@ -151,7 +153,7 @@ func (m *Merger) launch() (err error) {
 		metrics.HeadBlockTimeDrift.SetBlockTime(lastMergedOneBlockFile.BlockTime)
 		metrics.HeadBlockNumber.SetUint64(lastMergedOneBlockFile.Num)
 
-		m.bundler.Purge(func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
+		m.bundler.Purge(time.Now().Add(-m.deleteFilesMinAge), func(oneBlockFilesToDelete []*bundle.OneBlockFile) {
 			if len(oneBlockFilesToDelete) > 0 {
 				m.deleteFilesFunc(oneBlockFilesToDelete)
 			}
