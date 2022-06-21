@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+
+### BREAKING CHANGE
+* Merger now only writes irreversible blocks in merged blocks
+
 ### Changed
 * Merger now deletes one-block-files that it has seen before exactly like the ones that are passed MaxFixableFork, based on DeleteBlocksBefore
 * 'Live' option now changed to 'BatchMode' with the inverse behavior (for consistency with our other projects)

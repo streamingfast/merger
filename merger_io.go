@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,30 +14,41 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
-	"github.com/streamingfast/merger/bundle"
 	"go.uber.org/zap"
 )
 
 type IOInterface interface {
-	MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error)
-	FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error)
-	WalkOneBlockFiles(ctx context.Context, callback func(*bundle.OneBlockFile) error) error
-	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error)
-}
 
-type OneBlockFilesDeleter interface {
-	Delete(oneBlockFiles []*bundle.OneBlockFile)
+	// NextBundle will read through consecutive merged blocks, starting at `lowestBaseBlock`, and return the next bundle that needs to be created
+	// If it finds an existing merged file at `lowestBaseBlock`, it will read the last one and include the lastIrreversibleBlock so you can bootstrap your forkdb from there
+	NextBundle(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error)
+
+	// WalkOneBlockFiels calls your function for each oneBlockFile it reads, starting at the inclusiveLowerBlock. Useful to feed a block source
+	WalkOneBlockFiles(ctx context.Context, inclusiveLowerBlock uint64, callback func(*OneBlockFile) error) error
+
+	// MergeAndStore writes a merged file from a list of oneBlockFiles
+	MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error)
+
+	// DownloadOneBlockFile will get you the data from the file
+	DownloadOneBlockFile(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)
+
+	// DeleteAsync should be able to delete large quantities of oneBlockFiles from storage without ever blocking
+	DeleteAsync(oneBlockFiles []*OneBlockFile)
 }
 
 type DStoreIO struct {
-	oneBlocksStore      dstore.Store
-	mergedBlocksStore   dstore.Store
-	retryAttempts       int
-	retryCooldown       time.Duration
+	oneBlocksStore    dstore.Store
+	mergedBlocksStore dstore.Store
+
+	retryAttempts int
+	retryCooldown time.Duration
+
 	lowestPossibleBlock uint64
 	bundleSize          uint64
-	logger              *zap.Logger
-	tracer              logging.Tracer
+
+	logger *zap.Logger
+	tracer logging.Tracer
+	od     *oneBlockFilesDeleter
 }
 
 func NewDStoreIO(
@@ -48,22 +58,25 @@ func NewDStoreIO(
 	mergedBlocksStore dstore.Store,
 	retryAttempts int,
 	retryCooldown time.Duration,
-	lowestPossibleBlock uint64,
 	bundleSize uint64,
 ) *DStoreIO {
+
+	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
+	od.Start(4, 10000)
+
 	return &DStoreIO{
-		oneBlocksStore:      oneBlocksStore,
-		mergedBlocksStore:   mergedBlocksStore,
-		retryAttempts:       retryAttempts,
-		retryCooldown:       retryCooldown,
-		lowestPossibleBlock: lowestPossibleBlock,
-		bundleSize:          bundleSize,
-		logger:              logger,
-		tracer:              tracer,
+		oneBlocksStore:    oneBlocksStore,
+		mergedBlocksStore: mergedBlocksStore,
+		retryAttempts:     retryAttempts,
+		retryCooldown:     retryCooldown,
+		bundleSize:        bundleSize,
+		logger:            logger,
+		tracer:            tracer,
+		od:                od,
 	}
 }
 
-func (s *DStoreIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bundle.OneBlockFile) (err error) {
+func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
 		return
 	}
@@ -77,10 +90,10 @@ func (s *DStoreIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bu
 		zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num),
 	)
 
-	err = Retry(s.logger, 5, 500*time.Millisecond, func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), WriteObjectTimeout)
+	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
+		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
-		return s.mergedBlocksStore.WriteObject(ctx, bundleFilename, bundle.NewBundleReader(ctx, s.logger, s.tracer, oneBlockFiles, s.DownloadOneBlockFile))
+		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, NewBundleReader(ctx, s.logger, s.tracer, oneBlockFiles, s.DownloadOneBlockFile))
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
@@ -91,25 +104,13 @@ func (s *DStoreIO) MergeAndStore(inclusiveLowerBlock uint64, oneBlockFiles []*bu
 	return
 }
 
-func (s *DStoreIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), GetObjectTimeout)
-	defer cancel()
-	reader, err := s.mergedBlocksStore.OpenObject(ctx, fileNameForBlocksBundle(lowBlockNum))
-	if err != nil {
-		return nil, err
-	}
+func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, callback func(*OneBlockFile) error) error {
 
-	out, err := toOneBlockFile(reader)
-	return out, err
-}
-
-func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, callback func(*bundle.OneBlockFile) error) error {
-
-	return s.oneBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(s.lowestPossibleBlock), func(filename string) error {
+	return s.oneBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBlock), func(filename string) error {
 		if strings.HasSuffix(filename, ".tmp") {
 			return nil
 		}
-		oneBlockFile := bundle.MustNewOneBlockFile(filename)
+		oneBlockFile := MustNewOneBlockFile(filename)
 
 		if oneBlockFile.InnerLibNum == nil {
 			data, err := oneBlockFile.Data(ctx, s.DownloadOneBlockFile)
@@ -137,7 +138,7 @@ func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, callback func(*bundle.
 
 }
 
-func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundle.OneBlockFile) (data []byte, err error) {
+func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
 		out, err = s.oneBlocksStore.OpenObject(ctx, filename)
@@ -162,49 +163,56 @@ func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bundl
 	return
 }
 
-func (s *DStoreIO) FindStartBlock(ctx context.Context) (uint64, error) {
+func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outBaseBlock uint64, lib bstream.BlockRef, err error) {
 
-	lowestBoundary := (s.lowestPossibleBlock / s.bundleSize) * s.bundleSize
-	var seenBoundary uint64
-	err := s.mergedBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBoundary), func(filename string) error {
+	var lastFound *uint64
+	outBaseBlock = lowestBaseBlock
+	err = s.mergedBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBaseBlock), func(filename string) error {
 		num, err := strconv.ParseUint(filename, 10, 64)
 		if err != nil {
 			return err
 		}
-		if num < lowestBoundary { // user has decided to start its merger in the 'future'
-			return nil
-		}
 
-		if seenBoundary == 0 {
-			seenBoundary = num
-			return nil
+		if num != outBaseBlock {
+			return fmt.Errorf("merged blocks skip from %d to %d, you have a hole in your merged block files and need to reprocess or set firstStreamableBlock above this hole", outBaseBlock, num)
 		}
-		if num != seenBoundary+s.bundleSize {
-			return fmt.Errorf("merged blocks skip from %d to %d, you have a hole in your merged block files and need to reprocess or set firstStreamableBlock above this hole", seenBoundary, num)
-		}
-		seenBoundary = num
+		outBaseBlock += s.bundleSize
+		lastFound = &num
 		return nil
 	})
 
-	if err == nil && seenBoundary == 0 {
-		return lowestBoundary, nil // no merged file exist
+	if lastFound != nil {
+		lib, err = s.readLastBlock(ctx, *lastFound)
 	}
 
-	return seenBoundary + s.bundleSize, err
+	return
+}
+
+func (s *DStoreIO) readLastBlock(ctx context.Context, baseBlock uint64) (bstream.BlockRef, error) {
+	subCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
+	defer cancel()
+	reader, err := s.mergedBlocksStore.OpenObject(subCtx, fileNameForBlocksBundle(baseBlock))
+	if err != nil {
+		return nil, err
+	}
+	last, err := lastBlock(reader)
+	if err != nil {
+		return nil, err
+	}
+	return last.AsRef(), nil
+}
+
+func (s *DStoreIO) DeleteAsync(oneBlockFiles []*OneBlockFile) {
+	s.od.Delete(oneBlockFiles)
 }
 
 type oneBlockFilesDeleter struct {
 	sync.Mutex
-	toProcess chan string
-	store     dstore.Store
-	logger    *zap.Logger
-}
-
-func NewOneBlockFilesDeleter(logger *zap.Logger, store dstore.Store) *oneBlockFilesDeleter {
-	return &oneBlockFilesDeleter{
-		store:  store,
-		logger: logger,
-	}
+	toProcess     chan string
+	retryAttempts int
+	retryCooldown time.Duration
+	store         dstore.Store
+	logger        *zap.Logger
 }
 
 func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
@@ -214,7 +222,7 @@ func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
 	}
 }
 
-func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bundle.OneBlockFile) {
+func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*OneBlockFile) {
 	od.Lock()
 	defer od.Unlock()
 
@@ -236,7 +244,7 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bundle.OneBlockFile) {
 	for empty := false; !empty; {
 		select {
 		case f := <-od.toProcess:
-			deletable[f] = bundle.Empty
+			deletable[f] = Empty
 		default:
 			empty = true
 		}
@@ -249,31 +257,25 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bundle.OneBlockFile) {
 		if _, exists := deletable[file]; !exists {
 			od.toProcess <- file
 		}
-		deletable[file] = bundle.Empty
+		deletable[file] = Empty
 	}
 }
 
 func (od *oneBlockFilesDeleter) processDeletions() {
 	for {
 		file := <-od.toProcess
-
-		var err error
-		for i := 0; i < 3; i++ {
+		err := Retry(od.logger, od.retryAttempts, od.retryCooldown, func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
-			err = od.store.DeleteObject(ctx, file)
-			cancel()
-			if err == nil {
-				break
-			}
-			time.Sleep(time.Duration(100*i) * time.Millisecond)
-		}
+			defer cancel()
+			return od.store.DeleteObject(ctx, file)
+		})
 		if err != nil {
 			od.logger.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
 		}
 	}
 }
 
-func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneBlockFile, err error) {
+func lastBlock(mergeFileReader io.ReadCloser) (out *bstream.Block, err error) {
 	defer mergeFileReader.Close()
 
 	blkReader, err := bstream.GetBlockReaderFactory.New(mergeFileReader)
@@ -281,27 +283,11 @@ func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneB
 		return nil, err
 	}
 
-	lowerBlock := uint64(math.MaxUint64)
-	highestBlock := uint64(0)
 	for {
 		block, err := blkReader.Read()
 		if block != nil {
-			if block.Num() < lowerBlock {
-				lowerBlock = block.Num()
-			}
-
-			if block.Num() > highestBlock {
-				highestBlock = block.Num()
-			}
-
-			// we do this little dance to ensure that the 'canonical filename' will match any other oneblockfiles
-			// the oneblock encoding/decoding stay together inside 'bundle' package
-			fileName := bundle.BlockFileName(block)
-			oneBlockFile := bundle.MustNewOneBlockFile(fileName)
-			oneBlockFile.Merged = true
-			oneBlockFiles = append(oneBlockFiles, oneBlockFile)
+			out = block
 		}
-
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -310,5 +296,5 @@ func toOneBlockFile(mergeFileReader io.ReadCloser) (oneBlockFiles []*bundle.OneB
 		}
 	}
 
-	return
+	return out, nil
 }

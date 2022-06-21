@@ -24,7 +24,6 @@ import (
 	"github.com/streamingfast/dmetrics"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/merger"
-	"github.com/streamingfast/merger/bundle"
 	"github.com/streamingfast/merger/metrics"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
@@ -35,13 +34,10 @@ type Config struct {
 	StorageOneBlockFilesPath     string
 	StorageMergedBlocksFilesPath string
 	GRPCListenAddr               string
-	OneBlockDeletionMinAge       time.Duration
 
-	// perf tweak
-	WritersLeewayDuration          time.Duration
-	TimeBetweenStoreLookups        time.Duration
-	OneBlockDeletionThreads        int
-	MaxOneBlockOperationsBatchSize int
+	MaxForkedBlockAgeBeforePruning time.Duration
+	TimeBetweenPruning             time.Duration
+	TimeBetweenPolling             time.Duration
 }
 
 type App struct {
@@ -60,13 +56,6 @@ func New(config *Config) *App {
 func (a *App) Run() error {
 	zlog.Info("running merger", zap.Reflect("config", a.config))
 
-	if a.config.OneBlockDeletionThreads < 1 {
-		return fmt.Errorf("need at least 1 OneBlockDeletionThread")
-	}
-	if a.config.MaxOneBlockOperationsBatchSize < 250 {
-		return fmt.Errorf("minimum MaxOneBlockOperationsBatchSize is 250")
-	}
-
 	dmetrics.Register(metrics.MetricSet)
 
 	oneBlockStoreStore, err := dstore.NewDBinStore(a.config.StorageOneBlockFilesPath)
@@ -81,35 +70,18 @@ func (a *App) Run() error {
 
 	bundleSize := uint64(100)
 
-	io := merger.NewDStoreIO(zlog, tracer, oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond, bstream.GetProtocolFirstStreamableBlock, bundleSize)
-	filesDeleter := merger.NewOneBlockFilesDeleter(zlog, oneBlockStoreStore)
-
-	nextBundle, err := io.FindStartBlock(context.Background())
-	if err != nil {
-		return err
-	}
-
-	bundler := bundle.NewBundler(zlog, nextBundle, bstream.GetProtocolFirstStreamableBlock, bundleSize)
-	err = bundler.Bootstrap(func(lowBlockNum uint64) (oneBlockFiles []*bundle.OneBlockFile, err error) {
-		oneBlockFiles, fetchErr := io.FetchMergedOneBlockFiles(lowBlockNum)
-		if fetchErr != nil {
-			return nil, fmt.Errorf("fetching one block files from merged file with low block num %d: %w", lowBlockNum, fetchErr)
-		}
-		return oneBlockFiles, err
-	})
-	if err != nil {
-		return fmt.Errorf("bundle bootstrap: %w", err)
-	}
+	// we are setting the backoff here for dstoreIO
+	io := merger.NewDStoreIO(zlog, tracer, oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond, bundleSize)
 
 	m := merger.NewMerger(
 		zlog,
-		bundler,
-		a.config.TimeBetweenStoreLookups,
-		a.config.MaxOneBlockOperationsBatchSize,
 		a.config.GRPCListenAddr,
 		io,
-		a.config.OneBlockDeletionMinAge,
-		filesDeleter.Delete,
+		bstream.GetProtocolFirstStreamableBlock,
+		bundleSize,
+		a.config.MaxForkedBlockAgeBeforePruning,
+		a.config.TimeBetweenPruning,
+		a.config.TimeBetweenPolling,
 	)
 	zlog.Info("merger initiated")
 
@@ -122,7 +94,6 @@ func (a *App) Run() error {
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
 
-	filesDeleter.Start(a.config.OneBlockDeletionThreads, 100000)
 	go m.Launch()
 
 	zlog.Info("merger running")

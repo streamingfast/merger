@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func (m *Merger) startServer() {
+func (m *Merger) startGRPCServer() {
 	gs := dgrpc.NewServer()
 	m.logger.Info("grpc server created")
 
@@ -42,26 +42,18 @@ func (m *Merger) startServer() {
 
 func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_PreMergedBlocksServer) error {
 
-	longestChain := m.bundler.LongestOneBlockFileChain()
-
-	if len(longestChain) == 0 {
+	lowestNum := m.bundler.BaseBlockNum()
+	if req.LowBlockNum < lowestNum || req.LowBlockNum >= lowestNum+m.bundler.bundleSize {
 		err := fmt.Errorf("cannot find requested blocks")
 		_ = server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
 		return err
 	}
 
-	lowestBlock := longestChain[0]
-	highestBlock := longestChain[len(longestChain)-1]
-
-	if req.LowBlockNum < lowestBlock.Num || req.LowBlockNum >= highestBlock.Num {
-		err := fmt.Errorf("cannot find requested blocks")
-		_ = server.SetHeader(metadata.New(map[string]string{"error": err.Error()}))
-		return err
-	}
+	irreversibleBlocks := m.bundler.PreMergedBlocks()
 
 	var foundHighBlockID bool
 	var foundLowBlockNum bool
-	for _, oneBlock := range longestChain {
+	for _, oneBlock := range irreversibleBlocks {
 		if oneBlock.Num == req.LowBlockNum {
 			foundLowBlockNum = true
 		}
@@ -81,8 +73,7 @@ func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_Pre
 		return err
 	}
 
-	oneBlockFiles := m.bundler.ToBundle(highestBlock.Num)
-	for _, oneBlock := range oneBlockFiles {
+	for _, oneBlock := range irreversibleBlocks {
 		if oneBlock.Num < req.LowBlockNum {
 			continue
 		}

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bundle
+package merger
 
 import (
 	"context"
@@ -37,8 +37,17 @@ type OneBlockFile struct {
 	InnerLibNum   *uint64 //never use this field directly
 	PreviousID    string
 	MemoizeData   []byte
-	Merged        bool
 	Deleted       bool
+}
+
+// ToBstreamBlock is used to create a dummy "empty" block to use in a bstream.ForkableHandler
+func (f *OneBlockFile) ToBstreamBlock() *bstream.Block {
+	return &bstream.Block{
+		Id:         f.ID,
+		Number:     f.Num,
+		PreviousId: f.PreviousID,
+		Timestamp:  f.BlockTime,
+	}
 }
 
 func (f *OneBlockFile) String() string {
@@ -46,6 +55,7 @@ func (f *OneBlockFile) String() string {
 }
 
 func NewOneBlockFile(fileName string) (*OneBlockFile, error) {
+	_ = &bstream.Block{}
 	blockNum, blockTime, blockID, previousBlockID, libNum, canonicalName, err := ParseFilename(fileName)
 	if err != nil {
 		return nil, err
@@ -69,12 +79,6 @@ func MustNewOneBlockFile(fileName string) *OneBlockFile {
 		panic(err)
 	}
 	return out
-}
-
-func MustNewMergedOneBlockFile(fileName string) *OneBlockFile {
-	oneBlockFile := MustNewOneBlockFile(fileName)
-	oneBlockFile.Merged = true
-	return oneBlockFile
 }
 
 func (f *OneBlockFile) Data(ctx context.Context, oneBlockDownloader oneBlockDownloaderFunc) ([]byte, error) {

@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/merger/bundle"
+	"github.com/streamingfast/merger"
 )
 
-func parseFilenames(in []string, upTo uint64) map[string]*bundle.OneBlockFile {
-	out := make(map[string]*bundle.OneBlockFile)
+func parseFilenames(in []string, upTo uint64) map[string]*merger.OneBlockFile {
+	out := make(map[string]*merger.OneBlockFile)
 	for _, f := range in {
-		obf, err := bundle.NewOneBlockFile(f)
+		obf, err := merger.NewOneBlockFile(f)
 		if err != nil {
 			continue
 		}
@@ -24,18 +24,18 @@ func parseFilenames(in []string, upTo uint64) map[string]*bundle.OneBlockFile {
 
 type resolver struct {
 	// FIXME add context ...
-	mergedBlockFilesGetter func(base uint64) (map[string]*bundle.OneBlockFile, error)
-	oneBlockFilesGetter    func(upTo uint64) map[string]*bundle.OneBlockFile
+	mergedBlockFilesGetter func(base uint64) (map[string]*merger.OneBlockFile, error)
+	oneBlockFilesGetter    func(upTo uint64) map[string]*merger.OneBlockFile
 
-	// func (s *DStoreIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*bundle.OneBlockFile, error) {
+	// func (s *DStoreIO) FetchMergedOneBlockFiles(lowBlockNum uint64) ([]*merger.OneBlockFile, error) {
 	// function to get the list... already have that somewhere in merger
 }
 
-func (r *resolver) download(file *bundle.OneBlockFile) bstream.BlockRef {
+func (r *resolver) download(file *merger.OneBlockFile) bstream.BlockRef {
 	return bstream.NewBlockRef(file.ID, file.Num) //FIXME need to add the block file downloader
 }
 
-func (r *resolver) loadPreviousMergedBlocks(base uint64, blocks map[string]*bundle.OneBlockFile) error {
+func (r *resolver) loadPreviousMergedBlocks(base uint64, blocks map[string]*merger.OneBlockFile) error {
 	loadedBlocks, err := r.mergedBlockFilesGetter(base)
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func (r *resolver) resolve(block bstream.BlockRef, lib bstream.BlockRef) (undoBl
 	if err != nil {
 		return nil, 0, err
 	}
-	nextID := bundle.TruncateBlockID(block.ID())
+	nextID := merger.TruncateBlockID(block.ID())
 	oneBlocks := r.oneBlockFilesGetter(block.Num())
 
 	for {

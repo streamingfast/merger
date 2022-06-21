@@ -2,80 +2,51 @@
 
 ## OneBlock files naming
 
-{TIMESTAMP}-{BLOCKNUM}-{BLOCKIDSUFFIX}-{PREVIOUSIDSUFFIX}.json.gz
+{TIMESTAMP}-{BLOCKNUM}-{BLOCKIDSUFFIX}-{PREVIOUSIDSUFFIX}-{SOURCEID}.json.gz
 
 * TIMESTAMP: YYYYMMDDThhmmss.{0|5} where 0 and 5 are the possible values for 500-millisecond increments..
 * BLOCKNUM: 0-padded block number
 * BLOCKIDSUFFIX: [:8] from block ID
-* PREVIOUSIDSUFFIX: [:8] previous_id for block
+* PREVIOUSIDSUFFIX: [:8] previousId for block
+* SOURCEID: freeform string to identify who wrote the file. This is useful if you want multiple extractors writing to the same one-block-file store without concurrency issues. It is not part of the canonical form of the one-block-file.
 
 Example:
-* 20170701T122141.0-0000000100-24a07267-e5914b39.json.gz
-* 20170701T122141.5-0000000101-dbda3f44-09f6d693.json.gz
+* 20170701T122141.0-0000000100-24a07267-e5914b39-extractor-0.json.gz
+* 20170701T122141.5-0000000101-dbda3f44-09f6d693-myhostname134.json.gz
 
  fmt.Sprintf("%s.%01d", t.Format("20060102T150405"), t.Nanosecond()/100000000)
-
-## Merger structure
-
-* chunkSize == 100
-* currentBaseBlockNum uint32
-* currentBaseBlockTime time.Time
-* fileList map[string]OneBlockFile
-* wg //parallel wg for downloading...
-* nextBaseBlockIDSuffix [8]string
-* nextBaseBlockTime time.Time
-* nextBaseBlockFoundAt time.Time // we set this to Now() when we find the nextBaseBlock and its nextBaseBlockTime
-
-OneBlockFile struct{
-  name string
-  blk hlog.*Block
-}
 
 ## REAL-TIME
 
 ### init
-1) list the 100blocks files, keeping map
-2) go through every 100blocks segment from 0 to figure out if 100blocks segment is missing
-3) determine the base block number where to start
+1) List merged files from the first-streamable-block, until a "hole" is found, 
+2) set this as the start-block 
+
+ex: 
+* first-streamable-block == 12340
+* existing merged files: 12300, 12400, 12900
+* the start-block will be set to 12500
 
 ### processing loop
 
-#### 1. polling
-A) Do we have currentBaseBlockTime known ?
-* poll storage (every ... 10 seconds ?) for all one-block-file, send each filename in Triage() func
+#### 1. Polling the one-block-files to feed the Forkable Handler
+* List one-block-files and decode their fields based on the filenames only
+* skip any one-block-file that is < start-block
+* Send these one-block-files in a "Forkable Handler"
 
-B) else (merger was just started...):
-* poll storage for a one-block-file called: `blockNum-*.json.gz`
-  Set the currentBaseBlockTime to the earliest timestamp for that blocknum and continue to next loop
+#### 2. Accumulating irreversible (final) blocks
 
-#### 2. Triage each file from GS
-Triage checks:
-  if (
-  * filename.blockNum < currentBaseBlockNum + chunkSize
-  * filename.blockTime >= currentBaseBlockTime
-  ) --> start downloading that file (go func) and put it in map for inclusion
+* When there are enough linkable one-blocks, the Forkable Handler will let the "irreversible blocks" through, feeding the Bundler one by one in a linear fashion (there should not be any hole there)
+* When a one-block object comes through, its payload is read from the store (async, waitGroup()) so it is ready for the next step
+ 
+#### 3. Merging
 
-  if (
-  * filename.blockNum == currentBaseBlockNum
-  ) -> set the nextBaseBlockTime to the lowest value you can find here
-    -> set nextBaseBlockFoundAt to Now() when you replace this with a lower value.
+* When the Bundler receives an irreversible block that passes a boundary (ex: while loading bundle 100-199, we see the block 205)
+* It waits for the one-block reading waitgroup
+* It writes the merged file
+* It deletes the one-block-files that were merged (the final/canonical ones) -- leaving only the forked blocks in the one-block-store
+* It deletes any very old one-block-files (based on timestamp and max-forked-blocks-age
 
-#### 3. check if we must proceed with merging
-* if nextBaseBlockTime != 0 && Now() && we can crawl a whole sequence from the last block up to the first blocknum > nextBaseBlockFoundAt + 25 seconds, do the merging. If not, back in the loop.
+### Providing unmerged blocks through GRPC 
 
-#### 4. Do the merge
-* wg.Wait() to finish the downloads,
-* remove the file sin the map which are => nextBaseBlockTime (there may be some files if that value changed...)
-* order all the files in the map by blocktime and write their content in a jsonl 100blocks file on disk (blocks at equal blocktime can be written in whatever order...)
-* upload that 100blocks file
-* delete the files in the map from Google Storage
-* reset your Merger's values and make currentBaseBlockNum=currentBaseBlockNum+chunkSize, currentBaseBlockTime=nextBaseBlockTime
-
-
-## REPLAY
-
-note: mindreader writes 1block files to a local folder on the same pod (shared by 2 containers...)
-
-same thing as real-time, except:
-1) "init" will simply take the startBlockNum instead of finding it from the list of 100blocks file on destination
-2) "process.4.merge" will download a 100blocks file from destination and add all those blocks in the filelist map
+* On request, the merger can send the accumulated irreversible blocks in the bundler through GRPC

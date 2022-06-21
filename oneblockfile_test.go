@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package bundle
+package merger
 
 import (
 	"fmt"
-	"github.com/streamingfast/bstream"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/streamingfast/bstream"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,9 +32,9 @@ func TestOneBlockFile_MustNewOneBlockFile_Panics(t *testing.T) {
 	_ = MustNewOneBlockFile(name)
 }
 
-func TestOneBlockFile_MustNewMergedOneBlockFile(t *testing.T) {
+func TestOneBlockFile_MustNewOneBlockFile(t *testing.T) {
 	name := "0000000100-20210728T105016.01-00000100a-00000099a-90-suffix"
-	obf := MustNewMergedOneBlockFile(name)
+	obf := MustNewOneBlockFile(name)
 	require.IsType(t, OneBlockFile{}, *obf)
 	require.Equal(t, obf.CanonicalName, strings.Split(name, "-suffix")[0])
 }

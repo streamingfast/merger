@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/merger/bundle"
+	"github.com/streamingfast/merger"
 	"github.com/test-go/testify/assert"
 	"github.com/test-go/testify/require"
 )
@@ -17,7 +17,7 @@ func TestResolve(t *testing.T) {
 	cases := []struct {
 		name              string
 		oneBlockFiles     []string
-		mergedBlocksFiles map[uint64]map[string]*bundle.OneBlockFile
+		mergedBlocksFiles map[uint64]map[string]*merger.OneBlockFile
 		block             bstream.BlockRef
 		lib               bstream.BlockRef
 		expectUndoBlocks  []bstream.BlockRef
@@ -30,7 +30,7 @@ func TestResolve(t *testing.T) {
 				"0000000102-20210728T105016.0-0000102b-0000101a-100-suffix",
 				"0000000103-20210728T105016.0-0000103b-0000102b-100-suffix",
 			},
-			mergedBlocksFiles: map[uint64]map[string]*bundle.OneBlockFile{
+			mergedBlocksFiles: map[uint64]map[string]*merger.OneBlockFile{
 				100: parseFilenames([]string{
 					"0000000100-20210728T105016.0-0000100a-0000099a-90-suffix",
 					"0000000101-20210728T105016.0-0000101a-0000100a-100-suffix",
@@ -50,7 +50,7 @@ func TestResolve(t *testing.T) {
 				"0000000102-20210728T105016.0-0000102b-0000101a-100-suffix",
 				"0000000103-20210728T105016.0-0000103b-0000102b-100-suffix",
 			},
-			mergedBlocksFiles: map[uint64]map[string]*bundle.OneBlockFile{
+			mergedBlocksFiles: map[uint64]map[string]*merger.OneBlockFile{
 				100: parseFilenames([]string{
 					"0000000100-20210728T105016.0-0000100a-0000099a-90-suffix",
 					"0000000101-20210728T105016.0-0000101a-0000100a-100-suffix",
@@ -73,7 +73,7 @@ func TestResolve(t *testing.T) {
 				"0000000201-20210728T115016.0-0000201b-0000106b-104-suffix",
 				"0000000202-20210728T115016.0-0000202b-0000201b-104-suffix",
 			},
-			mergedBlocksFiles: map[uint64]map[string]*bundle.OneBlockFile{
+			mergedBlocksFiles: map[uint64]map[string]*merger.OneBlockFile{
 				100: parseFilenames([]string{
 					"0000000100-20210728T105016.0-0000100a-0000099a-90-suffix",
 					"0000000101-20210728T105016.0-0000101a-0000100a-100-suffix",
@@ -107,7 +107,7 @@ func TestResolve(t *testing.T) {
 				"0000000102-20210728T105016.0-0000102b-0000101a-100-suffix",
 				"0000000103-20210728T105016.0-0000103b-0000102b-100-suffix",
 			},
-			mergedBlocksFiles: map[uint64]map[string]*bundle.OneBlockFile{
+			mergedBlocksFiles: map[uint64]map[string]*merger.OneBlockFile{
 				100: parseFilenames([]string{
 					"0000000100-20210728T105016.0-0000100a-0000099a-90-suffix",
 					"0000000101-20210728T105016.0-0000101a-0000100a-100-suffix",
@@ -127,7 +127,7 @@ func TestResolve(t *testing.T) {
 				"0000000103-20210728T105016.0-0000103b-0000102b-100-suffix",
 				"0000000203-20210728T105016.0-0000203b-0000103b-100-suffix",
 			},
-			mergedBlocksFiles: map[uint64]map[string]*bundle.OneBlockFile{
+			mergedBlocksFiles: map[uint64]map[string]*merger.OneBlockFile{
 				200: parseFilenames([]string{
 					"0000000203-20210728T105016.0-0000203a-0000103a-100-suffix",
 				}, 299),
@@ -141,13 +141,13 @@ func TestResolve(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 
-			var getBlocksFromMerged = func(base uint64) (map[string]*bundle.OneBlockFile, error) {
+			var getBlocksFromMerged = func(base uint64) (map[string]*merger.OneBlockFile, error) {
 				if c.mergedBlocksFiles[base] == nil {
 					return nil, fmt.Errorf("file not found")
 				}
 				return c.mergedBlocksFiles[base], nil
 			}
-			var getOneBlocks = func(upto uint64) map[string]*bundle.OneBlockFile {
+			var getOneBlocks = func(upto uint64) map[string]*merger.OneBlockFile {
 				return parseFilenames(c.oneBlockFiles, upto)
 			}
 
