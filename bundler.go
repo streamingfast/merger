@@ -67,7 +67,7 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 		forkable.WithFilters(bstream.StepIrreversible),
 	}
 	if lib != nil {
-		options = append(options, forkable.WithExclusiveLIB(lib))
+		options = append(options, forkable.WithInclusiveLIB(lib))
 	}
 	b.forkable = forkable.New(b, options...)
 
@@ -78,6 +78,11 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 
 func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	obf := obj.(bstream.ObjectWrapper).WrappedObject().(*OneBlockFile)
+	if obf.Num < b.baseBlockNum {
+		// we may be receiving an inclusive LIB just before our bundle, ignore it
+		return nil
+	}
+
 	if obf.Num < b.baseBlockNum+b.bundleSize {
 		b.Lock()
 		b.irreversibleBlocks = append(b.irreversibleBlocks, obf)
