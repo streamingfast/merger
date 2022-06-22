@@ -78,8 +78,8 @@ func TestBundleReader_ReadByChunk(t *testing.T) {
 	assert.Equal(t, read, 1)
 	assert.Equal(t, r1, []byte{0x6})
 
-	read, err = r.Read(r1)
-	require.Error(t, io.EOF)
+	_, err = r.Read(r1)
+	require.Equal(t, io.EOF, err)
 }
 
 func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
@@ -89,7 +89,7 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
 	time.Sleep(1 * time.Millisecond)
 	return &OneBlockFile{
 		CanonicalName: fileName,
-		Filenames:     map[string]struct{}{fileName: Empty},
+		Filenames:     map[string]bool{fileName: true},
 		BlockTime:     time.Now(),
 		ID:            "",
 		Num:           0,

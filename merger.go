@@ -16,6 +16,7 @@ package merger
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/streamingfast/shutter"
@@ -62,37 +63,55 @@ func NewMerger(
 	}
 }
 
-func (m *Merger) Launch() {
+func (m *Merger) Run() {
 	m.logger.Info("starting merger")
-	m.startGRPCServer()
+
+	if err := m.startGRPCServer(); err != nil {
+		m.logger.Error("cannot start GRPC server", zap.Error(err))
+		m.Shutdown(err)
+		return
+	}
+
 	m.startOldFilesPruner()
 
-	m.Shutdown(m.launch())
-}
-
-func (m *Merger) startOldFilesPruner() {
-	for {
-		now := time.Now()
-		ctx := context.Background()
-
-		var toDelete []*OneBlockFile
-
-		lowestBlockUsedByBundler := m.bundler.BaseBlockNum()
-		m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *OneBlockFile) error {
-			if obf.Num < lowestBlockUsedByBundler && time.Since(obf.BlockTime) > m.maxBlockAgeBeforePruning {
-				toDelete = append(toDelete, obf)
-			}
-			return nil
-		})
-		m.io.DeleteAsync(toDelete)
-
-		if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
-			time.Sleep(m.timeBetweenPruning - spentTime)
-		}
+	if err := m.run(); err != nil {
+		m.logger.Error("merger returned error", zap.Error(err))
+		m.Shutdown(err)
+		return
 	}
 }
 
-func (m *Merger) launch() error {
+func (m *Merger) startOldFilesPruner() {
+	m.logger.Info("starting pruning of old files (delayed by time_between_pruning)",
+		zap.Duration("max_block_age_before_pruning", m.maxBlockAgeBeforePruning),
+		zap.Duration("time_between_pruning", m.timeBetweenPruning),
+	)
+
+	go func() {
+		time.Sleep(m.timeBetweenPruning) // do not start pruning immediately
+		for {
+			now := time.Now()
+			ctx := context.Background()
+
+			var toDelete []*OneBlockFile
+
+			lowestBlockUsedByBundler := m.bundler.BaseBlockNum()
+			m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *OneBlockFile) error {
+				if obf.Num < lowestBlockUsedByBundler && time.Since(obf.BlockTime) > m.maxBlockAgeBeforePruning {
+					toDelete = append(toDelete, obf)
+				}
+				return nil
+			})
+			m.io.DeleteAsync(toDelete)
+
+			if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
+				time.Sleep(m.timeBetweenPruning - spentTime)
+			}
+		}
+	}()
+}
+
+func (m *Merger) run() error {
 
 	ctx := context.Background()
 
@@ -104,7 +123,11 @@ func (m *Merger) launch() error {
 
 		base, lib, err := m.io.NextBundle(ctx, m.bundler.baseBlockNum)
 		if err != nil {
-			return err
+			if errors.Is(err, ErrHoleFound) {
+				m.logger.Warn("found hole in merged files", zap.Error(err))
+			} else {
+				return err
+			}
 		}
 
 		if base > m.bundler.baseBlockNum {
@@ -115,11 +138,12 @@ func (m *Merger) launch() error {
 			if lib != nil {
 				logFields = append(logFields, zap.Stringer("lib", lib))
 			}
-			m.logger.Debug("resetting bundler base block num", logFields...)
+			m.logger.Info("resetting bundler base block num", logFields...)
 			m.bundler.Reset(base, lib)
 		}
 
 		m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *OneBlockFile) error {
+			m.logger.Debug("processing block", zap.Stringer("obf", obf))
 			return m.bundler.HandleBlockFile(obf)
 		})
 

@@ -14,14 +14,13 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-func (m *Merger) startGRPCServer() {
-	gs := dgrpc.NewServer()
+func (m *Merger) startGRPCServer() error {
+	gs := dgrpc.NewGRPCServer()
 	m.logger.Info("grpc server created")
 
 	lis, err := net.Listen("tcp", m.grpcListenAddr)
 	if err != nil {
-		m.Shutdown(fmt.Errorf("failed listening grpc %q: %w", m.grpcListenAddr, err))
-		return
+		return fmt.Errorf("failed listening grpc %q: %w", m.grpcListenAddr, err)
 	}
 	m.logger.Info("tcp listener created")
 	m.OnTerminated(func(_ error) {
@@ -38,6 +37,7 @@ func (m *Merger) startGRPCServer() {
 			return
 		}
 	}()
+	return nil
 }
 
 func (m *Merger) PreMergedBlocks(req *pbmerge.Request, server pbmerge.Merger_PreMergedBlocksServer) error {

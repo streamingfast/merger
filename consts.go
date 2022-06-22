@@ -20,3 +20,5 @@ var ListFilesTimeout = 10 * time.Minute
 var WriteObjectTimeout = 5 * time.Minute
 var GetObjectTimeout = 5 * time.Minute
 var DeleteObjectTimeout = 5 * time.Minute
+
+const ParallelOneBlockDownload = 2

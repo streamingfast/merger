@@ -94,7 +94,7 @@ func (a *App) Run() error {
 	a.OnTerminating(m.Shutdown)
 	m.OnTerminated(a.Shutdown)
 
-	go m.Launch()
+	go m.Run()
 
 	zlog.Info("merger running")
 	return nil

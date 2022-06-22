@@ -20,6 +20,7 @@ import (
 	pbhealth "google.golang.org/grpc/health/grpc_health_v1"
 )
 
+// Check is basic GRPC Healthcheck
 func (m *Merger) Check(ctx context.Context, in *pbhealth.HealthCheckRequest) (*pbhealth.HealthCheckResponse, error) {
 	status := pbhealth.HealthCheckResponse_SERVING
 	return &pbhealth.HealthCheckResponse{
@@ -27,6 +28,7 @@ func (m *Merger) Check(ctx context.Context, in *pbhealth.HealthCheckRequest) (*p
 	}, nil
 }
 
+// Watch is basic GRPC Healthcheck as a stream
 func (m *Merger) Watch(req *pbhealth.HealthCheckRequest, stream pbhealth.Health_WatchServer) error {
 	err := stream.Send(&pbhealth.HealthCheckResponse{
 		Status: pbhealth.HealthCheckResponse_SERVING,

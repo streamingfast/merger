@@ -5,10 +5,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-
-### BREAKING CHANGE
+### BREAKING CHANGES: https://github.com/streamingfast/bstream/issues/22
 * Merger now only writes irreversible blocks in merged blocks
+* Merger keeps the non-canonical one-block-files (forked blocks) until `MaxForkedBlockAgeBeforePruning` is passed, doing a pass at most once every `TimeBetweenPruning`
+* Main loop will run at most once every `TimeBetweenPolling`
 
+## [v0.0.2]
 ### Changed
 * Merger now deletes one-block-files that it has seen before exactly like the ones that are passed MaxFixableFork, based on DeleteBlocksBefore
 * 'Live' option now changed to 'BatchMode' with the inverse behavior (for consistency with our other projects)

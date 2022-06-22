@@ -1,24 +1,8 @@
 # DESIGN
 
-## OneBlock files naming
-
-{TIMESTAMP}-{BLOCKNUM}-{BLOCKIDSUFFIX}-{PREVIOUSIDSUFFIX}-{SOURCEID}.json.gz
-
-* TIMESTAMP: YYYYMMDDThhmmss.{0|5} where 0 and 5 are the possible values for 500-millisecond increments..
-* BLOCKNUM: 0-padded block number
-* BLOCKIDSUFFIX: [:8] from block ID
-* PREVIOUSIDSUFFIX: [:8] previousId for block
-* SOURCEID: freeform string to identify who wrote the file. This is useful if you want multiple extractors writing to the same one-block-file store without concurrency issues. It is not part of the canonical form of the one-block-file.
-
-Example:
-* 20170701T122141.0-0000000100-24a07267-e5914b39-extractor-0.json.gz
-* 20170701T122141.5-0000000101-dbda3f44-09f6d693-myhostname134.json.gz
-
- fmt.Sprintf("%s.%01d", t.Format("20060102T150405"), t.Nanosecond()/100000000)
-
 ## REAL-TIME
 
-### init
+### On initialization
 1) List merged files from the first-streamable-block, until a "hole" is found, 
 2) set this as the start-block 
 
@@ -50,3 +34,21 @@ ex:
 ### Providing unmerged blocks through GRPC 
 
 * On request, the merger can send the accumulated irreversible blocks in the bundler through GRPC
+
+## OneBlock files naming
+
+{TIMESTAMP}-{BLOCKNUM}-{BLOCKIDSUFFIX}-{PREVIOUSIDSUFFIX}-{SOURCEID}.json.gz
+
+* TIMESTAMP: YYYYMMDDThhmmss.{0|5} where 0 and 5 are the possible values for 500-millisecond increments..
+* BLOCKNUM: 0-padded block number
+* BLOCKIDSUFFIX: [:8] from block ID
+* PREVIOUSIDSUFFIX: [:8] previousId for block
+* SOURCEID: freeform string to identify who wrote the file. This is useful if you want multiple extractors writing to the same one-block-file store without concurrency issues. It is not part of the canonical form of the one-block-file.
+
+Example:
+* 20170701T122141.0-0000000100-24a07267-e5914b39-extractor-0.json.gz
+* 20170701T122141.5-0000000101-dbda3f44-09f6d693-myhostname134.json.gz
+
+ fmt.Sprintf("%s.%01d", t.Format("20060102T150405"), t.Nanosecond()/100000000)
+
+

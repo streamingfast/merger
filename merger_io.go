@@ -3,6 +3,7 @@ package merger
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,6 +17,8 @@ import (
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
+
+var ErrHoleFound = errors.New("hole found in merged files")
 
 type IOInterface interface {
 
@@ -43,8 +46,7 @@ type DStoreIO struct {
 	retryAttempts int
 	retryCooldown time.Duration
 
-	lowestPossibleBlock uint64
-	bundleSize          uint64
+	bundleSize uint64
 
 	logger *zap.Logger
 	tracer logging.Tracer
@@ -174,7 +176,7 @@ func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outB
 		}
 
 		if num != outBaseBlock {
-			return fmt.Errorf("merged blocks skip from %d to %d, you have a hole in your merged block files and need to reprocess or set firstStreamableBlock above this hole", outBaseBlock, num)
+			return fmt.Errorf("%w: merged blocks skip from %d to %d, you need to fill this hole, set firstStreamableBlock above this hole or set merger option to ignore holes", ErrHoleFound, outBaseBlock, num)
 		}
 		outBaseBlock += s.bundleSize
 		lastFound = &num
@@ -182,13 +184,17 @@ func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outB
 	})
 
 	if lastFound != nil {
-		lib, err = s.readLastBlock(ctx, *lastFound)
+		last, err := s.readLastBlockFromMerged(ctx, *lastFound)
+		if err != nil {
+			return 0, nil, err
+		}
+		lib = last
 	}
 
 	return
 }
 
-func (s *DStoreIO) readLastBlock(ctx context.Context, baseBlock uint64) (bstream.BlockRef, error) {
+func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64) (bstream.BlockRef, error) {
 	subCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
 	defer cancel()
 	reader, err := s.mergedBlocksStore.OpenObject(subCtx, fileNameForBlocksBundle(baseBlock))
@@ -199,7 +205,8 @@ func (s *DStoreIO) readLastBlock(ctx context.Context, baseBlock uint64) (bstream
 	if err != nil {
 		return nil, err
 	}
-	return last.AsRef(), nil
+	// we truncate the block ID to have the short version that we get on oneBlockFiles
+	return bstream.NewBlockRef(TruncateBlockID(last.Id), last.Number), nil
 }
 
 func (s *DStoreIO) DeleteAsync(oneBlockFiles []*OneBlockFile) {
@@ -236,15 +243,15 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*OneBlockFile) {
 			fileNames = append(fileNames, filename)
 		}
 	}
-	od.logger.Info("deleting files that are too old or already seen", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
+	od.logger.Info("deleting a bunch of files", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
 
-	deletable := make(map[string]struct{})
+	deletable := make(map[string]bool)
 
 	// dedupe processing queue
 	for empty := false; !empty; {
 		select {
 		case f := <-od.toProcess:
-			deletable[f] = Empty
+			deletable[f] = true
 		default:
 			empty = true
 		}
@@ -257,7 +264,7 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*OneBlockFile) {
 		if _, exists := deletable[file]; !exists {
 			od.toProcess <- file
 		}
-		deletable[file] = Empty
+		deletable[file] = true
 	}
 }
 

@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 The merger process is responsible for accumulating blocks from all
-forks visible by the pool of instrumented nodes, and builds the famoux
+forks visible by the pool of instrumented nodes, and builds the famous
 100-blocks files consumed by `bstream`'s _FileSource_ and may other
 StreamingFast processes.
 
@@ -12,11 +12,9 @@ StreamingFast processes.
 
 See the different protocol-specific `StreamingFast` binaries at https://github.com/streamingfast/streamingfast#protocols
 
-Current implementations:
+## Design
 
-* [**StreamingFast for EOSIO**](https://github.com/streamingfast/sf-eosio)
-* **Ethereum on StreamingFast**, soon to be open sourced
-
+See [DESIGN](DESIGN)
 
 ## Contributing
 

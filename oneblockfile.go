@@ -26,11 +26,11 @@ import (
 
 type oneBlockDownloaderFunc = func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)
 
-var Empty struct{}
-
+// OneBlockFile is the representation of a single block inside one or more duplicate files, before they are merged
+// It has a truncated ID
 type OneBlockFile struct {
 	CanonicalName string
-	Filenames     map[string]struct{}
+	Filenames     map[string]bool
 	BlockTime     time.Time
 	ID            string
 	Num           uint64
@@ -42,12 +42,17 @@ type OneBlockFile struct {
 
 // ToBstreamBlock is used to create a dummy "empty" block to use in a bstream.ForkableHandler
 func (f *OneBlockFile) ToBstreamBlock() *bstream.Block {
-	return &bstream.Block{
+	blk := &bstream.Block{
 		Id:         f.ID,
 		Number:     f.Num,
 		PreviousId: f.PreviousID,
 		Timestamp:  f.BlockTime,
 	}
+
+	if f.InnerLibNum != nil {
+		blk.LibNum = *f.InnerLibNum
+	}
+	return blk
 }
 
 func (f *OneBlockFile) String() string {
@@ -62,8 +67,8 @@ func NewOneBlockFile(fileName string) (*OneBlockFile, error) {
 	}
 	return &OneBlockFile{
 		CanonicalName: canonicalName,
-		Filenames: map[string]struct{}{
-			fileName: Empty,
+		Filenames: map[string]bool{
+			fileName: true,
 		},
 		BlockTime:   blockTime,
 		ID:          blockID,
