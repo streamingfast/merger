@@ -19,6 +19,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/shutter"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -93,10 +94,10 @@ func (m *Merger) startOldFilesPruner() {
 			now := time.Now()
 			ctx := context.Background()
 
-			var toDelete []*OneBlockFile
+			var toDelete []*bstream.OneBlockFile
 
 			lowestBlockUsedByBundler := m.bundler.BaseBlockNum()
-			m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *OneBlockFile) error {
+			m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *bstream.OneBlockFile) error {
 				if obf.Num < lowestBlockUsedByBundler && time.Since(obf.BlockTime) > m.maxBlockAgeBeforePruning {
 					toDelete = append(toDelete, obf)
 				}
@@ -142,7 +143,7 @@ func (m *Merger) run() error {
 			m.bundler.Reset(base, lib)
 		}
 
-		m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *OneBlockFile) error {
+		m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
 			m.logger.Debug("processing block", zap.Stringer("obf", obf))
 			return m.bundler.HandleBlockFile(obf)
 		})

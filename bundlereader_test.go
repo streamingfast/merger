@@ -82,12 +82,12 @@ func TestBundleReader_ReadByChunk(t *testing.T) {
 	require.Equal(t, io.EOF, err)
 }
 
-func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
+func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *bstream.OneBlockFile {
 	t.Helper()
 	data, err := ioutil.ReadFile(path.Join("test_data", fileName))
 	require.NoError(t, err)
 	time.Sleep(1 * time.Millisecond)
-	return &OneBlockFile{
+	return &bstream.OneBlockFile{
 		CanonicalName: fileName,
 		Filenames:     map[string]bool{fileName: true},
 		BlockTime:     time.Now(),
@@ -98,53 +98,53 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *OneBlockFile {
 	}
 }
 
-func NewTestBundle() []*OneBlockFile {
+func NewTestBundle() []*bstream.OneBlockFile {
 	bstream.GetBlockWriterHeaderLen = 0
 
 	bt := time.Time{}
-	o1 := &OneBlockFile{
+	o1 := &bstream.OneBlockFile{
 		CanonicalName: "o1",
 		BlockTime:     bt,
 		MemoizeData:   []byte{0x1, 0x2},
 	}
-	o2 := &OneBlockFile{
+	o2 := &bstream.OneBlockFile{
 		CanonicalName: "o2",
 		BlockTime:     bt.Local().Add(1 * time.Second),
 		MemoizeData:   []byte{0x3, 0x4},
 	}
-	o3 := &OneBlockFile{
+	o3 := &bstream.OneBlockFile{
 		CanonicalName: "o3",
 		BlockTime:     bt.Local().Add(2 * time.Second),
 		MemoizeData:   []byte{0x5, 0x6},
 	}
-	return []*OneBlockFile{o1, o2, o3}
+	return []*bstream.OneBlockFile{o1, o2, o3}
 }
 
-func NewDownloadBundle() []*OneBlockFile {
+func NewDownloadBundle() []*bstream.OneBlockFile {
 	bt := time.Time{}
-	o1 := &OneBlockFile{
+	o1 := &bstream.OneBlockFile{
 		CanonicalName: "o1",
 		BlockTime:     bt,
 		MemoizeData:   []byte{},
 	}
-	o2 := &OneBlockFile{
+	o2 := &bstream.OneBlockFile{
 		CanonicalName: "o2",
 		BlockTime:     bt.Local().Add(1 * time.Second),
 		MemoizeData:   []byte{},
 	}
-	o3 := &OneBlockFile{
+	o3 := &bstream.OneBlockFile{
 		CanonicalName: "o3",
 		BlockTime:     bt.Local().Add(2 * time.Second),
 		MemoizeData:   []byte{},
 	}
-	return []*OneBlockFile{o1, o2, o3}
+	return []*bstream.OneBlockFile{o1, o2, o3}
 }
 
 func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 	//important
 	bstream.GetBlockWriterHeaderLen = 10
 
-	bundle := []*OneBlockFile{
+	bundle := []*bstream.OneBlockFile{
 		NewTestOneBlockFileFromFile(t, "0000000001-20150730T152628.0-13406cb6-b1cb8fa3.dbin"),
 		NewTestOneBlockFileFromFile(t, "0000000002-20150730T152657.0-044698c9-13406cb6.dbin"),
 		NewTestOneBlockFileFromFile(t, "0000000003-20150730T152728.0-a88cf741-044698c9.dbin"),
@@ -180,7 +180,7 @@ func TestBundleReader_Read_Then_Read_Block(t *testing.T) {
 func TestBundleReader_Read_DownloadOneBlockFileError(t *testing.T) {
 	bundle := NewDownloadBundle()
 
-	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 		return nil, fmt.Errorf("some error")
 	}
 
@@ -198,7 +198,7 @@ func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
 
 	bundle := NewDownloadBundle()
 
-	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 		return []byte{0xAB, 0xCD, 0xEF}, nil
 	}
 
@@ -214,7 +214,7 @@ func TestBundleReader_Read_DownloadOneBlockFileCorrupt(t *testing.T) {
 func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
 	bundle := NewDownloadBundle()
 
-	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 		return []byte{}, nil
 	}
 
@@ -230,7 +230,7 @@ func TestBundleReader_Read_DownloadOneBlockFileZeroLength(t *testing.T) {
 func TestBundleReader_Read_ReadBufferNotNil(t *testing.T) {
 	bundle := NewDownloadBundle()
 
-	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 		return nil, fmt.Errorf("some error")
 	}
 
@@ -246,12 +246,12 @@ func TestBundleReader_Read_ReadBufferNotNil(t *testing.T) {
 func TestBundleReader_Read_EmptyListOfOneBlockFiles(t *testing.T) {
 	bundle := NewDownloadBundle()
 
-	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+	downloadOneBlockFile := func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 		return nil, fmt.Errorf("some error")
 	}
 
 	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
-	r.oneBlockFiles = []*OneBlockFile{}
+	r.oneBlockFiles = []*bstream.OneBlockFile{}
 	r1 := make([]byte, 4)
 
 	read, err := r.Read(r1)

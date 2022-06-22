@@ -26,17 +26,17 @@ type IOInterface interface {
 	// If it finds an existing merged file at `lowestBaseBlock`, it will read the last one and include the lastIrreversibleBlock so you can bootstrap your forkdb from there
 	NextBundle(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error)
 
-	// WalkOneBlockFiels calls your function for each oneBlockFile it reads, starting at the inclusiveLowerBlock. Useful to feed a block source
-	WalkOneBlockFiles(ctx context.Context, inclusiveLowerBlock uint64, callback func(*OneBlockFile) error) error
+	// WalkOneBlockFiles calls your function for each oneBlockFile it reads, starting at the inclusiveLowerBlock. Useful to feed a block source
+	WalkOneBlockFiles(ctx context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error
 
 	// MergeAndStore writes a merged file from a list of oneBlockFiles
-	MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error)
+	MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error)
 
 	// DownloadOneBlockFile will get you the data from the file
-	DownloadOneBlockFile(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error)
+	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error)
 
 	// DeleteAsync should be able to delete large quantities of oneBlockFiles from storage without ever blocking
-	DeleteAsync(oneBlockFiles []*OneBlockFile)
+	DeleteAsync(oneBlockFiles []*bstream.OneBlockFile)
 }
 
 type DStoreIO struct {
@@ -78,7 +78,7 @@ func NewDStoreIO(
 	}
 }
 
-func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*OneBlockFile) (err error) {
+func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error) {
 	if len(oneBlockFiles) == 0 {
 		return
 	}
@@ -106,13 +106,13 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	return
 }
 
-func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, callback func(*OneBlockFile) error) error {
+func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, callback func(*bstream.OneBlockFile) error) error {
 
 	return s.oneBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBlock), func(filename string) error {
 		if strings.HasSuffix(filename, ".tmp") {
 			return nil
 		}
-		oneBlockFile := MustNewOneBlockFile(filename)
+		oneBlockFile := bstream.MustNewOneBlockFile(filename)
 
 		if oneBlockFile.InnerLibNum == nil {
 			data, err := oneBlockFile.Data(ctx, s.DownloadOneBlockFile)
@@ -140,7 +140,7 @@ func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, ca
 
 }
 
-func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *OneBlockFile) (data []byte, err error) {
+func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
 	for filename := range oneBlockFile.Filenames { // will try to get MemoizeData from any of those files
 		var out io.ReadCloser
 		out, err = s.oneBlocksStore.OpenObject(ctx, filename)
@@ -206,10 +206,10 @@ func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64
 		return nil, err
 	}
 	// we truncate the block ID to have the short version that we get on oneBlockFiles
-	return bstream.NewBlockRef(TruncateBlockID(last.Id), last.Number), nil
+	return bstream.NewBlockRef(bstream.TruncateBlockID(last.Id), last.Number), nil
 }
 
-func (s *DStoreIO) DeleteAsync(oneBlockFiles []*OneBlockFile) {
+func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) {
 	s.od.Delete(oneBlockFiles)
 }
 
@@ -229,7 +229,7 @@ func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
 	}
 }
 
-func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*OneBlockFile) {
+func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) {
 	od.Lock()
 	defer od.Unlock()
 

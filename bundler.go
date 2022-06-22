@@ -31,7 +31,7 @@ type Bundler struct {
 	baseBlockNum uint64
 	bundleSize   uint64
 
-	irreversibleBlocks []*OneBlockFile
+	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 }
 
@@ -52,13 +52,13 @@ func (b *Bundler) BaseBlockNum() uint64 {
 }
 
 // PreMergedBlocks can be called from a different thread
-func (b *Bundler) PreMergedBlocks() []*OneBlockFile {
+func (b *Bundler) PreMergedBlocks() []*bstream.OneBlockFile {
 	b.Lock()
 	defer b.Unlock()
 	return b.irreversibleBlocks
 }
 
-func (b *Bundler) HandleBlockFile(obf *OneBlockFile) error {
+func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
 	return b.forkable.ProcessBlock(obf.ToBstreamBlock(), obf) // forkable will call our own b.ProcessBlock() on irreversible blocks only
 }
 
@@ -77,7 +77,7 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 }
 
 func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
-	obf := obj.(bstream.ObjectWrapper).WrappedObject().(*OneBlockFile)
+	obf := obj.(bstream.ObjectWrapper).WrappedObject().(*bstream.OneBlockFile)
 	if obf.Num < b.baseBlockNum {
 		// we may be receiving an inclusive LIB just before our bundle, ignore it
 		return nil
@@ -96,7 +96,7 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 
 	b.io.DeleteAsync(b.irreversibleBlocks)
 	b.Lock()
-	b.irreversibleBlocks = []*OneBlockFile{obf}
+	b.irreversibleBlocks = []*bstream.OneBlockFile{obf}
 	b.baseBlockNum += b.bundleSize
 	b.Unlock()
 

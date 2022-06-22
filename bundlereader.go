@@ -30,7 +30,7 @@ type BundleReader struct {
 	ctx              context.Context
 	readBuffer       []byte
 	readBufferOffset int
-	oneBlockFiles    []*OneBlockFile
+	oneBlockFiles    []*bstream.OneBlockFile
 	headerPassed     bool
 
 	downloader      *dhammer.Nailer
@@ -39,7 +39,7 @@ type BundleReader struct {
 	logger *zap.Logger
 }
 
-func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tracer, oneBlockFiles []*OneBlockFile, oneBlockDownloader oneBlockDownloaderFunc) *BundleReader {
+func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tracer, oneBlockFiles []*bstream.OneBlockFile, oneBlockDownloader bstream.OneBlockDownloaderFunc) *BundleReader {
 	return &BundleReader{
 		ctx:           ctx,
 		oneBlockFiles: oneBlockFiles,
@@ -55,7 +55,7 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 			for _, oneBlockFile := range r.oneBlockFiles {
 				r.downloader.Push(r.ctx, oneBlockFile)
 			}
-			r.oneBlockFiles = []*OneBlockFile{}
+			r.oneBlockFiles = []*bstream.OneBlockFile{}
 			r.logger.Debug("finished queuing one block files to be read")
 			r.downloader.Close()
 		}()
@@ -103,9 +103,9 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 	return bytesRead, nil
 }
 
-func downloadOneBlockJob(logger *zap.Logger, tracer logging.Tracer, oneBlockDownloader oneBlockDownloaderFunc) dhammer.NailerFunc {
+func downloadOneBlockJob(logger *zap.Logger, tracer logging.Tracer, oneBlockDownloader bstream.OneBlockDownloaderFunc) dhammer.NailerFunc {
 	return func(ctx context.Context, in interface{}) (interface{}, error) {
-		oneBlockFile := in.(*OneBlockFile)
+		oneBlockFile := in.(*bstream.OneBlockFile)
 		if tracer.Enabled() {
 			logger.Debug("downloading one block file", zap.String("failename", oneBlockFile.CanonicalName))
 		}
