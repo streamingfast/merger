@@ -274,7 +274,11 @@ func (od *oneBlockFilesDeleter) processDeletions() {
 		err := Retry(od.logger, od.retryAttempts, od.retryCooldown, func() error {
 			ctx, cancel := context.WithTimeout(context.Background(), DeleteObjectTimeout)
 			defer cancel()
-			return od.store.DeleteObject(ctx, file)
+			err := od.store.DeleteObject(ctx, file)
+			if errors.Is(err, dstore.ErrNotFound) {
+				return nil
+			}
+			return err
 		})
 		if err != nil {
 			od.logger.Warn("cannot delete oneblock file after a few retries", zap.String("file", file), zap.Error(err))
