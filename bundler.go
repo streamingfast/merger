@@ -94,9 +94,11 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 		return err
 	}
 
-	b.io.DeleteAsync(b.irreversibleBlocks)
 	b.Lock()
-	b.irreversibleBlocks = []*bstream.OneBlockFile{obf}
+	// we keep the last block of the bundle, only deleting it on next merge, to facilitate joining to one-block-filled hub
+	lastBlock := b.irreversibleBlocks[len(b.irreversibleBlocks)-1]
+	b.io.DeleteAsync(b.irreversibleBlocks[:len(b.irreversibleBlocks)-1])
+	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
 	b.Unlock()
 
