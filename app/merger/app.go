@@ -35,9 +35,9 @@ type Config struct {
 	StorageMergedBlocksFilesPath string
 	GRPCListenAddr               string
 
-	MaxForkedBlockAgeBeforePruning time.Duration
-	TimeBetweenPruning             time.Duration
-	TimeBetweenPolling             time.Duration
+	PruneForkedBlocksAfter uint64
+	TimeBetweenPruning     time.Duration
+	TimeBetweenPolling     time.Duration
 }
 
 type App struct {
@@ -79,7 +79,7 @@ func (a *App) Run() error {
 		io,
 		bstream.GetProtocolFirstStreamableBlock,
 		bundleSize,
-		a.config.MaxForkedBlockAgeBeforePruning,
+		a.config.PruneForkedBlocksAfter,
 		a.config.TimeBetweenPruning,
 		a.config.TimeBetweenPolling,
 	)

@@ -17,7 +17,7 @@ func TestHealthz_Check(t *testing.T) {
 		nil,
 		1,
 		100,
-		time.Second,
+		100,
 		time.Second,
 		time.Second,
 	)

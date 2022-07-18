@@ -35,8 +35,8 @@ type Merger struct {
 
 	timeBetweenPolling time.Duration
 
-	timeBetweenPruning       time.Duration
-	maxBlockAgeBeforePruning time.Duration
+	timeBetweenPruning   time.Duration
+	pruningDistanceToLIB uint64
 
 	bundler *Bundler
 }
@@ -48,19 +48,19 @@ func NewMerger(
 
 	firstStreamableBlock uint64,
 	bundleSize uint64,
-	maxForkedBlockAgeBeforePruning time.Duration,
+	pruningDistanceToLIB uint64,
 	timeBetweenPruning time.Duration,
 	timeBetweenPolling time.Duration,
 ) *Merger {
 	return &Merger{
-		Shutter:                  shutter.New(),
-		bundler:                  NewBundler(firstStreamableBlock, bundleSize, io),
-		grpcListenAddr:           grpcListenAddr,
-		io:                       io,
-		maxBlockAgeBeforePruning: maxForkedBlockAgeBeforePruning,
-		timeBetweenPolling:       timeBetweenPolling,
-		timeBetweenPruning:       timeBetweenPruning,
-		logger:                   logger,
+		Shutter:              shutter.New(),
+		bundler:              NewBundler(firstStreamableBlock, bundleSize, io),
+		grpcListenAddr:       grpcListenAddr,
+		io:                   io,
+		pruningDistanceToLIB: pruningDistanceToLIB,
+		timeBetweenPolling:   timeBetweenPolling,
+		timeBetweenPruning:   timeBetweenPruning,
+		logger:               logger,
 	}
 }
 
@@ -84,21 +84,22 @@ func (m *Merger) Run() {
 
 func (m *Merger) startOldFilesPruner() {
 	m.logger.Info("starting pruning of old files (delayed by time_between_pruning)",
-		zap.Duration("max_block_age_before_pruning", m.maxBlockAgeBeforePruning),
+		zap.Uint64("pruning_distance_to_head", m.pruningDistanceToLIB),
 		zap.Duration("time_between_pruning", m.timeBetweenPruning),
 	)
 
 	go func() {
-		time.Sleep(m.timeBetweenPruning) // do not start pruning immediately
+		delay := m.timeBetweenPruning // do not start pruning immediately
 		for {
+			time.Sleep(delay)
 			now := time.Now()
 			ctx := context.Background()
 
 			var toDelete []*bstream.OneBlockFile
 
-			lowestBlockUsedByBundler := m.bundler.BaseBlockNum()
+			pruningTarget := m.pruningTarget()
 			m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *bstream.OneBlockFile) error {
-				if obf.Num < lowestBlockUsedByBundler && time.Since(obf.BlockTime) > m.maxBlockAgeBeforePruning {
+				if obf.Num < pruningTarget {
 					toDelete = append(toDelete, obf)
 				}
 				return nil
@@ -106,10 +107,19 @@ func (m *Merger) startOldFilesPruner() {
 			m.io.DeleteAsync(toDelete)
 
 			if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
-				time.Sleep(m.timeBetweenPruning - spentTime)
+				delay = m.timeBetweenPruning - spentTime
 			}
 		}
 	}()
+}
+
+func (m *Merger) pruningTarget() uint64 {
+	bundlerBase := m.bundler.BaseBlockNum()
+	if m.pruningDistanceToLIB > bundlerBase {
+		return 0
+	}
+
+	return bundlerBase - m.pruningDistanceToLIB
 }
 
 func (m *Merger) run() error {

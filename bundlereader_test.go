@@ -90,7 +90,6 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *bstream.OneBloc
 	return &bstream.OneBlockFile{
 		CanonicalName: fileName,
 		Filenames:     map[string]bool{fileName: true},
-		BlockTime:     time.Now(),
 		ID:            "",
 		Num:           0,
 		PreviousID:    "",
@@ -101,40 +100,32 @@ func NewTestOneBlockFileFromFile(t *testing.T, fileName string) *bstream.OneBloc
 func NewTestBundle() []*bstream.OneBlockFile {
 	bstream.GetBlockWriterHeaderLen = 0
 
-	bt := time.Time{}
 	o1 := &bstream.OneBlockFile{
 		CanonicalName: "o1",
-		BlockTime:     bt,
 		MemoizeData:   []byte{0x1, 0x2},
 	}
 	o2 := &bstream.OneBlockFile{
 		CanonicalName: "o2",
-		BlockTime:     bt.Local().Add(1 * time.Second),
 		MemoizeData:   []byte{0x3, 0x4},
 	}
 	o3 := &bstream.OneBlockFile{
 		CanonicalName: "o3",
-		BlockTime:     bt.Local().Add(2 * time.Second),
 		MemoizeData:   []byte{0x5, 0x6},
 	}
 	return []*bstream.OneBlockFile{o1, o2, o3}
 }
 
 func NewDownloadBundle() []*bstream.OneBlockFile {
-	bt := time.Time{}
 	o1 := &bstream.OneBlockFile{
 		CanonicalName: "o1",
-		BlockTime:     bt,
 		MemoizeData:   []byte{},
 	}
 	o2 := &bstream.OneBlockFile{
 		CanonicalName: "o2",
-		BlockTime:     bt.Local().Add(1 * time.Second),
 		MemoizeData:   []byte{},
 	}
 	o3 := &bstream.OneBlockFile{
 		CanonicalName: "o3",
-		BlockTime:     bt.Local().Add(2 * time.Second),
 		MemoizeData:   []byte{},
 	}
 	return []*bstream.OneBlockFile{o1, o2, o3}

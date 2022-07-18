@@ -1,7 +1,6 @@
 package merger
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -114,24 +113,6 @@ func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, ca
 		}
 		oneBlockFile := bstream.MustNewOneBlockFile(filename)
 
-		if oneBlockFile.InnerLibNum == nil {
-			data, err := oneBlockFile.Data(ctx, s.DownloadOneBlockFile)
-			if err != nil {
-				return fmt.Errorf("getting one block file data %q: %w", filename, err)
-			}
-
-			blockReader, err := bstream.GetBlockReaderFactory.New(bytes.NewReader(data))
-			if err != nil {
-				return fmt.Errorf("unable to read one block %q: %w", filename, err)
-			}
-
-			block, err := blockReader.Read()
-			if block == nil {
-				return err
-			}
-
-			oneBlockFile.InnerLibNum = &block.LibNum
-		}
 		if err := callback(oneBlockFile); err != nil {
 			return err
 		}
