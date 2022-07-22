@@ -52,7 +52,7 @@ func NewMerger(
 	timeBetweenPruning time.Duration,
 	timeBetweenPolling time.Duration,
 ) *Merger {
-	return &Merger{
+	m := &Merger{
 		Shutter:              shutter.New(),
 		bundler:              NewBundler(firstStreamableBlock, bundleSize, io),
 		grpcListenAddr:       grpcListenAddr,
@@ -62,6 +62,9 @@ func NewMerger(
 		timeBetweenPruning:   timeBetweenPruning,
 		logger:               logger,
 	}
+	m.OnTerminating(func(_ error) { m.bundler.inProcess.Wait() }) // finish bundles that may be merging in parallel
+
+	return m
 }
 
 func (m *Merger) Run() {

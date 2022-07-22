@@ -30,6 +30,8 @@ type Bundler struct {
 
 	baseBlockNum uint64
 	bundleSize   uint64
+	bundleError  chan error
+	inProcess    sync.WaitGroup
 
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
@@ -37,8 +39,9 @@ type Bundler struct {
 
 func NewBundler(startBlock, bundleSize uint64, io IOInterface) *Bundler {
 	b := &Bundler{
-		bundleSize: bundleSize,
-		io:         io,
+		bundleSize:  bundleSize,
+		io:          io,
+		bundleError: make(chan error, 1),
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
@@ -90,14 +93,26 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 		return nil
 	}
 
-	if err := b.io.MergeAndStore(context.Background(), b.baseBlockNum, b.irreversibleBlocks); err != nil {
+	select {
+	case err := <-b.bundleError:
 		return err
+	default:
 	}
+
+	b.inProcess.Add(1)
+	go func() {
+		defer b.inProcess.Done()
+		blocksToBundle := b.irreversibleBlocks
+		if err := b.io.MergeAndStore(context.Background(), b.baseBlockNum, blocksToBundle); err != nil {
+			b.bundleError <- err
+			return
+		}
+		b.io.DeleteAsync(blocksToBundle[:len(blocksToBundle)-1])
+	}()
 
 	b.Lock()
 	// we keep the last block of the bundle, only deleting it on next merge, to facilitate joining to one-block-filled hub
 	lastBlock := b.irreversibleBlocks[len(b.irreversibleBlocks)-1]
-	b.io.DeleteAsync(b.irreversibleBlocks[:len(b.irreversibleBlocks)-1])
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
 	b.Unlock()
