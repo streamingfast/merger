@@ -99,11 +99,12 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	default:
 	}
 
+	blocksToBundle := b.irreversibleBlocks
+	baseBlockNum := b.baseBlockNum
 	b.inProcess.Add(1)
 	go func() {
 		defer b.inProcess.Done()
-		blocksToBundle := b.irreversibleBlocks
-		if err := b.io.MergeAndStore(context.Background(), b.baseBlockNum, blocksToBundle); err != nil {
+		if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
 			b.bundleError <- err
 			return
 		}
