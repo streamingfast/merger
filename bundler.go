@@ -15,10 +15,13 @@
 package merger
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
+	"time"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
@@ -85,6 +88,19 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	b.Unlock()
 }
 
+func readBlockTime(data []byte) (time.Time, error) {
+	reader := bytes.NewReader(data)
+	blockReader, err := bstream.GetBlockReaderFactory.New(reader)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("unable to create block reader: %w", err)
+	}
+	blk, err := blockReader.Read()
+	if err != nil && err != io.EOF {
+		return time.Time{}, fmt.Errorf("block reader failed: %w", err)
+	}
+	return blk.Time(), nil
+}
+
 func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	obf := obj.(bstream.ObjectWrapper).WrappedObject().(*bstream.OneBlockFile)
 	if obf.Num < b.baseBlockNum {
@@ -96,6 +112,16 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 		b.Lock()
 		b.irreversibleBlocks = append(b.irreversibleBlocks, obf)
 		metrics.HeadBlockNumber.SetUint64(obf.Num)
+		go func() {
+			// this pre-downloads the data
+			data, err := obf.Data(context.Background(), b.io.DownloadOneBlockFile)
+			if err != nil {
+				return
+			}
+			// now that we have the data, might as well read the block time for metrics
+			time, err := readBlockTime(data)
+			metrics.HeadBlockTimeDrift.SetBlockTime(time)
+		}()
 		b.Unlock()
 		return nil
 	}

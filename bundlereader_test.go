@@ -242,7 +242,6 @@ func TestBundleReader_Read_EmptyListOfOneBlockFiles(t *testing.T) {
 	}
 
 	r := NewBundleReader(context.Background(), testLogger, testTracer, bundle, downloadOneBlockFile)
-	r.oneBlockFiles = []*bstream.OneBlockFile{}
 	r1 := make([]byte, 4)
 
 	read, err := r.Read(r1)

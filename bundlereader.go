@@ -18,10 +18,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/streamingfast/bstream"
-	"github.com/streamingfast/dhammer"
 	"github.com/streamingfast/logging"
 	"go.uber.org/zap"
 )
@@ -30,53 +28,54 @@ type BundleReader struct {
 	ctx              context.Context
 	readBuffer       []byte
 	readBufferOffset int
-	oneBlockFiles    []*bstream.OneBlockFile
 	headerPassed     bool
-
-	downloader      *dhammer.Nailer
-	startDownloader sync.Once
+	oneBlockDataChan chan []byte
+	errChan          chan error
 
 	logger *zap.Logger
 }
 
 func NewBundleReader(ctx context.Context, logger *zap.Logger, tracer logging.Tracer, oneBlockFiles []*bstream.OneBlockFile, oneBlockDownloader bstream.OneBlockDownloaderFunc) *BundleReader {
-	return &BundleReader{
-		ctx:           ctx,
-		oneBlockFiles: oneBlockFiles,
-		downloader:    dhammer.NewNailer(ParallelOneBlockDownload, downloadOneBlockJob(logger, tracer, oneBlockDownloader), dhammer.NailerLogger(logger), dhammer.NailerTracer(tracer)),
-		logger:        logger,
+	r := &BundleReader{
+		ctx:              ctx,
+		logger:           logger,
+		oneBlockDataChan: make(chan []byte, 1),
+		errChan:          make(chan error, 1),
+	}
+	go r.downloadAll(oneBlockFiles, oneBlockDownloader)
+	return r
+}
+
+// downloadAll does not work in parallel: for performance, the oneBlockFiles' data should already have been memoized by calling Data() on them.
+func (r *BundleReader) downloadAll(oneBlockFiles []*bstream.OneBlockFile, oneBlockDownloader bstream.OneBlockDownloaderFunc) {
+	defer close(r.oneBlockDataChan)
+	for _, oneBlockFile := range oneBlockFiles {
+		data, err := oneBlockFile.Data(r.ctx, oneBlockDownloader)
+		if err != nil {
+			r.errChan <- err
+			return
+		}
+		r.oneBlockDataChan <- data
 	}
 }
 
 func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
-	r.startDownloader.Do(func() {
-		r.downloader.Start(r.ctx)
-		go func() {
-			for _, oneBlockFile := range r.oneBlockFiles {
-				r.downloader.Push(r.ctx, oneBlockFile)
-			}
-			r.oneBlockFiles = []*bstream.OneBlockFile{}
-			r.logger.Debug("finished queuing one block files to be read")
-			r.downloader.Close()
-		}()
-	})
 
 	if r.readBuffer == nil {
-		// nothing in the buffer read the next one block that should be ready
-		if err := r.downloader.Err(); err != nil {
-			return 0, fmt.Errorf("parallel one block downloader failed: %w", err)
+
+		var data []byte
+		select {
+		case d, ok := <-r.oneBlockDataChan:
+			if !ok {
+				return 0, io.EOF
+			}
+			data = d
+		case err := <-r.errChan:
+			return 0, err
+		case <-r.ctx.Done():
+			return 0, nil
 		}
 
-		out, hasMore := <-r.downloader.Out
-		if !hasMore {
-			return 0, io.EOF
-		}
-
-		if err := r.downloader.Err(); err != nil {
-			return 0, fmt.Errorf("parallel one block downloader failed: %w", err)
-		}
-
-		data := out.([]byte)
 		if len(data) == 0 {
 			r.readBuffer = nil
 			return 0, fmt.Errorf("one-block-file corrupt: empty data")
@@ -101,18 +100,4 @@ func (r *BundleReader) Read(p []byte) (bytesRead int, err error) {
 	}
 
 	return bytesRead, nil
-}
-
-func downloadOneBlockJob(logger *zap.Logger, tracer logging.Tracer, oneBlockDownloader bstream.OneBlockDownloaderFunc) dhammer.NailerFunc {
-	return func(ctx context.Context, in interface{}) (interface{}, error) {
-		oneBlockFile := in.(*bstream.OneBlockFile)
-		if tracer.Enabled() {
-			logger.Debug("downloading one block file", zap.String("failename", oneBlockFile.CanonicalName))
-		}
-		data, err := oneBlockFile.Data(ctx, oneBlockDownloader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve oneblock %s file data: %w", oneBlockFile.CanonicalName, err)
-		}
-		return data, nil
-	}
 }

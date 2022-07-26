@@ -170,8 +170,7 @@ func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outB
 		if err != nil {
 			return 0, nil, err
 		}
-		_ = lastTime // FIXME: need to read blocktime from data when we download it
-		//metrics.HeadBlockTimeDrift.SetBlockTime(*lastTime)
+		metrics.HeadBlockTimeDrift.SetBlockTime(*lastTime)
 		metrics.HeadBlockNumber.SetUint64(last.Num())
 		lib = last
 	}

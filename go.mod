@@ -3,7 +3,7 @@ module github.com/streamingfast/merger
 go 1.16
 
 require (
-	github.com/streamingfast/bstream v0.0.2-0.20220718122956-ac9279114d50
+	github.com/streamingfast/bstream v0.0.2-0.20220726185619-d6283d1f1aea
 	github.com/streamingfast/dbin v0.0.0-20210809205249-73d5eca35dc5
 	github.com/streamingfast/dgrpc v0.0.0-20220301153539-536adf71b594
 	github.com/streamingfast/dhammer v0.0.0-20220506192416-3797a7906da2
