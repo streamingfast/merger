@@ -20,6 +20,7 @@ func TestHealthz_Check(t *testing.T) {
 		100,
 		time.Second,
 		time.Second,
+		0,
 	)
 	request := &pbhealth.HealthCheckRequest{}
 	resp, err := m.Check(ctx, request)

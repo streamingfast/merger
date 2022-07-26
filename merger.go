@@ -51,10 +51,11 @@ func NewMerger(
 	pruningDistanceToLIB uint64,
 	timeBetweenPruning time.Duration,
 	timeBetweenPolling time.Duration,
+	stopBlock uint64,
 ) *Merger {
 	m := &Merger{
 		Shutter:              shutter.New(),
-		bundler:              NewBundler(firstStreamableBlock, bundleSize, io),
+		bundler:              NewBundler(firstStreamableBlock, stopBlock, bundleSize, io),
 		grpcListenAddr:       grpcListenAddr,
 		io:                   io,
 		pruningDistanceToLIB: pruningDistanceToLIB,
@@ -78,11 +79,11 @@ func (m *Merger) Run() {
 
 	m.startOldFilesPruner()
 
-	if err := m.run(); err != nil {
+	err := m.run()
+	if err != nil {
 		m.logger.Error("merger returned error", zap.Error(err))
-		m.Shutdown(err)
-		return
 	}
+	m.Shutdown(err)
 }
 
 func (m *Merger) startOldFilesPruner() {
@@ -143,6 +144,12 @@ func (m *Merger) run() error {
 				return err
 			}
 		}
+		if m.bundler.stopBlock != 0 && base > m.bundler.stopBlock {
+			if err == ErrStopBlockReached {
+				m.logger.Info("stop block reached")
+				return nil
+			}
+		}
 
 		if base > m.bundler.baseBlockNum {
 			logFields := []zapcore.Field{
@@ -156,10 +163,17 @@ func (m *Merger) run() error {
 			m.bundler.Reset(base, lib)
 		}
 
-		m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
+		err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
 			m.logger.Debug("processing block", zap.Stringer("obf", obf))
 			return m.bundler.HandleBlockFile(obf)
 		})
+		if err != nil {
+			if err == ErrStopBlockReached {
+				m.logger.Info("stop block reached")
+				return nil
+			}
+			return err
+		}
 
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {
 			time.Sleep(m.timeBetweenPolling - spentTime)

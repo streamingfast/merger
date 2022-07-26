@@ -38,6 +38,7 @@ type Config struct {
 	PruneForkedBlocksAfter uint64
 	TimeBetweenPruning     time.Duration
 	TimeBetweenPolling     time.Duration
+	StopBlock              uint64
 }
 
 type App struct {
@@ -82,6 +83,7 @@ func (a *App) Run() error {
 		a.config.PruneForkedBlocksAfter,
 		a.config.TimeBetweenPruning,
 		a.config.TimeBetweenPolling,
+		a.config.StopBlock,
 	)
 	zlog.Info("merger initiated")
 

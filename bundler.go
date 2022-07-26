@@ -16,12 +16,15 @@ package merger
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
 )
+
+var ErrStopBlockReached = errors.New("stop block reached")
 
 type Bundler struct {
 	sync.Mutex
@@ -32,16 +35,18 @@ type Bundler struct {
 	bundleSize   uint64
 	bundleError  chan error
 	inProcess    sync.WaitGroup
+	stopBlock    uint64
 
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 }
 
-func NewBundler(startBlock, bundleSize uint64, io IOInterface) *Bundler {
+func NewBundler(startBlock, stopBlock, bundleSize uint64, io IOInterface) *Bundler {
 	b := &Bundler{
 		bundleSize:  bundleSize,
 		io:          io,
 		bundleError: make(chan error, 1),
+		stopBlock:   stopBlock,
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
@@ -117,6 +122,9 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
 	b.Unlock()
+	if b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock {
+		return ErrStopBlockReached
+	}
 
 	return nil
 }
