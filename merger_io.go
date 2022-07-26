@@ -14,6 +14,7 @@ import (
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/dstore"
 	"github.com/streamingfast/logging"
+	"github.com/streamingfast/merger/metrics"
 	"go.uber.org/zap"
 )
 
@@ -165,29 +166,32 @@ func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outB
 	})
 
 	if lastFound != nil {
-		last, err := s.readLastBlockFromMerged(ctx, *lastFound)
+		last, lastTime, err := s.readLastBlockFromMerged(ctx, *lastFound)
 		if err != nil {
 			return 0, nil, err
 		}
+		_ = lastTime // FIXME: need to read blocktime from data when we download it
+		//metrics.HeadBlockTimeDrift.SetBlockTime(*lastTime)
+		metrics.HeadBlockNumber.SetUint64(last.Num())
 		lib = last
 	}
 
 	return
 }
 
-func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64) (bstream.BlockRef, error) {
+func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64) (bstream.BlockRef, *time.Time, error) {
 	subCtx, cancel := context.WithTimeout(ctx, GetObjectTimeout)
 	defer cancel()
 	reader, err := s.mergedBlocksStore.OpenObject(subCtx, fileNameForBlocksBundle(baseBlock))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	last, err := lastBlock(reader)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// we truncate the block ID to have the short version that we get on oneBlockFiles
-	return bstream.NewBlockRef(bstream.TruncateBlockID(last.Id), last.Number), nil
+	return bstream.NewBlockRef(bstream.TruncateBlockID(last.Id), last.Number), &last.Timestamp, nil
 }
 
 func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) {

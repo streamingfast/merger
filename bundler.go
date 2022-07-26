@@ -22,6 +22,7 @@ import (
 
 	"github.com/streamingfast/bstream"
 	"github.com/streamingfast/bstream/forkable"
+	"github.com/streamingfast/merger/metrics"
 )
 
 var ErrStopBlockReached = errors.New("stop block reached")
@@ -94,6 +95,7 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	if obf.Num < b.baseBlockNum+b.bundleSize {
 		b.Lock()
 		b.irreversibleBlocks = append(b.irreversibleBlocks, obf)
+		metrics.HeadBlockNumber.SetUint64(obf.Num)
 		b.Unlock()
 		return nil
 	}
