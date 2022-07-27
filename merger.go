@@ -164,7 +164,6 @@ func (m *Merger) run() error {
 		}
 
 		err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
-			m.logger.Debug("processing block", zap.Stringer("obf", obf))
 			return m.bundler.HandleBlockFile(obf)
 		})
 		if err != nil {
