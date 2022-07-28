@@ -64,7 +64,7 @@ func NewDStoreIO(
 ) *DStoreIO {
 
 	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
-	od.Start(4, 10000)
+	od.Start(8, 10000)
 
 	return &DStoreIO{
 		oneBlocksStore:    oneBlocksStore,
@@ -227,9 +227,13 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) {
 			fileNames = append(fileNames, filename)
 		}
 	}
-	od.logger.Info("deleting a bunch of files", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
+	od.logger.Info("deleting a bunch of one_block_files", zap.Int("number_of_files", len(fileNames)), zap.String("first_file", fileNames[0]), zap.String("last_file", fileNames[len(fileNames)-1]))
 
 	deletable := make(map[string]bool)
+
+	for _, f := range fileNames {
+		deletable[f] = true
+	}
 
 	// dedupe processing queue
 	for empty := false; !empty; {
@@ -241,14 +245,12 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) {
 		}
 	}
 
-	for _, file := range fileNames {
+	for file := range deletable {
 		if len(od.toProcess) == cap(od.toProcess) {
+			od.logger.Warn("skipping file deletions: too channel is full", zap.Int("capacity", cap(od.toProcess)))
 			break
 		}
-		if _, exists := deletable[file]; !exists {
-			od.toProcess <- file
-		}
-		deletable[file] = true
+		od.toProcess <- file
 	}
 }
 
