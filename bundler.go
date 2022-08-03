@@ -167,7 +167,7 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 			return
 		}
 		b.io.MoveForkedBlocks(context.Background(), forkedBlocks)
-		b.io.DeleteAsync(blocksToBundle)
+		// we do not delete bundled blocks now, they will be pruned later. keeping the blocks from the last bundle is useful for bootstrapping
 	}()
 
 	b.Lock()
