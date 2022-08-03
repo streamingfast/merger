@@ -63,7 +63,7 @@ func NewMerger(
 		timeBetweenPruning:   timeBetweenPruning,
 		logger:               logger,
 	}
-	m.OnTerminating(func(_ error) { m.bundler.inProcess.Wait() }) // finish bundles that may be merging in parallel
+	m.OnTerminating(func(_ error) { m.bundler.inProcess.Lock(); m.bundler.inProcess.Unlock() }) // finish bundle that may be merging async
 
 	return m
 }

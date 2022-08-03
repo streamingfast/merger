@@ -241,6 +241,10 @@ func (s *DStoreIO) MoveForkedBlocks(ctx context.Context, oneBlockFiles []*bstrea
 				continue
 			}
 			err = s.forkedBlocksStore.WriteObject(ctx, name, reader)
+			if err != nil {
+				s.logger.Warn("could not copy forked block", zap.Error(err))
+				continue
+			}
 			reader.Close()
 			break
 		}

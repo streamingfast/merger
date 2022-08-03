@@ -36,10 +36,11 @@ type Bundler struct {
 	io IOInterface
 
 	baseBlockNum uint64
-	bundleSize   uint64
-	bundleError  chan error
-	inProcess    sync.WaitGroup
-	stopBlock    uint64
+
+	bundleSize  uint64
+	bundleError chan error
+	inProcess   sync.Mutex
+	stopBlock   uint64
 
 	seenBlockFiles     map[string]*bstream.OneBlockFile
 	irreversibleBlocks []*bstream.OneBlockFile
@@ -60,8 +61,9 @@ func NewBundler(startBlock, stopBlock, bundleSize uint64, io IOInterface) *Bundl
 
 // BaseBlockNum can be called from a different thread
 func (b *Bundler) BaseBlockNum() uint64 {
-	b.Lock()
-	defer b.Unlock()
+	b.inProcess.Lock()
+	defer b.inProcess.Unlock()
+	// while inProcess is locked, all blocks below b.baseBlockNum are actually merged
 	return b.baseBlockNum
 }
 
@@ -159,9 +161,9 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	forkedBlocks := b.forkedBlocksInCurrentBundle()
 	blocksToBundle := b.irreversibleBlocks
 	baseBlockNum := b.baseBlockNum
-	b.inProcess.Add(1)
+	b.inProcess.Lock()
 	go func() {
-		defer b.inProcess.Done()
+		defer b.inProcess.Unlock()
 		if err := b.io.MergeAndStore(context.Background(), baseBlockNum, blocksToBundle); err != nil {
 			b.bundleError <- err
 			return
