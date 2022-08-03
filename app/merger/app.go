@@ -33,12 +33,15 @@ import (
 type Config struct {
 	StorageOneBlockFilesPath     string
 	StorageMergedBlocksFilesPath string
-	GRPCListenAddr               string
+	StorageForkedBlocksFilesPath string
+
+	GRPCListenAddr string
 
 	PruneForkedBlocksAfter uint64
-	TimeBetweenPruning     time.Duration
-	TimeBetweenPolling     time.Duration
-	StopBlock              uint64
+
+	TimeBetweenPruning time.Duration
+	TimeBetweenPolling time.Duration
+	StopBlock          uint64
 }
 
 type App struct {
@@ -69,10 +72,23 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
+	forkedBlocksStore, err := dstore.NewDBinStore(a.config.StorageForkedBlocksFilesPath)
+	if err != nil {
+		return fmt.Errorf("failed to init destination archive store: %w", err)
+	}
+
 	bundleSize := uint64(100)
 
 	// we are setting the backoff here for dstoreIO
-	io := merger.NewDStoreIO(zlog, tracer, oneBlockStoreStore, mergedBlocksStore, 5, 500*time.Millisecond, bundleSize)
+	io := merger.NewDStoreIO(
+		zlog,
+		tracer,
+		oneBlockStoreStore,
+		mergedBlocksStore,
+		forkedBlocksStore,
+		5,
+		500*time.Millisecond,
+		bundleSize)
 
 	m := merger.NewMerger(
 		zlog,

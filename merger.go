@@ -78,6 +78,7 @@ func (m *Merger) Run() {
 	}
 
 	m.startOldFilesPruner()
+	m.startForkedBlocksPruner()
 
 	err := m.run()
 	if err != nil {
@@ -86,12 +87,34 @@ func (m *Merger) Run() {
 	m.Shutdown(err)
 }
 
-func (m *Merger) startOldFilesPruner() {
-	m.logger.Info("starting pruning of old files (delayed by time_between_pruning)",
-		zap.Uint64("pruning_distance_to_head", m.pruningDistanceToLIB),
+func (m *Merger) startForkedBlocksPruner() {
+	m.logger.Info("starting pruning of forked files",
+		zap.Uint64("pruning_distance_to_lib", m.pruningDistanceToLIB),
 		zap.Duration("time_between_pruning", m.timeBetweenPruning),
 	)
 
+	go func() {
+		delay := m.timeBetweenPruning // do not start pruning immediately
+		for {
+			time.Sleep(delay)
+			now := time.Now()
+
+			pruningTarget := m.pruningTarget(m.pruningDistanceToLIB)
+			m.io.DeleteForkedBlocksAsync(bstream.GetProtocolFirstStreamableBlock, pruningTarget)
+
+			if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
+				delay = m.timeBetweenPruning - spentTime
+			}
+		}
+	}()
+
+}
+
+func (m *Merger) startOldFilesPruner() {
+	m.logger.Info("starting pruning of unused (old) one-block-files",
+		zap.Uint64("pruning_distance_to_lib", m.bundler.bundleSize),
+		zap.Duration("time_between_pruning", m.timeBetweenPruning),
+	)
 	go func() {
 		delay := m.timeBetweenPruning // do not start pruning immediately
 		for {
@@ -101,7 +124,7 @@ func (m *Merger) startOldFilesPruner() {
 
 			var toDelete []*bstream.OneBlockFile
 
-			pruningTarget := m.pruningTarget()
+			pruningTarget := m.pruningTarget(m.bundler.bundleSize)
 			m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *bstream.OneBlockFile) error {
 				if obf.Num < pruningTarget {
 					toDelete = append(toDelete, obf)
@@ -117,13 +140,13 @@ func (m *Merger) startOldFilesPruner() {
 	}()
 }
 
-func (m *Merger) pruningTarget() uint64 {
+func (m *Merger) pruningTarget(distance uint64) uint64 {
 	bundlerBase := m.bundler.BaseBlockNum()
-	if m.pruningDistanceToLIB > bundlerBase {
+	if distance > bundlerBase {
 		return 0
 	}
 
-	return bundlerBase - m.pruningDistanceToLIB
+	return bundlerBase - distance
 }
 
 func (m *Merger) run() error {

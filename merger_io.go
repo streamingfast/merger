@@ -37,11 +37,18 @@ type IOInterface interface {
 
 	// DeleteAsync should be able to delete large quantities of oneBlockFiles from storage without ever blocking
 	DeleteAsync(oneBlockFiles []*bstream.OneBlockFile)
+
+	// DeleteForkedBlocksAsync will delete forked blocks between lowBoundary and highBoundary (both inclusive)
+	DeleteForkedBlocksAsync(inclusiveLowBoundary, inclusiveHighBoundary uint64)
+
+	// MoveForkedBlocks will copy an array of oneBlockFiles to the forkedBlocksStore, then delete them (dstore does not have MOVE primitive)
+	MoveForkedBlocks(ctx context.Context, oneBlockFiles []*bstream.OneBlockFile)
 }
 
 type DStoreIO struct {
 	oneBlocksStore    dstore.Store
 	mergedBlocksStore dstore.Store
+	forkedBlocksStore dstore.Store
 
 	retryAttempts int
 	retryCooldown time.Duration
@@ -51,6 +58,7 @@ type DStoreIO struct {
 	logger *zap.Logger
 	tracer logging.Tracer
 	od     *oneBlockFilesDeleter
+	forkOd *oneBlockFilesDeleter
 }
 
 func NewDStoreIO(
@@ -58,6 +66,7 @@ func NewDStoreIO(
 	tracer logging.Tracer,
 	oneBlocksStore dstore.Store,
 	mergedBlocksStore dstore.Store,
+	forkedBlocksStore dstore.Store,
 	retryAttempts int,
 	retryCooldown time.Duration,
 	bundleSize uint64,
@@ -66,15 +75,20 @@ func NewDStoreIO(
 	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
 	od.Start(8, 10000)
 
+	forkOd := &oneBlockFilesDeleter{store: forkedBlocksStore, logger: logger}
+	forkOd.Start(8, 10000)
+
 	return &DStoreIO{
 		oneBlocksStore:    oneBlocksStore,
 		mergedBlocksStore: mergedBlocksStore,
+		forkedBlocksStore: forkedBlocksStore,
 		retryAttempts:     retryAttempts,
 		retryCooldown:     retryCooldown,
 		bundleSize:        bundleSize,
 		logger:            logger,
 		tracer:            tracer,
 		od:                od,
+		forkOd:            forkOd,
 	}
 }
 
@@ -104,6 +118,31 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	s.logger.Info("merged and uploaded", zap.String("filename", fileNameForBlocksBundle(inclusiveLowerBlock)), zap.Duration("merge_time", time.Since(t0)))
 
 	return
+}
+
+func (s *DStoreIO) DeleteForkedBlocksAsync(inclusiveLowBoundary, inclusiveHighBoundary uint64) {
+	var forkedBlockFiles []*bstream.OneBlockFile
+	err := s.forkedBlocksStore.WalkFrom(context.Background(), "", "", func(filename string) error {
+		if strings.HasSuffix(filename, ".tmp") {
+			return nil
+		}
+		obf := bstream.MustNewOneBlockFile(filename)
+		if obf.Num > inclusiveHighBoundary {
+			return io.EOF
+		}
+		forkedBlockFiles = append(forkedBlockFiles, obf)
+		return nil
+	})
+
+	if err != nil && err != io.EOF {
+		s.logger.Warn("cannot walk forked block files to delete old ones",
+			zap.Uint64("inclusive_low_boundary", inclusiveLowBoundary),
+			zap.Uint64("inclusive_high_boundary", inclusiveHighBoundary),
+			zap.Error(err),
+		)
+	}
+
+	s.forkOd.Delete(forkedBlockFiles)
 }
 
 func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, callback func(*bstream.OneBlockFile) error) error {
@@ -191,6 +230,22 @@ func (s *DStoreIO) readLastBlockFromMerged(ctx context.Context, baseBlock uint64
 	}
 	// we truncate the block ID to have the short version that we get on oneBlockFiles
 	return bstream.NewBlockRef(bstream.TruncateBlockID(last.Id), last.Number), &last.Timestamp, nil
+}
+
+func (s *DStoreIO) MoveForkedBlocks(ctx context.Context, oneBlockFiles []*bstream.OneBlockFile) {
+	for _, f := range oneBlockFiles {
+		for name := range f.Filenames {
+			reader, err := s.oneBlocksStore.OpenObject(ctx, name)
+			if err != nil {
+				s.logger.Warn("could not copy forked block", zap.Error(err))
+				continue
+			}
+			err = s.forkedBlocksStore.WriteObject(ctx, name, reader)
+			reader.Close()
+			break
+		}
+	}
+	s.od.Delete(oneBlockFiles)
 }
 
 func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) {

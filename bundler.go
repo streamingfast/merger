@@ -41,16 +41,18 @@ type Bundler struct {
 	inProcess    sync.WaitGroup
 	stopBlock    uint64
 
+	seenBlockFiles     map[string]*bstream.OneBlockFile
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 }
 
 func NewBundler(startBlock, stopBlock, bundleSize uint64, io IOInterface) *Bundler {
 	b := &Bundler{
-		bundleSize:  bundleSize,
-		io:          io,
-		bundleError: make(chan error, 1),
-		stopBlock:   stopBlock,
+		bundleSize:     bundleSize,
+		io:             io,
+		bundleError:    make(chan error, 1),
+		stopBlock:      stopBlock,
+		seenBlockFiles: make(map[string]*bstream.OneBlockFile),
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
@@ -71,7 +73,29 @@ func (b *Bundler) PreMergedBlocks() []*bstream.OneBlockFile {
 }
 
 func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
+	b.seenBlockFiles[obf.CanonicalName] = obf
 	return b.forkable.ProcessBlock(obf.ToBstreamBlock(), obf) // forkable will call our own b.ProcessBlock() on irreversible blocks only
+}
+
+func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
+	highBoundary := b.baseBlockNum + b.bundleSize
+
+	// remove irreversible blocks from map (they will be merged and deleted soon)
+	for _, block := range b.irreversibleBlocks {
+		delete(b.seenBlockFiles, block.CanonicalName)
+	}
+
+	// identify and then delete remaining blocks from map, return them as forks
+	for name, block := range b.seenBlockFiles {
+		if block.Num < b.baseBlockNum {
+			delete(b.seenBlockFiles, name) // too old, just cleaning up the map of lingering old blocks
+		}
+		if block.Num < highBoundary {
+			out = append(out, block)
+			delete(b.seenBlockFiles, name)
+		}
+	}
+	return
 }
 
 func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
@@ -132,6 +156,7 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	default:
 	}
 
+	forkedBlocks := b.forkedBlocksInCurrentBundle()
 	blocksToBundle := b.irreversibleBlocks
 	baseBlockNum := b.baseBlockNum
 	b.inProcess.Add(1)
@@ -141,7 +166,8 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 			b.bundleError <- err
 			return
 		}
-		b.io.DeleteAsync(blocksToBundle[:len(blocksToBundle)-1])
+		b.io.MoveForkedBlocks(context.Background(), forkedBlocks)
+		b.io.DeleteAsync(blocksToBundle)
 	}()
 
 	b.Lock()
