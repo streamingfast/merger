@@ -58,6 +58,7 @@ func NewMerger(
 		bundler:              NewBundler(firstStreamableBlock, stopBlock, bundleSize, io),
 		grpcListenAddr:       grpcListenAddr,
 		io:                   io,
+		firstStreamableBlock: firstStreamableBlock,
 		pruningDistanceToLIB: pruningDistanceToLIB,
 		timeBetweenPolling:   timeBetweenPolling,
 		timeBetweenPruning:   timeBetweenPruning,
