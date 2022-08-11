@@ -20,3 +20,4 @@ var MetricSet = dmetrics.NewSet()
 
 var HeadBlockTimeDrift = MetricSet.NewHeadTimeDrift("merger")
 var HeadBlockNumber = MetricSet.NewHeadBlockNumber("merger")
+var AppReadiness = MetricSet.NewAppReadiness("merger")

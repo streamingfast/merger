@@ -136,6 +136,7 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 
 	if obf.Num < b.baseBlockNum+b.bundleSize {
 		b.Lock()
+		metrics.AppReadiness.SetReady()
 		b.irreversibleBlocks = append(b.irreversibleBlocks, obf)
 		metrics.HeadBlockNumber.SetUint64(obf.Num)
 		go func() {
