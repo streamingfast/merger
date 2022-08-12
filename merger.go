@@ -55,7 +55,7 @@ func NewMerger(
 ) *Merger {
 	m := &Merger{
 		Shutter:              shutter.New(),
-		bundler:              NewBundler(firstStreamableBlock, stopBlock, bundleSize, io),
+		bundler:              NewBundler(firstStreamableBlock, stopBlock, firstStreamableBlock, bundleSize, io),
 		grpcListenAddr:       grpcListenAddr,
 		io:                   io,
 		firstStreamableBlock: firstStreamableBlock,

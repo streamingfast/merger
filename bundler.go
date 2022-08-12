@@ -37,23 +37,26 @@ type Bundler struct {
 
 	baseBlockNum uint64
 
-	bundleSize  uint64
-	bundleError chan error
-	inProcess   sync.Mutex
-	stopBlock   uint64
+	bundleSize                 uint64
+	bundleError                chan error
+	inProcess                  sync.Mutex
+	stopBlock                  uint64
+	enforceNextBlockOnBoundary bool
+	firstStreamableBlock       uint64
 
 	seenBlockFiles     map[string]*bstream.OneBlockFile
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
 }
 
-func NewBundler(startBlock, stopBlock, bundleSize uint64, io IOInterface) *Bundler {
+func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface) *Bundler {
 	b := &Bundler{
-		bundleSize:     bundleSize,
-		io:             io,
-		bundleError:    make(chan error, 1),
-		stopBlock:      stopBlock,
-		seenBlockFiles: make(map[string]*bstream.OneBlockFile),
+		bundleSize:           bundleSize,
+		io:                   io,
+		bundleError:          make(chan error, 1),
+		firstStreamableBlock: firstStreamableBlock,
+		stopBlock:            stopBlock,
+		seenBlockFiles:       make(map[string]*bstream.OneBlockFile),
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
@@ -103,9 +106,13 @@ func (b *Bundler) forkedBlocksInCurrentBundle() (out []*bstream.OneBlockFile) {
 func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	options := []forkable.Option{
 		forkable.WithFilters(bstream.StepIrreversible),
+		forkable.HoldBlocksUntilLIB(),
 	}
 	if lib != nil {
 		options = append(options, forkable.WithInclusiveLIB(lib))
+		b.enforceNextBlockOnBoundary = false // we don't need to check first block because we know it will be linked to lib
+	} else {
+		b.enforceNextBlockOnBoundary = true
 	}
 	b.forkable = forkable.New(b, options...)
 
@@ -132,6 +139,13 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	if obf.Num < b.baseBlockNum {
 		// we may be receiving an inclusive LIB just before our bundle, ignore it
 		return nil
+	}
+
+	if b.enforceNextBlockOnBoundary {
+		if obf.Num != b.baseBlockNum && obf.Num != b.firstStreamableBlock {
+			return fmt.Errorf("expecting to start at block %d but got block %d (and we have no previous blockID to align with..). First streamable block is configured to be: %d", b.baseBlockNum, obf.Num, b.firstStreamableBlock)
+		}
+		b.enforceNextBlockOnBoundary = false
 	}
 
 	if obf.Num < b.baseBlockNum+b.bundleSize {
