@@ -8,13 +8,11 @@ forks visible by the pool of instrumented nodes, and builds the famous
 100-blocks files consumed by `bstream`'s _FileSource_ and may other
 StreamingFast processes.
 
-## Installation & Usage
-
-See the different protocol-specific `StreamingFast` binaries at https://github.com/streamingfast/streamingfast#protocols
-
 ## Design
 
-See [DESIGN](DESIGN)
+The Merger section of the official Firehose documentation provides additional information on its design details.
+
+https://firehose.streamingfast.io/concepts-and-architeceture/components#merger
 
 ## Contributing
 
