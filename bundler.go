@@ -107,6 +107,7 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 	options := []forkable.Option{
 		forkable.WithFilters(bstream.StepIrreversible),
 		forkable.HoldBlocksUntilLIB(),
+		forkable.WithWarnOnUnlinkableBlocks(100), // don't warn too soon, sometimes oneBlockFiles are uploaded out of order from mindreader (on remote I/O)
 	}
 	if lib != nil {
 		options = append(options, forkable.WithInclusiveLIB(lib))

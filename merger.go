@@ -154,6 +154,7 @@ func (m *Merger) run() error {
 
 	ctx := context.Background()
 
+	var holeFoundLogged bool
 	for {
 		now := time.Now()
 		if m.IsTerminating() {
@@ -163,7 +164,12 @@ func (m *Merger) run() error {
 		base, lib, err := m.io.NextBundle(ctx, m.bundler.baseBlockNum)
 		if err != nil {
 			if errors.Is(err, ErrHoleFound) {
-				m.logger.Warn("found hole in merged files", zap.Error(err))
+				if holeFoundLogged {
+					m.logger.Debug("found hole in merged files. this is not normal behavior unless reprocessing batches", zap.Error(err))
+				} else {
+					holeFoundLogged = true
+					m.logger.Warn("found hole in merged files (next occurence will show up as Debug)", zap.Error(err))
+				}
 			} else {
 				return err
 			}
