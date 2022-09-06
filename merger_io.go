@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,8 @@ import (
 )
 
 var ErrHoleFound = errors.New("hole found in merged files")
+var DefaultFilesDeleteBatchSize = 10000
+var DefaultFilesDeleteThreads = 8
 
 type IOInterface interface {
 
@@ -73,10 +76,10 @@ func NewDStoreIO(
 ) *DStoreIO {
 
 	od := &oneBlockFilesDeleter{store: oneBlocksStore, logger: logger}
-	od.Start(8, 10000)
+	od.Start(DefaultFilesDeleteThreads, DefaultFilesDeleteBatchSize*2)
 
 	forkOd := &oneBlockFilesDeleter{store: forkedBlocksStore, logger: logger}
-	forkOd.Start(8, 10000)
+	forkOd.Start(DefaultFilesDeleteThreads, DefaultFilesDeleteBatchSize*2)
 
 	return &DStoreIO{
 		oneBlocksStore:    oneBlocksStore,
@@ -304,8 +307,14 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) er
 		}
 	}
 
-	var err error
+	var deletableArr []string
 	for file := range deletable {
+		deletableArr = append(deletableArr, file)
+	}
+	sort.Strings(deletableArr)
+
+	var err error
+	for _, file := range deletableArr {
 		if len(od.toProcess) == cap(od.toProcess) {
 			od.logger.Warn("skipping file deletions: the channel is full", zap.Int("capacity", cap(od.toProcess)))
 			err = fmt.Errorf("skipped some files")

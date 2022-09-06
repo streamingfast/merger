@@ -118,28 +118,40 @@ func (m *Merger) startOldFilesPruner() {
 	)
 	go func() {
 		delay := m.timeBetweenPruning // do not start pruning immediately
+
+		unfinishedDelay := time.Second * 5
+		if unfinishedDelay > delay {
+			unfinishedDelay = delay / 2
+		}
+
 		ctx := context.Background()
 		for {
 			time.Sleep(delay)
-			now := time.Now()
 
 			var toDelete []*bstream.OneBlockFile
 
 			pruningTarget := m.pruningTarget(m.bundler.bundleSize)
-			m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *bstream.OneBlockFile) error {
-				if obf.Num < pruningTarget {
-					toDelete = append(toDelete, obf)
-				}
-				return nil
-			})
-			if err := m.io.DeleteAsync(toDelete); err != nil {
-				delay = 0
+			if pruningTarget == 0 {
+				m.logger.Debug("skipping file deletion until we have a pruning target")
 				continue
 			}
 
-			if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
-				delay = m.timeBetweenPruning - spentTime
+			delay = m.timeBetweenPruning
+			err := m.io.WalkOneBlockFiles(ctx, m.firstStreamableBlock, func(obf *bstream.OneBlockFile) error {
+				if obf.Num < pruningTarget {
+					toDelete = append(toDelete, obf)
+				}
+				if len(toDelete) >= DefaultFilesDeleteBatchSize {
+					delay = unfinishedDelay
+					return ErrStopBlockReached
+				}
+				return nil
+			})
+			if err != nil && !errors.Is(err, ErrStopBlockReached) {
+				m.logger.Warn("error while walking oneBlockFiles", zap.Error(err))
 			}
+
+			m.io.DeleteAsync(toDelete)
 		}
 	}()
 }
