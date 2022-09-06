@@ -36,7 +36,7 @@ type IOInterface interface {
 	DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error)
 
 	// DeleteAsync should be able to delete large quantities of oneBlockFiles from storage without ever blocking
-	DeleteAsync(oneBlockFiles []*bstream.OneBlockFile)
+	DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error
 
 	// DeleteForkedBlocksAsync will delete forked blocks between lowBoundary and highBoundary (both inclusive)
 	DeleteForkedBlocksAsync(inclusiveLowBoundary, inclusiveHighBoundary uint64)
@@ -249,11 +249,11 @@ func (s *DStoreIO) MoveForkedBlocks(ctx context.Context, oneBlockFiles []*bstrea
 			break
 		}
 	}
-	s.od.Delete(oneBlockFiles)
+	_ = s.od.Delete(oneBlockFiles)
 }
 
-func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) {
-	s.od.Delete(oneBlockFiles)
+func (s *DStoreIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error {
+	return s.od.Delete(oneBlockFiles)
 }
 
 type oneBlockFilesDeleter struct {
@@ -272,12 +272,12 @@ func (od *oneBlockFilesDeleter) Start(threads int, maxDeletions int) {
 	}
 }
 
-func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) {
+func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) error {
 	od.Lock()
 	defer od.Unlock()
 
 	if len(oneBlockFiles) == 0 {
-		return
+		return nil
 	}
 
 	var fileNames []string
@@ -304,13 +304,16 @@ func (od *oneBlockFilesDeleter) Delete(oneBlockFiles []*bstream.OneBlockFile) {
 		}
 	}
 
+	var err error
 	for file := range deletable {
 		if len(od.toProcess) == cap(od.toProcess) {
-			od.logger.Warn("skipping file deletions: too channel is full", zap.Int("capacity", cap(od.toProcess)))
+			od.logger.Warn("skipping file deletions: the channel is full", zap.Int("capacity", cap(od.toProcess)))
+			err = fmt.Errorf("skipped some files")
 			break
 		}
 		od.toProcess <- file
 	}
+	return err
 }
 
 func (od *oneBlockFilesDeleter) processDeletions() {

@@ -118,10 +118,10 @@ func (m *Merger) startOldFilesPruner() {
 	)
 	go func() {
 		delay := m.timeBetweenPruning // do not start pruning immediately
+		ctx := context.Background()
 		for {
 			time.Sleep(delay)
 			now := time.Now()
-			ctx := context.Background()
 
 			var toDelete []*bstream.OneBlockFile
 
@@ -132,7 +132,10 @@ func (m *Merger) startOldFilesPruner() {
 				}
 				return nil
 			})
-			m.io.DeleteAsync(toDelete)
+			if err := m.io.DeleteAsync(toDelete); err != nil {
+				delay = 0
+				continue
+			}
 
 			if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
 				delay = m.timeBetweenPruning - spentTime
