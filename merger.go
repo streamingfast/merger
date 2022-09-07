@@ -72,11 +72,7 @@ func NewMerger(
 func (m *Merger) Run() {
 	m.logger.Info("starting merger")
 
-	if err := m.startGRPCServer(); err != nil {
-		m.logger.Error("cannot start GRPC server", zap.Error(err))
-		m.Shutdown(err)
-		return
-	}
+	m.startGRPCServer()
 
 	m.startOldFilesPruner()
 	m.startForkedBlocksPruner()
