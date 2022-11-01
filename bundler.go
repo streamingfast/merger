@@ -184,8 +184,10 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 			b.bundleError <- err
 			return
 		}
-		b.io.MoveForkedBlocks(context.Background(), forkedBlocks)
-		// we do not delete bundled blocks now, they will be pruned later. keeping the blocks from the last bundle is useful for bootstrapping
+		if forkableIO, ok := b.io.(ForkAwareIOInterface); ok {
+			forkableIO.MoveForkedBlocks(context.Background(), forkedBlocks)
+		}
+		// we do not delete bundled blocks here, they get pruned later. keeping the blocks from the last bundle is useful for bootstrapping
 	}()
 
 	b.Lock()

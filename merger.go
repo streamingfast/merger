@@ -85,6 +85,10 @@ func (m *Merger) Run() {
 }
 
 func (m *Merger) startForkedBlocksPruner() {
+	forkableIO, ok := m.io.(ForkAwareIOInterface)
+	if !ok {
+		return
+	}
 	m.logger.Info("starting pruning of forked files",
 		zap.Uint64("pruning_distance_to_lib", m.pruningDistanceToLIB),
 		zap.Duration("time_between_pruning", m.timeBetweenPruning),
@@ -97,7 +101,7 @@ func (m *Merger) startForkedBlocksPruner() {
 			now := time.Now()
 
 			pruningTarget := m.pruningTarget(m.pruningDistanceToLIB)
-			m.io.DeleteForkedBlocksAsync(bstream.GetProtocolFirstStreamableBlock, pruningTarget)
+			forkableIO.DeleteForkedBlocksAsync(bstream.GetProtocolFirstStreamableBlock, pruningTarget)
 
 			if spentTime := time.Since(now); spentTime < m.timeBetweenPruning {
 				delay = m.timeBetweenPruning - spentTime

@@ -72,9 +72,12 @@ func (a *App) Run() error {
 		return fmt.Errorf("failed to init destination archive store: %w", err)
 	}
 
-	forkedBlocksStore, err := dstore.NewDBinStore(a.config.StorageForkedBlocksFilesPath)
-	if err != nil {
-		return fmt.Errorf("failed to init destination archive store: %w", err)
+	var forkedBlocksStore dstore.Store
+	if a.config.StorageForkedBlocksFilesPath != "" {
+		forkedBlocksStore, err = dstore.NewDBinStore(a.config.StorageForkedBlocksFilesPath)
+		if err != nil {
+			return fmt.Errorf("failed to init destination archive store: %w", err)
+		}
 	}
 
 	bundleSize := uint64(100)
