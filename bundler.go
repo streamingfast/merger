@@ -70,13 +70,6 @@ func (b *Bundler) BaseBlockNum() uint64 {
 	return b.baseBlockNum
 }
 
-// PreMergedBlocks can be called from a different thread
-func (b *Bundler) PreMergedBlocks() []*bstream.OneBlockFile {
-	b.Lock()
-	defer b.Unlock()
-	return b.irreversibleBlocks
-}
-
 func (b *Bundler) HandleBlockFile(obf *bstream.OneBlockFile) error {
 	b.seenBlockFiles[obf.CanonicalName] = obf
 	return b.forkable.ProcessBlock(obf.ToBstreamBlock(), obf) // forkable will call our own b.ProcessBlock() on irreversible blocks only
@@ -119,6 +112,7 @@ func (b *Bundler) Reset(nextBase uint64, lib bstream.BlockRef) {
 
 	b.Lock()
 	b.baseBlockNum = nextBase
+	b.irreversibleBlocks = nil
 	b.Unlock()
 }
 
@@ -161,8 +155,9 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 				return
 			}
 			// now that we have the data, might as well read the block time for metrics
-			time, err := readBlockTime(data)
-			metrics.HeadBlockTimeDrift.SetBlockTime(time)
+			if time, err := readBlockTime(data); err == nil {
+				metrics.HeadBlockTimeDrift.SetBlockTime(time)
+			}
 		}()
 		b.Unlock()
 		return nil

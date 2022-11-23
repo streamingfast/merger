@@ -15,9 +15,11 @@
 package merger
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/streamingfast/bstream"
 	"go.uber.org/zap"
 	"gopkg.in/olivere/elastic.v3/backoff"
 )
@@ -47,4 +49,47 @@ func Retry(logger *zap.Logger, attempts int, sleep time.Duration, callback func(
 		logger.Warn("retrying after error", zap.Error(err))
 	}
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
+}
+
+type TestMergerIO struct {
+	NextBundleFunc           func(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error)
+	WalkOneBlockFilesFunc    func(ctx context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error
+	MergeAndStoreFunc        func(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error)
+	DownloadOneBlockFileFunc func(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error)
+	DeleteAsyncFunc          func(oneBlockFiles []*bstream.OneBlockFile) error
+}
+
+func (io *TestMergerIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (baseBlock uint64, lastIrreversibleBlock bstream.BlockRef, err error) {
+	if io.NextBundleFunc != nil {
+		return io.NextBundleFunc(ctx, lowestBaseBlock)
+	}
+	return lowestBaseBlock, nil, nil
+}
+
+func (io *TestMergerIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error) {
+	if io.MergeAndStoreFunc != nil {
+		return io.MergeAndStoreFunc(ctx, inclusiveLowerBlock, oneBlockFiles)
+	}
+	return nil
+}
+
+func (io *TestMergerIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstream.OneBlockFile) (data []byte, err error) {
+	if io.DownloadOneBlockFileFunc != nil {
+		return io.DownloadOneBlockFileFunc(ctx, oneBlockFile)
+	}
+
+	return nil, nil
+}
+
+func (io *TestMergerIO) WalkOneBlockFiles(ctx context.Context, inclusiveLowerBlock uint64, callback func(*bstream.OneBlockFile) error) error {
+	if io.WalkOneBlockFilesFunc != nil {
+		return io.WalkOneBlockFilesFunc(ctx, inclusiveLowerBlock, callback)
+	}
+	return nil
+}
+func (io *TestMergerIO) DeleteAsync(oneBlockFiles []*bstream.OneBlockFile) error {
+	if io.DeleteAsyncFunc != nil {
+		return io.DeleteAsyncFunc(oneBlockFiles)
+	}
+	return nil
 }

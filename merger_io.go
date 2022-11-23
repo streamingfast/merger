@@ -111,7 +111,15 @@ func NewDStoreIO(
 }
 
 func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64, oneBlockFiles []*bstream.OneBlockFile) (err error) {
-	if len(oneBlockFiles) == 0 {
+	// since we keep the last block from previous merged bundle for future deleting,
+	// we want to make sure that it does not end up in this merged bundle too
+	var filteredOBF []*bstream.OneBlockFile
+	for _, obf := range oneBlockFiles {
+		if obf.Num >= inclusiveLowerBlock {
+			filteredOBF = append(filteredOBF, obf)
+		}
+	}
+	if len(filteredOBF) == 0 {
 		return
 	}
 	t0 := time.Now()
@@ -120,14 +128,14 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 	s.logger.Info("about to write merged blocks to storage location",
 		zap.String("filename", bundleFilename),
 		zap.Duration("write_timeout", WriteObjectTimeout),
-		zap.Uint64("lower_block_num", oneBlockFiles[0].Num),
-		zap.Uint64("highest_block_num", oneBlockFiles[len(oneBlockFiles)-1].Num),
+		zap.Uint64("lower_block_num", filteredOBF[0].Num),
+		zap.Uint64("highest_block_num", filteredOBF[len(filteredOBF)-1].Num),
 	)
 
 	err = Retry(s.logger, s.retryAttempts, s.retryCooldown, func() error {
 		inCtx, cancel := context.WithTimeout(ctx, WriteObjectTimeout)
 		defer cancel()
-		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, NewBundleReader(ctx, s.logger, s.tracer, oneBlockFiles, s.DownloadOneBlockFile))
+		return s.mergedBlocksStore.WriteObject(inCtx, bundleFilename, NewBundleReader(ctx, s.logger, s.tracer, filteredOBF, s.DownloadOneBlockFile))
 	})
 	if err != nil {
 		return fmt.Errorf("write object error: %s", err)
