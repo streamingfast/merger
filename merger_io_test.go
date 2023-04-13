@@ -67,6 +67,8 @@ func newDStoreIO(
 }
 
 func TestMergerIO_MergeUploadPerfect(t *testing.T) {
+	bstream.GetBlockWriterHeaderLen = 0
+
 	files := []*bstream.OneBlockFile{
 		block100,
 		block101,
@@ -100,6 +102,7 @@ func TestMergerIO_MergeUploadPerfect(t *testing.T) {
 	assert.Equal(t, mergeLastBase, "0000000100")
 
 	expectFilenames := []string{
+		"0000000100-0000000000000100a-0000000000000099a-98-suffix", // read header
 		"0000000100-0000000000000100a-0000000000000099a-98-suffix",
 		"0000000101-0000000000000101a-0000000000000100a-99-suffix",
 	}
@@ -114,10 +117,12 @@ func TestMergerIO_MergeUploadPerfect(t *testing.T) {
 
 func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 	files := []*bstream.OneBlockFile{
+		block98,
 		block99,
 		block100,
 		block101,
 	}
+
 	var mergeLastBase string
 	var filesRead []string
 	var mergeCounter int
@@ -147,6 +152,8 @@ func TestMergerIO_MergeUploadFiltered(t *testing.T) {
 	assert.Equal(t, mergeLastBase, "0000000100")
 
 	expectFilenames := []string{
+		"0000000098-0000000000000098a-0000000000000097a-96-suffix", // read header
+		// 99 not read
 		"0000000100-0000000000000100a-0000000000000099a-98-suffix",
 		"0000000101-0000000000000101a-0000000000000100a-99-suffix",
 	}
@@ -167,7 +174,7 @@ func TestMergerIO_MergeUploadNoFiles(t *testing.T) {
 	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
 
 	err := mio.MergeAndStore(context.Background(), 114, files)
-	require.NoError(t, err)
+	require.Error(t, err)
 }
 func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
 	files := []*bstream.OneBlockFile{
@@ -177,6 +184,9 @@ func TestMergerIO_MergeUploadFilteredToZero(t *testing.T) {
 	oneBlockStore := dstore.NewMockStore(nil)
 	mergedBlocksStore := dstore.NewMockStore(nil)
 	mio := newDStoreIO(oneBlockStore, mergedBlocksStore)
+
+	block102Final100.MemoizeData = []byte{0x0, 0x1, 0x2, 0x3}
+	block103Final101.MemoizeData = []byte{0x0, 0x1, 0x2, 0x3}
 
 	err := mio.MergeAndStore(context.Background(), 114, files)
 	require.NoError(t, err)

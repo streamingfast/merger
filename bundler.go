@@ -190,7 +190,16 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 	lastBlock := b.irreversibleBlocks[len(b.irreversibleBlocks)-1]
 	b.irreversibleBlocks = []*bstream.OneBlockFile{lastBlock, obf}
 	b.baseBlockNum += b.bundleSize
+	for obf.Num > b.baseBlockNum+b.bundleSize { // skip more merged-block-files
+		b.inProcess.Lock()
+		if err := b.io.MergeAndStore(context.Background(), b.baseBlockNum, []*bstream.OneBlockFile{lastBlock}); err != nil { // lastBlock will be excluded from bundle but is useful to bundler
+			return err
+		}
+		b.inProcess.Unlock()
+		b.baseBlockNum += b.bundleSize
+	}
 	b.Unlock()
+
 	if b.stopBlock != 0 && b.baseBlockNum >= b.stopBlock {
 		return ErrStopBlockReached
 	}
