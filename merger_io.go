@@ -276,13 +276,13 @@ func (s *ForkAwareDStoreIO) DeleteForkedBlocksAsync(inclusiveLowBoundary, inclus
 		}
 		obf := bstream.MustNewOneBlockFile(filename)
 		if obf.Num > inclusiveHighBoundary {
-			return io.EOF
+			return dstore.StopIteration
 		}
 		forkedBlockFiles = append(forkedBlockFiles, obf)
 		return nil
 	})
 
-	if err != nil && err != io.EOF {
+	if err != nil && err != dstore.StopIteration {
 		s.logger.Warn("cannot walk forked block files to delete old ones",
 			zap.Uint64("inclusive_low_boundary", inclusiveLowBoundary),
 			zap.Uint64("inclusive_high_boundary", inclusiveHighBoundary),
