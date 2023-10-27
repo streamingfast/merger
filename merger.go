@@ -166,7 +166,6 @@ func (m *Merger) pruningTarget(distance uint64) uint64 {
 }
 
 func (m *Merger) run() error {
-
 	ctx := context.Background()
 
 	var holeFoundLogged bool
@@ -189,6 +188,7 @@ func (m *Merger) run() error {
 				return err
 			}
 		}
+
 		if m.bundler.stopBlock != 0 && base > m.bundler.stopBlock {
 			if err == ErrStopBlockReached {
 				m.logger.Info("stop block reached")
@@ -215,6 +215,7 @@ func (m *Merger) run() error {
 			})
 
 			if err == ErrFirstBlockAfterInitialStreamableBlock {
+				m.bundler.Reset(base, lib)
 				return err
 			}
 

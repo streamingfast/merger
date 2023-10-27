@@ -158,7 +158,6 @@ func (s *DStoreIO) MergeAndStore(ctx context.Context, inclusiveLowerBlock uint64
 }
 
 func (s *DStoreIO) WalkOneBlockFiles(ctx context.Context, lowestBlock uint64, callback func(*bstream.OneBlockFile) error) error {
-
 	return s.oneBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBlock), func(filename string) error {
 		if strings.HasSuffix(filename, ".tmp") {
 			return nil
@@ -199,7 +198,6 @@ func (s *DStoreIO) DownloadOneBlockFile(ctx context.Context, oneBlockFile *bstre
 }
 
 func (s *DStoreIO) NextBundle(ctx context.Context, lowestBaseBlock uint64) (outBaseBlock uint64, lib bstream.BlockRef, err error) {
-
 	var lastFound *uint64
 	outBaseBlock = lowestBaseBlock
 	err = s.mergedBlocksStore.WalkFrom(ctx, "", fileNameForBlocksBundle(lowestBaseBlock), func(filename string) error {
