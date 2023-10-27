@@ -183,7 +183,7 @@ func (m *Merger) run() error {
 					m.logger.Debug("found hole in merged files. this is not normal behavior unless reprocessing batches", zap.Error(err))
 				} else {
 					holeFoundLogged = true
-					m.logger.Warn("found hole in merged files (next occurence will show up as Debug)", zap.Error(err))
+					m.logger.Warn("found hole in merged files (next occurrence will show up as Debug)", zap.Error(err))
 				}
 			} else {
 				return err
@@ -208,15 +208,32 @@ func (m *Merger) run() error {
 			m.bundler.Reset(base, lib)
 		}
 
-		err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
-			return m.bundler.HandleBlockFile(obf)
+		var walkErr error
+		retryErr := Retry(m.logger, 12, 5*time.Second, func() error {
+			err = m.io.WalkOneBlockFiles(ctx, m.bundler.baseBlockNum, func(obf *bstream.OneBlockFile) error {
+				return m.bundler.HandleBlockFile(obf)
+			})
+
+			if err == ErrFirstBlockAfterInitialStreamableBlock {
+				return err
+			}
+
+			if err != nil {
+				walkErr = err
+			}
+			return nil
 		})
-		if err != nil {
-			if err == ErrStopBlockReached {
+
+		if retryErr != nil {
+			return retryErr
+		}
+
+		if walkErr != nil {
+			if walkErr == ErrStopBlockReached {
 				m.logger.Info("stop block reached")
 				return nil
 			}
-			return err
+			return walkErr
 		}
 
 		if spentTime := time.Since(now); spentTime < m.timeBetweenPolling {

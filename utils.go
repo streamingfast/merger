@@ -32,10 +32,10 @@ func toBaseNum(in uint64, bundleSize uint64) uint64 {
 	return in / bundleSize * bundleSize
 }
 
-func Retry(logger *zap.Logger, attempts int, sleep time.Duration, callback func() error) (err error) {
+func Retry(logger *zap.Logger, attempts int, sleep time.Duration, function func() error) (err error) {
 	b := backoff.NewExponentialBackoff(sleep, 5*time.Second)
 	for i := 0; ; i++ {
-		err = callback()
+		err = function()
 		if err == nil {
 			return
 		}

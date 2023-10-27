@@ -19,6 +19,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/streamingfast/logging"
+	"go.uber.org/zap"
 	"io"
 	"sync"
 	"time"
@@ -29,6 +31,7 @@ import (
 )
 
 var ErrStopBlockReached = errors.New("stop block reached")
+var ErrFirstBlockAfterInitialStreamableBlock = errors.New("received first block after inital streamable block")
 
 type Bundler struct {
 	sync.Mutex
@@ -47,7 +50,11 @@ type Bundler struct {
 	seenBlockFiles     map[string]*bstream.OneBlockFile
 	irreversibleBlocks []*bstream.OneBlockFile
 	forkable           *forkable.Forkable
+
+	logger *zap.Logger
 }
+
+var logger, _ = logging.PackageLogger("merger", "github.com/streamingfast/merger/bundler")
 
 func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, io IOInterface) *Bundler {
 	b := &Bundler{
@@ -57,6 +64,7 @@ func NewBundler(startBlock, stopBlock, firstStreamableBlock, bundleSize uint64, 
 		firstStreamableBlock: firstStreamableBlock,
 		stopBlock:            stopBlock,
 		seenBlockFiles:       make(map[string]*bstream.OneBlockFile),
+		logger:               logger,
 	}
 	b.Reset(toBaseNum(startBlock, bundleSize), nil)
 	return b
@@ -138,7 +146,8 @@ func (b *Bundler) ProcessBlock(_ *bstream.Block, obj interface{}) error {
 
 	if b.enforceNextBlockOnBoundary {
 		if obf.Num != b.baseBlockNum && obf.Num != b.firstStreamableBlock {
-			return fmt.Errorf("expecting to start at block %d but got block %d (and we have no previous blockID to align with..). First streamable block is configured to be: %d", b.baseBlockNum, obf.Num, b.firstStreamableBlock)
+			b.logger.Error("expecting to start at block `base_block_num` but got block `block_num` (and we have no previous blockID to align with..). First streamable block is configured to be: `first_streamable_block`", zap.Uint64("base_block_num", b.baseBlockNum), zap.Uint64("block_num", obf.Num), zap.Uint64("first_streamable_block", b.firstStreamableBlock))
+			return ErrFirstBlockAfterInitialStreamableBlock
 		}
 		b.enforceNextBlockOnBoundary = false
 	}
