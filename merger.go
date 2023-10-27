@@ -39,8 +39,6 @@ type Merger struct {
 	pruningDistanceToLIB uint64
 
 	bundler *Bundler
-
-	startDelay time.Duration
 }
 
 func NewMerger(
@@ -54,7 +52,6 @@ func NewMerger(
 	timeBetweenPruning time.Duration,
 	timeBetweenPolling time.Duration,
 	stopBlock uint64,
-	startDelay time.Duration,
 ) *Merger {
 	m := &Merger{
 		Shutter:              shutter.New(),
@@ -66,7 +63,6 @@ func NewMerger(
 		timeBetweenPolling:   timeBetweenPolling,
 		timeBetweenPruning:   timeBetweenPruning,
 		logger:               logger,
-		startDelay:           startDelay,
 	}
 	m.OnTerminating(func(_ error) { m.bundler.inProcess.Lock(); m.bundler.inProcess.Unlock() }) // finish bundle that may be merging async
 
@@ -80,8 +76,6 @@ func (m *Merger) Run() {
 
 	m.startOldFilesPruner()
 	m.startForkedBlocksPruner()
-
-	time.Sleep(m.startDelay)
 
 	err := m.run()
 	if err != nil {

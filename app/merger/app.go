@@ -42,7 +42,6 @@ type Config struct {
 	TimeBetweenPruning time.Duration
 	TimeBetweenPolling time.Duration
 	StopBlock          uint64
-	StartDelay         time.Duration
 }
 
 type App struct {
@@ -104,7 +103,6 @@ func (a *App) Run() error {
 		a.config.TimeBetweenPruning,
 		a.config.TimeBetweenPolling,
 		a.config.StopBlock,
-		a.config.StartDelay,
 	)
 	zlog.Info("merger initiated")
 
